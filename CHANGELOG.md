@@ -45,6 +45,19 @@ All notable changes to this project are documented here. The format is based on
   which reported a correctly updated machine as drifted and which nothing but its own test called, is
   retired (FIX-PLAN slice 13, PK2, C-3, C-9).
 
+### Added
+
+- `create-cmp doctor --adherence` prints the adherence report card (U2). There are nine rows,
+  each derived from this machine and repo: project hooks registered and runnable, no scope
+  disabling hooks, the pre-push gate, CI Verify present and required, the receipt attesting HEAD,
+  user-scope credential-read denies, the release acts decided at user scope, plugin bytes against
+  the marketplace, and cmp-inspector configured. Each row reads PASS, FAIL or UNKNOWN with its
+  fixing command, and UNKNOWN never renders as PASS. `--adherence --fix` asks yes/no per entry
+  before appending PM1's `permissions.deny` and `permissions.ask` entries to
+  `~/.claude/settings.json` in place. It never adds an ask that shadows an existing `allow` or
+  `autoMode.allow`, and reports that conflict instead. The ruleset and the sandbox advice are
+  printed and never applied (FIX-PLAN slice 14; PM1–PM3, D4, B-L-7).
+
 ## [0.28.6] - 2026-09-29
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the

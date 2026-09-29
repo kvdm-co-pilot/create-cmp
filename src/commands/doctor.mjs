@@ -5,6 +5,13 @@
 //
 //   create-cmp doctor [--yes] [--dry-run] [--no-ios] [--no-install]
 //                     [--target-dir <dir>] [--fix]
+//   create-cmp doctor --adherence [--fix] [--target-dir <dir>]
+//
+// --adherence prints the U2 report card instead (src/lib/adherence.mjs): nine rows,
+// each PASS, FAIL or UNKNOWN with its fixing command. With --fix it offers, one yes/no
+// each, the user-scope credential denies and release-act asks — never an ask that
+// shadows an existing allow — and prints the ruleset and the sandbox advice, applying
+// neither. There is no auto-yes for it: `--yes` is not read there.
 //
 // --fix applies only SAFE heals (write local.properties from ANDROID_HOME, add
 // ksp.useKSP2=true, wire the walk into .claude/settings.json); everything else
@@ -29,6 +36,7 @@ import { fileURLToPath } from "node:url";
 import { flagBool } from "../lib/args.mjs";
 import { colors, ok } from "../lib/log.mjs";
 import { consent, probe } from "../bootstrap/exec.mjs";
+import { runAdherence } from "../lib/adherence.mjs";
 import { doctor as toolchainDoctor } from "../doctor.mjs";
 import { anchorViolations, unfixedHookAnchors } from "../lib/hooks.mjs";
 import {
@@ -843,6 +851,27 @@ function printFindings(findings) {
  * @param {string|undefined} positional optional target dir positional
  */
 export async function runDoctor(flags, positional) {
+  // The report card is its own mode: it installs nothing and diagnoses no build.
+  if (flagBool(flags, "adherence", false)) {
+    const dir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
+    const paint = (s, t) => (s === "PASS" ? colors.green(t) : s === "FAIL" ? colors.red(t) : colors.yellow(t));
+    const code = await runAdherence({
+      projectDir: path.resolve(dir),
+      fix: flagBool(flags, "fix", false),
+      // One question per entry, never auto-approved: `--yes` is deliberately not read, so
+      // the no-TTY decline must not advise it (consent's own message does).
+      prompt: async (q) => {
+        if (!process.stdin.isTTY) {
+          process.stdout.write(`${q} (no TTY, declining — this asks at a terminal; there is no auto-yes)\n`);
+          return false;
+        }
+        return consent(q, { assumeYes: false });
+      },
+      paint,
+    });
+    process.exit(code);
+  }
+
   // 1) Toolchain preflight — unchanged existing behavior.
   const toolchain = await toolchainDoctor({
     assumeYes: flagBool(flags, "yes", false),
