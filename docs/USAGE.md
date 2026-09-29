@@ -149,8 +149,8 @@ actually in force on this machine and repo, and prints one row each: project hoo
 runnable (the Stop hook wired, and `qa/receipt-check.mjs --hook` exiting 0 or 2 on a synthetic
 payload), no settings scope setting `disableAllHooks`, the pre-push gate on (`core.hooksPath` =
 `.githooks`), CI Verify present and required (the workflow file, and the branch's rules when `gh` is
-authenticated), the receipt attesting HEAD, credential reads denied at user scope, the release
-acts (`gh pr merge`, `npm publish`, `git push * main`) decided at user scope, the installed plugin
+authenticated), the receipt attesting HEAD, credential reads denied and the release acts (`gh pr merge`,
+`npm publish`, `git push * main`) decided at any settings scope (user, project, local, managed), the installed plugin
 byte-identical to its marketplace, and cmp-inspector configured with its entry file present. Each
 row reads PASS, FAIL or UNKNOWN with the command that fixes it, and a question this machine cannot
 answer is UNKNOWN, never PASS. With `--fix` it offers the user-scope `permissions.deny` entries for
