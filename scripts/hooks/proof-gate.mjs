@@ -627,7 +627,22 @@ function skipFlags(args, j, takesValue) {
 
 // The global flags each program takes a SEPARATE value for, so the value is not read as the subcommand.
 const GH_VALUE = new Set(["-R", "--repo", "--hostname"]);
-const NPM_VALUE = new Set(["-w", "--workspace", "-C", "--prefix", "--cache", "--loglevel", "--registry", "--userconfig"]);
+/**
+ * npm flags whose NEXT token is a value — so the value is read neither as the
+ * subcommand (`npm --tag next publish` publishes) nor as the folder operand
+ * (`npm publish --access public` is not publishing "public"). ONE list, read by
+ * both `act` and `commandCwd`: two lists answered differently (review round 1),
+ * and test/every-spelling-npm-or-git-resolves-to-a-gated-act-is-that-act.test.mjs
+ * reads this one out of the source.
+ */
+const NPM_TAKES_VALUE = new Set(["-w", "--workspace", "-C", "--prefix", "--cache", "--loglevel", "--registry", "--userconfig", "--access", "--tag", "--otp", "--auth-type", "--provenance-file"]);
+/**
+ * npm runs a unique prefix of a command name as that command (`npm pu` publishes —
+ * run with --dry-run on npm 11.16, 2026-09-29). Only the watched command is
+ * resolved: "p" is shared by pack, ping, pkg, prefix, profile and prune, so "pu"
+ * is the shortest spelling of publish.
+ */
+const isNpmPublish = (w) => typeof w === "string" && w.length >= 2 && "publish".startsWith(w);
 const PM_VALUE = new Set(["-C", "--dir", "--cwd", "-F", "--filter", "--registry"]);
 const NPX_VALUE = new Set(["-p", "--package", "-c", "--call"]);
 const GIT_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace"]);
@@ -636,8 +651,12 @@ const NODE_VALUE = new Set(["-r", "--require", "--import", "--loader", "--experi
 const NODE_EVAL = new Set(["-e", "--eval", "-p", "--print"]);
 /** `gh api` merging a pull request: `repos/{owner}/{repo}/pulls/1/merge`, any method. */
 const PULL_MERGE = /(?:^|\/)pulls\/[^/\s]+\/merge\/?$/;
-/** A push refspec whose destination is trunk: `HEAD:main`, `x:main`, `+x:refs/heads/main`. */
-const TO_MAIN = /^\+?[^:]*:(?:refs\/heads\/)?main$/;
+/**
+ * A push refspec whose destination is trunk: `HEAD:main`, `x:main`, `+x:refs/heads/main`
+ * — and a refspec with no colon, which git reads as `<ref>:<ref>`, so `main`,
+ * `+main` and `refs/heads/main` land on trunk too.
+ */
+const TO_MAIN = /^\+?(?:[^:]*:)?(?:refs\/heads\/)?main$/;
 /** A launcher's package spec may name a version: `npx npm@10 publish` runs npm. */
 const unversioned = (words) => (words.length ? [words[0].replace(/^((?:.*\/)?(?:npm|pnpm|yarn|bun))@[^/]*$/, "$1"), ...words.slice(1)] : words);
 
@@ -661,8 +680,8 @@ function act(words, depth = 0) {
       if (args[j] === "api") return args.slice(j + 1).some((a) => PULL_MERGE.test(a)) ? "merge" : null;
       return null;
     case "npm":
-      j = skipFlags(args, 0, NPM_VALUE);
-      if (args[j] === "publish") return "publish";
+      j = skipFlags(args, 0, NPM_TAKES_VALUE);
+      if (isNpmPublish(args[j])) return "publish";
       if (args[j] === "exec" || args[j] === "x") return act(unversioned(args.slice(skipFlags(args, j + 1, NPX_VALUE))), depth + 1);
       return null;
     case "npx":
@@ -1023,7 +1042,8 @@ export const STARTED_MS = Date.now();
  * included), so this term still covers it and no bound was added (KD-208).
  *
  * THE FOUR BOUNDS NOW SUM TO EXACTLY THE DECLARED BUDGET (1000 + 3000 + 2500 +
- * 3500 = 10000), which the arithmetic test in
+ * 3500 = 10000) — the budget being the fail-closed launcher's 10 s deadline, the
+ * smaller of it and the 11 s registered timeout (declaredBudgetMs) — which the arithmetic test in
  * test/a-device-run-proves-a-tree-the-merge-will-not-keep.test.mjs still
  * passes and which leaves NO slack: the next term added to this hook comes out
  * of REMOTE_CALL_CAP_MS, out of the stamp's cap, or out of a deliberately
@@ -1070,7 +1090,31 @@ export function declaredBudgetMs(root = REPO_ROOT) {
   }
   const entry = (settings.hooks?.PreToolUse ?? []).flatMap((e) => e.hooks ?? []).find((h) => String(h.command ?? "").includes("scripts/hooks/proof-gate.mjs"));
   // Claude Code's own default when a hook declares no timeout is 60s.
-  return (typeof entry?.timeout === "number" ? entry.timeout : 60) * 1000;
+  const registeredMs = (typeof entry?.timeout === "number" ? entry.timeout : 60) * 1000;
+  return Math.min(registeredMs, launcherDeadlineMs(root, String(entry?.command ?? "")));
+}
+
+/**
+ * The deadline scripts/hooks/fail-closed.sh kills the gate at, when the wiring
+ * runs the gate through it — or Infinity. It is the third argument after the
+ * launcher (`<gate> [prefilter] [deadline-seconds]`), else the launcher's own
+ * `limit=${3:-N}`. It kills BEFORE the registered timeout, so it, not the
+ * timeout, is the budget whenever it is the smaller (review round 1).
+ */
+function launcherDeadlineMs(root, command) {
+  const args = [...command.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
+  const at = args.findIndex((a) => a.endsWith("fail-closed.sh"));
+  if (at < 0) return Infinity;
+  let seconds = Number(args[at + 3]);
+  if (!(seconds > 0)) {
+    try {
+      const fs = createRequire(import.meta.url)("node:fs");
+      seconds = Number(/^limit=\$\{3:-(\d+)\}/m.exec(fs.readFileSync(path.join(root, "scripts", "hooks", "fail-closed.sh"), "utf8"))?.[1]);
+    } catch {
+      seconds = NaN;
+    }
+  }
+  return seconds > 0 ? seconds * 1000 : 9000; // unreadable launcher: the default it ships with today
 }
 
 /** What is left for the whole ordering check, after what is already spent and what answering will cost. Can be zero or negative, and then nothing is asked. */
@@ -1359,9 +1403,6 @@ const NAMED_REPO = /(?:^|\s)(?:--repo[=\s]|-R\s)|(?:^|\s)GH_REPO=/;
 /** npm flags that move the package being published away from the directory the command runs in. */
 const NPM_RELOCATES = /(?:^|\s)(?:--prefix|--workspaces?|-w|-C)(?:[=\s]|$)/;
 
-/** npm flags whose NEXT token is a value, not the folder operand — so `npm publish --access public` is not read as publishing "public". */
-const NPM_TAKES_VALUE = new Set(["--access", "--tag", "--otp", "--registry", "--auth-type", "--userconfig", "--provenance-file"]);
-
 /**
  * The command prefix with everything this reader must not read blanked to spaces
  * — or `{ unknown }` when it cannot get that far.
@@ -1583,7 +1624,7 @@ export function commandCwd(kind, command, cwd) {
     // one place a wrong answer ships bytes to a registry.
     if (NPM_RELOCATES.test(invoked)) return { unknown: "it names the package directory out of band (--prefix, -C or --workspace), which this gate does not resolve to a tree" };
     const tokens = invoked.split(/\s+/).filter(Boolean);
-    for (let k = tokens.indexOf("publish") + 1; k > 0 && k < tokens.length; k += 1) {
+    for (let k = tokens.findIndex(isNpmPublish) + 1; k > 0 && k < tokens.length; k += 1) {
       if (!tokens[k].startsWith("-")) return { unknown: `it publishes "${tokens[k]}" rather than the directory it runs in, and this gate reads only directories` };
       if (NPM_TAKES_VALUE.has(tokens[k])) k += 1;
     }

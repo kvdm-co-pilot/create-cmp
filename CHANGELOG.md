@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- A stamped app's Verify workflow no longer fails on a private repository outside GitHub Enterprise
+  Cloud: the `actions/attest-build-provenance` step runs only when the repository is public, where
+  artifact attestations exist on every plan (ADR-0017, "Private repositories").
+- A stamped app's `.claude/settings.json` asks before edits to `qa/hooks/**`, so the Stop gate's
+  fail-closed launcher is guarded like the gate's other files; `--minimal` drops the rule with the lane.
+
 ## [0.28.5] - 2026-09-29
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the

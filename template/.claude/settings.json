@@ -6,7 +6,8 @@
       "Edit(qa/lib/**)",
       "Edit(qa/evidence/**)",
       "Write(qa/evidence/**)",
-      "Edit(.githooks/**)"
+      "Edit(.githooks/**)",
+      "Edit(qa/hooks/**)"
     ]
   },
   "hooks": {

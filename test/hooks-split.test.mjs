@@ -117,6 +117,7 @@ test("the Stop hook runs the gate through the fail-closed launcher; minimal drop
     "Edit(qa/evidence/**)",
     "Write(qa/evidence/**)",
     "Edit(.githooks/**)",
+    "Edit(qa/hooks/**)",
   ]);
   const minimal = minimalHookSettings(settings, { sessionContext: MINIMAL_SESSION_CONTEXT });
   assert.equal(minimal.permissions, undefined, "minimal kept a permission rule for a lane it does not carry");

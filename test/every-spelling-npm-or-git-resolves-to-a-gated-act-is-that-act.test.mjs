@@ -16,7 +16,10 @@
 //      from the source, so the two cannot drift apart again unnoticed.
 //   3. A refspec with no colon names its own destination: `git push origin main`
 //      is `main:main`, and lands on trunk exactly like `HEAD:main`.
-//   4. `--repo=<remote>` names the remote, so the first operand is a refspec.
+//   4. NOT a case, measured: `--repo=<remote>` does not demote the first operand.
+//      git 2.50.1 reads the first operand as the repository even with --repo
+//      (`git push --repo=origin HEAD:main` tried to reach a host named "head" and
+//      pushed nothing, 2026-09-29), so the gate is right to leave it unclassified.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -39,13 +42,12 @@ test("every spelling npm resolves to publish — a unique prefix, or a value-tak
   assert.deepEqual(missed, [], `${missed.length} spelling(s) npm runs as publish walk past the gate as no gated act at all`);
 });
 
-test("every push whose destination is main is classified merge — including a refspec with no colon, and a remote named by --repo=", () => {
+test("every push whose destination is main is classified merge — including a refspec with no colon", () => {
   const spellings = [
     "git push origin main",
     "git push origin +main",
     "git push origin refs/heads/main",
     "git push -f origin main",
-    "git push --repo=origin HEAD:main",
   ];
   const missed = spellings.filter((c) => classify(c) !== "merge");
   assert.deepEqual(missed, [], `${missed.length} push(es) onto trunk walk past the merge refusal`);
