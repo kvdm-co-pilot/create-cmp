@@ -282,3 +282,37 @@ jobs:
             judge="scripts/proof-plan.mjs"
           fi
           node "$judge" --ci --base "origin/$BASE_REF" --tree "$GITHUB_WORKSPACE" --sha "$HEAD_SHA" --repo "$GITHUB_REPOSITORY"
+
+  # DOES THE PLUGIN LOAD? (FIX-PLAN slice 13, PK3, C-4) Nothing else in CI runs
+  # Claude Code's own reader over this repo — the repo root IS the plugin root.
+  # `claude plugin validate --strict --json .` checks the manifests and the
+  # component layout, with every warning counted as a failure.
+  #
+  # PINNED CLI. validate's rules move between releases; an unpinned install would
+  # turn a Claude Code release into a red PR nobody changed. Bump the pin on
+  # purpose (2.1.283 is the release the 2026-09-27 doc base was read against).
+  #
+  # NOT REQUIRED YET (GATE-RULES Rule 1: calibrate a gate on a recorded run before
+  # requiring it). It stays out of .github/ruleset-create-cmp.json until a recorded
+  # run is green. If --strict is red on the root layout — the root CLAUDE.md (not
+  # loaded from a plugin root, and validate warns), root bin/, the `agents` key
+  # replacing the default folder, `$schema` — that red is data for slice 19 (the
+  # plugin-root split): log it as a KD. `--strict` is never dropped to get green.
+  #
+  # The other half of "it loads" — `plugin_errors` in `claude -p`'s stream-json
+  # system/init — needs an authenticated CLI and a secret fork PRs cannot see, so
+  # it runs at release (.claude/skills/npm-publish/SKILL.md), not here.
+  plugin-loads:
+    name: plugin loads
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the pinned Claude Code CLI
+        run: npm i -g @anthropic-ai/claude-code@2.1.283
+      - name: Validate the plugin, warnings as failures
+        run: claude plugin validate --strict --json .

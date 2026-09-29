@@ -25,7 +25,15 @@ node scripts/plugin-refresh.mjs --dry-run   # print the plan, write nothing
 ```
 
 `--check` also runs at SessionStart, as one line under the proof schedule. If that line says
-`current`, there is nothing to do here.
+`current`, there is nothing to do here — and it says `current` only when the bytes at every
+scope's `installPath` (from `installed_plugins.json`) match the marketplace clone at HEAD, in
+both directions. A matching version number or a sha that exists is not enough.
+
+A refresh takes the documented path first — `claude plugin marketplace update`, then
+`claude plugin update` for each scope — and reads the result back from `installed_plugins.json`
+(`version`, `installPath`) and the bytes. Only if that leaves it stale (the update refuses a
+version number that did not move) does it rebuild the cache directory itself. `/reload-plugins`
+is then yours to type in each session it names.
 
 ## Why a program and not a checklist
 
@@ -43,7 +51,8 @@ days, all four at once:
   every one of the above.
 
 So the program refuses to call a refresh done unless the installed tree is **byte-identical** to
-the source it claims to come from.
+the source it claims to come from — and `--check` asks the same question, so it cannot say
+`current` over older bytes under the right number (it did, until FIX-PLAN slice 13).
 
 ## Reading what it prints
 
@@ -69,6 +78,12 @@ it absent, which produced two confident wrong conclusions in one day before the 
 
 - **It will not reload a running session.** What a session has loaded is fixed until it reloads;
   the program reports who needs to and prints `/reload-plugins`. Only a human runs that.
+- **It will not remove a version directory a running session holds.** The rebuild replaces
+  `cache/<version>/` from scratch, but if that directory's `.in_use/` names a live process, it
+  refuses, lists the holders, and touches nothing: their hooks and MCP server run from those
+  bytes, and removing the directory would also remove the leases that say who is on it. Bump
+  `.claude-plugin/plugin.json`'s version so the update lands in a new directory, or end those
+  sessions and re-run.
 - **It will not refresh at SessionStart.** The hook calls `--check` only. A session start that
   silently mutates an install is a session start nobody can trust.
 - **It will not tell you two identical generations apart by their content**, because nothing can.
@@ -77,6 +92,10 @@ it absent, which produced two confident wrong conclusions in one day before the 
 
 ## When the proof fails
 
-The program exits non-zero and names the differing and missing files. That means the cache and
-the clone disagree after a rebuild, which should be impossible — treat it as a real defect. Do
-not re-run it hoping for a different answer, and do not hand-copy the files it named.
+The program exits non-zero and says, per scope, how many files differ, are missing or are extra.
+Its closing lines print only what it read back from disk: each scope's recorded version and
+installPath, whether those bytes match the clone, and which sessions hold only an older lease.
+
+A mismatch after the rebuild means the cache and the clone disagree over bytes it just copied,
+which should be impossible — treat it as a real defect. Do not re-run it hoping for a different
+answer, and do not hand-copy the files into the cache.

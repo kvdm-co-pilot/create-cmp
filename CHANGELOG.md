@@ -21,6 +21,30 @@ All notable changes to this project are documented here. The format is based on
   their output as untrusted app-controlled text. `inspector/mcp/test/tool-descriptions.test.mjs`
   reads all of it back from the raw `tools/list` response of the source server and the bundle.
 
+### Added
+
+- CI asks whether the plugin loads. The new `plugin loads` job installs a pinned Claude Code CLI
+  (`@anthropic-ai/claude-code@2.1.283`) and runs `claude plugin validate --strict --json .`. It is not
+  a required check yet (GATE-RULES Rule 1: calibrate on a recorded run first); if `--strict` is red on
+  the root layout, that red is logged as data for the plugin-root split, and `--strict` stays. The
+  `plugin_errors` check needs an authenticated CLI, so it is a release step in the npm-publish skill
+  (FIX-PLAN slice 13, PK3, C-4).
+
+### Fixed
+
+- `node scripts/plugin-refresh.mjs --check`, and the SessionStart line built on it, no longer say
+  "current" over older bytes under the right version number. Each scope's `installPath` from
+  `installed_plugins.json` is compared byte for byte with the marketplace clone at HEAD, in both
+  directions, and only a match is current. The refresh no longer removes a version directory a running
+  session holds: when its `.in_use/` names a live process, it refuses and lists the holders, where it
+  used to delete the directory and its leases and then report every session as reloaded. It now takes
+  the documented path first (`claude plugin marketplace update`, then `claude plugin update` per scope),
+  falls back to its own rebuild only when that leaves the install stale, and its closing lines print
+  only what it read back from disk. An ignored nested path (`inspector/mcp/node_modules/`) no longer
+  takes its whole top-level directory out of the byte comparison. `scripts/check-plugin-sync.mjs`,
+  which reported a correctly updated machine as drifted and which nothing but its own test called, is
+  retired (FIX-PLAN slice 13, PK2, C-3, C-9).
+
 ## [0.28.6] - 2026-09-29
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the
