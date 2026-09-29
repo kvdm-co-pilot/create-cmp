@@ -318,6 +318,9 @@ export const REVIEW_TIER_TRIGGERS = Object.freeze([
   "skills/",
   "agents/",
   ".github/",
+  // This repository's own pre-push hook (slice 5): what runs before a push
+  // reaches CI, so an edit to it obliges a review and must be able to reopen one.
+  ".githooks/",
   ".claude-plugin/",
   ".claude/settings.json",
   ".gitignore",
