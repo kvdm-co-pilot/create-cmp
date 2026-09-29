@@ -45,6 +45,16 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- `create-cmp harden` merges `.claude/settings.json` cleanly after `add firebase`. A `--minimal` app
+  that ran `add firebase` carries its consent hook and ask rule in that file, and harden's line merge
+  saw both sides move the same lines: the file went to the conflicted bucket with a `.cmp-new`
+  sidecar, and the full lane's Stop gate, hooks and ask rules waited on a hand resolution. The
+  three-way walk (harden and `upgrade --harness`) now merges that file as JSON: objects key by key,
+  `hooks.<event>` by matcher and command text, `permissions.allow`/`ask`/`deny` as sets. A hook or
+  rule either side added survives, and only what one side removed while the other left it alone
+  goes; both sides changing one value differently still falls back to the line merge and its
+  sidecar. `test/a-minimal-app-that-added-firebase-hardens-without-a-settings-conflict.test.mjs`.
+
 - `node scripts/plugin-refresh.mjs --check`, and the SessionStart line built on it, no longer say
   "current" over older bytes under the right version number. Each scope's `installPath` from
   `installed_plugins.json` is compared byte for byte with the marketplace clone at HEAD, in both
