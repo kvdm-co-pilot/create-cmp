@@ -123,7 +123,8 @@ Every change must pass the verify lane (`node qa/verify.mjs`) and commit its upd
 [`.github/workflows/verify.yml`](./.github/workflows/verify.yml).
 
 The committed receipt is written on your machine, so it is your machine's word. CI's own receipt
-is signed by GitHub for the run that produced it (an artifact attestation, keyless), and
+is signed by GitHub for the run that produced it (an artifact attestation, keyless — on public
+repositories only, since private ones need GitHub Enterprise Cloud; the step is skipped there), and
 `gh attestation verify <file> --repo <owner>/<repo>` checks it, where `<file>` is the `latest.json`
 inside a run's downloaded `verify-evidence` artifact — not the committed file, whose timestamps
 differ from CI's. The L1 check is
@@ -159,7 +160,8 @@ never fires twice in a row for the same stop. Each session also opens with one d
 `node qa/gates-status.mjs --line`, naming which gates are active here — the Stop hook, the
 pre-push hook (`.githooks` on or off), and the CI Verify workflow (whether GitHub requires it is
 unknown locally unless an authenticated `gh` answers). Edits to the gate's own files
-(`qa/receipt-check.mjs`, `qa/lib/`, `qa/evidence/`, `.githooks/`) ask for your approval first.
+(`qa/receipt-check.mjs`, `qa/lib/`, `qa/evidence/`, `qa/hooks/`, `.githooks/`) ask for your approval
+first.
 
 Doc-only edits (`*.md`, `README`, `.github/`, `.claude/`) are deliberately outside the
 verified surface: editing docs never invalidates a good receipt. The intent is transparent

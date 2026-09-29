@@ -83,8 +83,9 @@ the hash answers — without being able to check who produced them.
   Enterprise Cloud, with signing by GitHub's own Sigstore instance rather than the public one.
   **UNVERIFIED** — the check to run: GitHub's "Using artifact attestations" documentation,
   section on availability, and one `attest-build-provenance` run in a private repository on a
-  non-Enterprise plan. Until it is checked, the template's step may fail on private repositories
-  under Free/Pro/Team; if it does, the step needs a guard, not a removal.
+  non-Enterprise plan. The guard is in place: the template's step runs only when
+  `github.event.repository.visibility == 'public'`, so a private repository's required Verify check
+  never fails on it; a private repository on Enterprise Cloud widens that `if:` to attest.
 - **The committed receipt and CI's receipt are different bytes.** `generatedAt`, durations and
   tool timings differ on every run, so the attestation does not cover the committed file and the
   comparison is never byte equality. It is: same `inputs.hash` (same verified tree), and for every

@@ -26,9 +26,11 @@
 # The prefilter is deliberately cheap and over-broad (it reads the whole
 # payload, description included): it only ever turns a crash into a refusal.
 #
-# THE DEADLINE. The wrapper kills the gate at [deadline-seconds] (default 9),
-# shorter than the 10 s the settings file registers, so a gate that hangs is a
-# gate that did not answer — refused — rather than a hook Claude Code kills.
+# THE DEADLINE. The wrapper kills the gate at [deadline-seconds] (default 9;
+# .claude/settings.json passes 10), shorter than the timeout the settings file
+# registers (11 s), so a gate that hangs is a gate that did not answer — refused —
+# rather than a hook Claude Code kills. The gate plans against this deadline, not
+# the registered one: declaredBudgetMs() in proof-gate.mjs reads it off the wiring.
 # GNU `timeout` is absent on macOS, so it is a background sleep and a kill.
 #
 # WHAT IT CANNOT DO. If Claude Code itself kills THIS process at the registered

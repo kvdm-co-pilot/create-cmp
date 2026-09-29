@@ -32,8 +32,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs\" \"gh|npm|npx|pnpm|bun|yarn|git push|fleet-check\"",
-            "timeout": 10
+            "command": "sh \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs\" \"gh|npm|npx|pnpm|bun|yarn|git push|fleet-check\" 10",
+            "timeout": 11
           }
         ]
       }
