@@ -893,3 +893,17 @@ A hook's identity is `[matcher, command.trim()]`. When the engine changes a lane
 the app had raised that hook's `timeout`, the app's entry matches base and is dropped as "removed", and the engine's new
 spelling lands with the engine's timeout. No hook is lost and no deny is dropped. *Logged 2026-09-30, batch 2 review
 round 1.*
+
+### KD-283 — a timing assertion on the gate's classifier flakes under full-suite load
+
+`test/a-worktree-under-a-path-with-a-space-in-it-is-a-tree-the-gate-can-name.test.mjs:146` ("classifying a long
+quoted fleet-check operand costs what its length costs")
+
+The case compares wall-clock costs of `classify()` on operands of different lengths and asserts a ratio. Alone it
+passes three runs out of three; inside `npm test` it failed once on 2026-09-30 (actual false, expected true) while
+2,700 other tests ran beside it. Slice 5's argv reader does more work per call than the text matcher it replaced,
+which narrows the margin the ratio relied on. A wall-clock ratio is not a property of the code; the test should
+count work (tokens visited, or a deterministic operation counter) or compare against a generous absolute bound.
+
+**Fires when:** the suite runs on a loaded machine; the gate itself is unaffected.
+*Logged 2026-09-30, at the close of slice `harness/hooks-never-grant` batch 2 (after the last review round).*
