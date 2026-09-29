@@ -332,6 +332,12 @@ export function decideFile({ relPath, base, next, theirs, merge = mergeThreeWay,
     if (eq(theirs, base)) return write("applied", next); // app never touched it
     // All three differ:
     if (isBinaryPath(relPath)) return conflict(); // binaries never merge
+    if (STRUCTURAL_JSON_FILES.has(relPath)) {
+      // Hook groups and permission rules are sets: merged as JSON, an overlay's group (add
+      // firebase's consent hook) sits beside the lane's instead of colliding with it line for line.
+      const merged = mergeSettingsJson(theirs, base, next);
+      if (merged !== null) return merged.equals(theirs) ? none("current") : write("merged", merged);
+    }
     const m = merge(theirs, base, next);
     if (m.clean && m.content !== null) {
       // A merge that reproduces the app's file byte-for-byte means the app
@@ -358,6 +364,136 @@ export function decideFile({ relPath, base, next, theirs, merge = mergeThreeWay,
   }
 
   return null; // in neither base nor new: app-authored, invisible to the sweep
+}
+
+/**
+ * The file whose three sides merge as JSON, not as lines: .claude/settings.json. Its hook groups
+ * and permission rules are sets — an overlay (`add firebase`) appends a PreToolUse group and an
+ * ask rule beside the stamp's, the full lane's settings rewrite the same arrays, and a line merge
+ * of the two reports both sides moving the same lines when neither touched the other's entry.
+ */
+export const STRUCTURAL_JSON_FILES = new Set([".claude/settings.json"]);
+
+const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const CONFLICT = Symbol("conflict");
+
+/** One three-way value: the side that moved wins; both moving the same way is one move. */
+function pick(b, t, n) {
+  if (same(t, n)) return t;
+  if (same(t, b)) return n;
+  if (same(n, b)) return t;
+  return CONFLICT;
+}
+
+/**
+ * Three-way merge of arrays of strings as sets (permissions.allow/ask/deny): the engine's array,
+ * less what the app removed from base, plus what the app added over base — the engine's order,
+ * the app's additions after it.
+ */
+function mergeStringSet(b = [], t = [], n = []) {
+  const inBase = new Set(b);
+  const inTheirs = new Set(t);
+  const out = new Set();
+  for (const v of n) if (!(inBase.has(v) && !inTheirs.has(v))) out.add(v);
+  for (const v of t) if (!inBase.has(v)) out.add(v);
+  return [...out];
+}
+
+/**
+ * Three-way merge of one hooks.<event> array — groups `{matcher, hooks: [{command, …}]}`. A hook
+ * is identified by its group's matcher and its command text, surrounding whitespace aside. The
+ * result is the engine's groups, less the hooks the app removed from base, plus the hooks the app
+ * added over base in the app's own group (matcher and fields kept). A hook on all three sides
+ * whose fields moved merges by `pick`; both sides moving it differently is a conflict.
+ */
+function mergeHookGroups(b = [], t = [], n = []) {
+  const wellFormed = (groups) =>
+    Array.isArray(groups) && groups.every((g) => isPlainObject(g) && Array.isArray(g.hooks ?? []));
+  if (![b, t, n].every(wellFormed)) return CONFLICT;
+  const idOf = (group, hook) => JSON.stringify([group.matcher ?? "", String(hook?.command ?? "").trim()]);
+  const index = (groups) => {
+    const m = new Map();
+    for (const g of groups) for (const h of g.hooks ?? []) m.set(idOf(g, h), h);
+    return m;
+  };
+  const [bi, ti, ni] = [index(b), index(t), index(n)];
+  const out = [];
+  for (const g of n) {
+    const hooks = [];
+    for (const h of g.hooks ?? []) {
+      const id = idOf(g, h);
+      if (bi.has(id) && !ti.has(id)) continue; // the app removed it
+      const v = ti.has(id) ? pick(bi.get(id), ti.get(id), h) : h;
+      if (v === CONFLICT) return CONFLICT;
+      hooks.push(structuredClone(v));
+    }
+    if (hooks.length > 0 || (g.hooks ?? []).length === 0) out.push({ ...structuredClone(g), hooks });
+  }
+  for (const g of t) {
+    const added = (g.hooks ?? []).filter((h) => !bi.has(idOf(g, h)) && !ni.has(idOf(g, h)));
+    if (added.length > 0) out.push({ ...structuredClone(g), hooks: structuredClone(added) });
+  }
+  return out;
+}
+
+/** The arrays merged as sets rather than as values, by their path in the settings object. */
+function setMergeFor(keys) {
+  if (keys.length !== 2) return null;
+  if (keys[0] === "hooks") return mergeHookGroups;
+  if (keys[0] === "permissions" && ["allow", "ask", "deny"].includes(keys[1])) {
+    return (b, t, n) =>
+      [b, t, n].every((v) => v === undefined || v.every((s) => typeof s === "string"))
+        ? mergeStringSet(b, t, n)
+        : CONFLICT;
+  }
+  return null;
+}
+
+function mergeValue(b, t, n, keys) {
+  const setMerge = setMergeFor(keys);
+  if (setMerge && [b, t, n].some(Array.isArray)) {
+    if ([b, t, n].some((v) => v !== undefined && !Array.isArray(v))) return CONFLICT;
+    return setMerge(b, t, n);
+  }
+  const moved = pick(b, t, n);
+  if (moved !== CONFLICT) return moved;
+  if (isPlainObject(t) && isPlainObject(n) && (b === undefined || isPlainObject(b))) {
+    const out = {};
+    for (const k of [...Object.keys(n), ...Object.keys(t).filter((k) => !(k in n))]) {
+      const v = mergeValue(b?.[k], t[k], n[k], [...keys, k]);
+      if (v === CONFLICT) return CONFLICT;
+      if (v !== undefined) out[k] = v;
+    }
+    return out;
+  }
+  return CONFLICT;
+}
+
+/**
+ * Three-way merge of a JSON settings file by its structure: objects key by key, hooks.<event> by
+ * hook command, permissions.allow/ask/deny as sets, any other value by whichever side moved it.
+ * Neither side is weakened — every hook and rule either side added survives, and only what one
+ * side removed from base while the other left it alone goes. Null when a side is not a JSON
+ * object, or both sides moved the same value differently: the caller falls back to the line merge.
+ * @param {Buffer} theirs the app's file
+ * @param {Buffer} base the old engine's file
+ * @param {Buffer} next the new engine's file
+ * @returns {Buffer|null} the merged file (`theirs` itself when the merge changes nothing)
+ */
+export function mergeSettingsJson(theirs, base, next) {
+  let sides;
+  try {
+    sides = [theirs, base, next].map((buf) => JSON.parse(buf.toString("utf8")));
+  } catch {
+    return null;
+  }
+  if (!sides.every(isPlainObject)) return null;
+  const [t, b, n] = sides;
+  const merged = mergeValue(b, t, n, []);
+  if (merged === CONFLICT || !isPlainObject(merged)) return null;
+  if (same(merged, t)) return theirs;
+  return Buffer.from(`${JSON.stringify(merged, null, 2)}\n`);
 }
 
 function readIfPresent(dir, relPath) {
