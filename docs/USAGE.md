@@ -508,7 +508,10 @@ the inspector, and the desktop dev-client — and no service. Next: run it (and 
 `cmp-firebase-connect` → `create-cmp add firebase` adds the SDK and its wiring (with a mock config that
 says it is one), then the Firebase CLI creates/reuses a project, registers the app and drops the
 **real** `google-services.json` over the mock; a green `assembleDebug` proves it. (Auth sign-in
-providers + the Storage bucket are console-only — the skill says so.)
+providers + the Storage bucket are console-only — the skill says so.) The add step also registers `qa/hooks/firebase-consent.mjs` as a
+PreToolUse hook in the app's `.claude/settings.json`, so Claude Code asks before `firebase projects:create`,
+`apps:create`, `firestore:databases:create` or `apps:android:sha:create` runs, naming the mutation — it
+asks and never allows — and adds an ask rule before that file is edited.
 
 ### C. The dev-client loop (fast UI iteration, no emulator)
 

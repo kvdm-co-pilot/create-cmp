@@ -25,11 +25,12 @@ the wiring with a green build.
 > by name when the app's shape is one it does not recognise. Never hand-edit Gradle, the catalog or
 > the entry points to wire Firebase; if the step refuses, report its message to the user.
 
-> **Consent rule.** Every command that creates or mutates a cloud resource on the user's Google
-> account (`projects:create`, `apps:create`, `firestore:databases:create`, `apps:android:sha:create`)
-> is shown to the user **verbatim first** and run only after an explicit yes. Read-only commands
-> (`--version`, `login:list`, `projects:list`, `apps:list`, `apps:sdkconfig`, `firestore:locations`,
-> `--help`) need no gate. Never batch a mutation behind a read.
+> **Consent is a program in the stamped app; this skill does not restate it.** `create-cmp add
+> firebase` (§1 step 4) ships `qa/hooks/firebase-consent.mjs` and registers it in the app's
+> `.claude/settings.json` as a PreToolUse hook: when a command would run `projects:create`,
+> `apps:create`, `firestore:databases:create` or `apps:android:sha:create`, Claude Code asks the
+> user first, naming the mutation. The hook asks and never allows. Run the add step before any
+> cloud command, so the hook is there when one runs.
 
 > **Cost honesty.** A fresh Firebase project starts on the **Spark (free)** plan. Nothing in this
 > flow enables billing, attaches a card, or upgrades to Blaze — and the CLI *cannot* silently do so.

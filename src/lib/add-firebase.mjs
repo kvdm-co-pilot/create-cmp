@@ -17,7 +17,10 @@
 //             blocks, so their buildTypes are untouched
 //   mock/     the config files written when no real one is given — values that SAY mock, never a
 //             placeholder that reads as a real project
-//   edits.json  the catalog entries and the single-line insertions, each at an anchor line
+//   edits.json  the catalog entries and the single-line insertions, each at an anchor line; and
+//             `settings`, merged into .claude/settings.json: the PreToolUse hook that asks before a
+//             Firebase cloud mutation (files/qa/hooks/firebase-consent.mjs), and the permissions.ask
+//             rule that asks before that file is edited (FIX-PLAN decision D6)
 //
 // EVERY EDIT IS IDEMPOTENT: each one first asks whether it is already made (the `present` text, the
 // block marker, identical bytes), so a second run plans nothing and writes nothing. EVERY
@@ -64,6 +67,7 @@ const GOOGLE_SERVICE_INFO_REL = "iosApp/iosApp/GoogleService-Info.plist";
 const APP_BUILD_REL = "composeApp/build.gradle.kts";
 const CATALOG_REL = "gradle/libs.versions.toml";
 const SPEC_REL = "create-cmp.json";
+const SETTINGS_REL = ".claude/settings.json";
 
 /** Why a Firebase region cannot move once the step ran — the owner's decision, 2026-09-25. */
 const REGION_IS_FIXED = "The region is set when Firebase is added; changing it is not supported by this step.";
@@ -348,6 +352,58 @@ function ownFileRegion(raw, tokens, have) {
   return m && new Set(m.slice(1)).size === 1 ? m[1] : null;
 }
 
+/** Does an `Edit(…)` ask rule's path pattern cover `rel`? `**` spans directories, `*` does not. */
+function askRuleCovers(rule, rel) {
+  const m = /^Edit\((.+)\)$/.exec(String(rule));
+  if (!m) return false;
+  const pattern = m[1].replace(/^\.?\/(?!\/)/, "");
+  const source = pattern
+    .split("**")
+    .map((part) => part.split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join("[^/]*"))
+    .join(".*");
+  return new RegExp(`^${source}$`).test(rel);
+}
+
+/**
+ * Merge the overlay's `settings` entry into a parsed .claude/settings.json: the PreToolUse hook
+ * group when no hook command carries `entry.present`, and each ask rule whose path no ask rule
+ * already there covers. The adopter's own hooks and rules are kept as they are, in their order.
+ * @returns {object|null} the merged settings, or null when both are already there
+ */
+export function mergeFirebaseSettings(settings, entry) {
+  const shape = (what) =>
+    refuse(`${SETTINGS_REL}: ${what} is not the shape Claude Code reads, and Firebase registers a hook in it. It is not rewritten.`);
+  const isObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+  const out = structuredClone(settings);
+  let changed = false;
+
+  if (out.hooks !== undefined && !isObject(out.hooks)) shape("hooks");
+  const groups = out.hooks?.PreToolUse;
+  if (groups !== undefined && !Array.isArray(groups)) shape("hooks.PreToolUse");
+  const registered = (groups ?? []).some(
+    (g) => Array.isArray(g?.hooks) && g.hooks.some((h) => String(h?.command ?? "").includes(entry.present)),
+  );
+  if (!registered) {
+    out.hooks ??= {};
+    out.hooks.PreToolUse = [...(groups ?? []), structuredClone(entry.preToolUse)];
+    changed = true;
+  }
+
+  if (out.permissions !== undefined && !isObject(out.permissions)) shape("permissions");
+  const ask = out.permissions?.ask;
+  if (ask !== undefined && !Array.isArray(ask)) shape("permissions.ask");
+  const missing = entry.ask.filter((rule) => {
+    const rel = /^Edit\((.+)\)$/.exec(rule)[1];
+    return !(ask ?? []).some((have) => askRuleCovers(have, rel));
+  });
+  if (missing.length > 0) {
+    out.permissions ??= {};
+    out.permissions.ask = [...(ask ?? []), ...missing];
+    changed = true;
+  }
+  return changed ? out : null;
+}
+
 // ── config files ────────────────────────────────────────────────────────────
 
 function googleServicesPackages(text, where) {
@@ -536,6 +592,30 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
     }
     planned.set(rel, content);
     if (have === null) created.add(rel);
+  }
+
+  // .claude/settings.json: consent to a Firebase cloud mutation is a program in the app — a hook
+  // that answers `ask` (never `allow`), and an ask rule before its file is edited. Merged, never
+  // replaced; an app with no settings file gets one holding just these two.
+  if (edits.settings) {
+    const have = readText(projectDir, SETTINGS_REL);
+    let settings = {};
+    if (have !== null) {
+      try {
+        settings = JSON.parse(have);
+      } catch (e) {
+        refuse(`${SETTINGS_REL} is not valid JSON (${e.message}), and Firebase registers a hook in it. It is not rewritten.`);
+      }
+      if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
+        refuse(`${SETTINGS_REL} is not a JSON object, and Firebase registers a hook in it. It is not rewritten.`);
+      }
+    }
+    const merged = mergeFirebaseSettings(settings, edits.settings);
+    if (merged === null) present.push(`${SETTINGS_REL} (the Firebase consent hook and its ask rule)`);
+    else {
+      planned.set(SETTINGS_REL, `${JSON.stringify(merged, null, 2)}\n`);
+      if (have === null) created.add(SETTINGS_REL);
+    }
   }
 
   // google-services.json: the adopter's real file, or a mock that says so.
