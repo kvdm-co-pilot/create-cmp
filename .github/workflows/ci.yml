@@ -208,7 +208,7 @@ jobs:
   # ONE NAME FOR THE MATRIX (FIX-PLAN slice 7). `test` reports three contexts,
   # `engine unit tests (20|22|24)`, and a ruleset can only require names it
   # knows; a required `engine unit tests` would never be satisfied and would
-  # block every merge. This fan-in is the one context qa/ruleset-create-cmp.json
+  # block every merge. This fan-in is the one context .github/ruleset-create-cmp.json
   # requires, so the matrix can change without editing the ruleset. `always()`
   # so a failed or cancelled leg reports red here rather than skipped — a
   # skipped required check counts as passing.

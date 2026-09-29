@@ -58,12 +58,12 @@ node bin/create-cmp.mjs --name "Demo App" --package com.example.demo \
 Two CI checks are meant to gate every merge to `main`: `tests` (one context over the Node 20/22/24
 matrix of `engine unit tests`) and `proof owed` (`node scripts/proof-plan.mjs --ci`, run from the base
 branch's code: what the PR's diff owes, and whether a `review` / `L2 run` check run attests it). Today
-the ruleset requires neither. The payload that would make it so is `qa/ruleset-create-cmp.json`;
+the ruleset requires neither. The payload that would make it so is `.github/ruleset-create-cmp.json`;
 applying it is a repository-settings act for the maintainer, not something a PR does:
 
 ```bash
 gh api repos/kvdm-co-pilot/create-cmp/rulesets            # read first: require-pr-main was id 18921080 on 2026-09-29
-gh api -X PUT repos/kvdm-co-pilot/create-cmp/rulesets/18921080 --input qa/ruleset-create-cmp.json
+gh api -X PUT repos/kvdm-co-pilot/create-cmp/rulesets/18921080 --input .github/ruleset-create-cmp.json
 ```
 
 What changes: the ruleset gains `required_status_checks` (`tests`, `proof owed`, strict — the branch

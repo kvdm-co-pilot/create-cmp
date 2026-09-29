@@ -23,7 +23,7 @@ All notable changes to this project are documented here. The format is based on
   with `gh api` when `GH_TOKEN` is set and UNKNOWN otherwise. Without `--strict` it reports and exits
   0 (Rule 1: calibrate before refusing); under `--strict` a MISSING or UNKNOWN tier exits 1. The new `proof owed` job runs the BASE branch's copy of the script against the
   PR (`--tree`), not strict yet, and pull requests only. A fan-in job `tests` gives the Node matrix one
-  context a ruleset can require. `qa/ruleset-create-cmp.json` and CONTRIBUTING.md hold the prepared,
+  context a ruleset can require. `.github/ruleset-create-cmp.json` and CONTRIBUTING.md hold the prepared,
   unapplied ruleset that would require both and drop the admin bypass (FIX-PLAN slice 7).
 - `scripts/hooks/fail-closed.sh` runs this repository's PreToolUse proof gate. A gate that crashes
   (`node` missing from PATH, a segfault) or outruns the launcher's 9 s deadline now refuses a
