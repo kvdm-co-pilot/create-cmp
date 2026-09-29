@@ -6,93 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-### Added
-
-- **The auto-mode classifier hears what the schedule owes.** After a Bash call whose program, read by the proof gate's argv reader, is `git`, `gh`, `npm`, `pnpm`, `yarn` or `npx` — or which the gate classifies as a merge, PR or publish — `scripts/hooks/proof-gate.mjs` reads the tree's obligation once on PostToolUse. If a tier is not settled, it emits `{"hookSpecificOutput":{"hookEventName":"PostToolUse","classifierContext":"proof-plan: <tiers> OWED on <branch>; merging or pushing to main now is premature"}}`, with a tier's state in brackets when it is not plain OWED, such as `review (reopened)`. Any other command, a clean trunk and a tree of another repository get nothing. It is steering, not a gate: the classifier misses 17% of overeager actions by Anthropic's own count, and the PreToolUse merge refusal still does the enforcing. The same read now feeds the post-merge `close()`. A matched call cost 0.6–0.73 s wall on this tree, measured 2026-09-30.
-- **A brief is checked at spawn, and a compacted session finds its brief again.** `scripts/hooks/brief-check.mjs` runs on PreToolUse for the `Agent` and `Task` tool names (both until a live session settles which is current), from `.claude/settings.json` and from the plugin's `scripts/hooks/plugin-hooks.json`. For `create-cmp:executor`, `executor`, `create-cmp:cmp-orchestrator`, `cmp-orchestrator` and `deep-worker` the prompt must carry labelled `Objective:`, `Output:` (a path), `Branch:`, `Hand-off:`, `Out of scope:` and `Proof:`; `staff-reviewer` takes `Diff:` and `Brief:` in place of Branch and Hand-off. A missing field is denied, and the reason names it and prints the agent's whole schema. Every other agent type is silent, and a crash exits 0 with nothing, because this is a form check and not a safety gate. Run over the 216 covered spawns in the local transcripts on 2026-09-29, it passed 8 and would have denied 208. `node scripts/proof-plan.mjs --open` now takes `--brief`, `--handoff` and `--round`. The SessionStart schedule adds one line naming them and the latest recorded review round, and says so when the payload's `source` is `compact` or `resume`. The deep-worker's prose sentence about a brief with no branch or hand-off file is removed, because the hook now says it.
-- **A Firebase cloud mutation asks first, in the stamped app.** `create-cmp add firebase` ships `qa/hooks/firebase-consent.mjs` and registers it as a PreToolUse hook on Bash in the app's `.claude/settings.json`. It answers `permissionDecision: "ask"`, with a reason naming the mutation, for `firebase projects:create`, `apps:create`, `firestore:databases:create` and `apps:android:sha:create` — run directly, through `npx`/`npm exec`/`pnpm dlx`/`bunx`, behind a wrapper such as `env` or `timeout`, or inside `sh -c`. It is silent for every other command. It never answers `allow`, and it exits 0 on its own crash, because it is a consent check and not a safety gate. The step also adds `Edit(qa/hooks/firebase-consent.mjs)` to `permissions.ask` unless an ask rule already covers that path, so a minimal app gets it too. The `cmp-firebase-connect` skill points at the hook instead of restating a consent rule, and stays model-invocable. How `ask` behaves under auto mode and under `-p` is not yet checked in a live session.
-- A `claude plugin eval` suite in `evals/`: one natural-phrasing trigger case for each of the 11 plugin skills, and near-miss negatives for cmp-new, grill-me and cmp-doctor. Each case has a `tool_used` grader on the Skill tool and a `regex` result grader, runs 3 times, and is run locally at release (`evals/README.md`, npm-publish step 2). Results go to `evals/results/`, which is gitignored. `test/plugin-evals-are-well-formed.test.mjs` checks the shape.
-
-### Changed
-
-- **The stamped `CLAUDE.md` loads the walk, approvals, comments, lane and UI-loop sections only when they apply.**
-  Approvals, Comments and "The lane is not yours to edit" moved to path-scoped `.claude/rules/approvals.md`,
-  `comments.md` and `lane.md`, whose `paths:` globs name the files they govern (`qa/approvals.json`, `specs/**`,
-  theme, components, screens; `qa/comments.json`; the machine-owned `qa/*.mjs`, `qa/lib/**/*.mjs` and lane
-  declarations). The walk and the UI feedback loop moved to the project skills `walk` and
-  `ui-loop`. `CLAUDE.md` keeps the definition of done, the visible triage and grill rule, a short statement of
-  the lane boundary, and one pointer to each. The harness-mode rendering goes from 395 lines to 190. `--minimal` deletes `.claude/rules` as it
-  deletes `.claude/skills`, and the `ui-loop` skill leaves with the inspector.
-  `test/a-path-scoped-rule-fires-on-a-stamped-file.test.mjs` stamps an app and fails on a rule glob that
-  matches no stamped file, or on a stamped `CLAUDE.md` over 200 lines in full or minimal mode.
-- **`cmp-inspector` tools are found by what they do, and say what they touch.** Each of the 15
-  descriptions opens with the act and a "Use when …" sentence, moves design-doc references to the
-  end, and stays within 1,024 characters. The read tools carry `readOnlyHint: true`, `connect_live`
-  carries `destructiveHint: true`, and `resolve_comment` carries
-  `_meta["anthropic/requiresUserInteraction"]: true`, so the agent can no longer close the human's
-  comments without the human seeing it. `runtime_logs`, `runtime_crashes` and `db_query` label
-  their output as untrusted app-controlled text. `inspector/mcp/test/tool-descriptions.test.mjs`
-  reads all of it back from the raw `tools/list` response of the source server and the bundle.
-
-### Added
-
-- CI asks whether the plugin loads. The new `plugin loads` job installs a pinned Claude Code CLI
-  (`@anthropic-ai/claude-code@2.1.283`) and runs `claude plugin validate --strict --json .`. It is not
-  a required check yet (GATE-RULES Rule 1: calibrate on a recorded run first); if `--strict` is red on
-  the root layout, that red is logged as data for the plugin-root split, and `--strict` stays. The
-  `plugin_errors` check needs an authenticated CLI, so it is a release step in the npm-publish skill
-  (FIX-PLAN slice 13, PK3, C-4).
-
-### Fixed
-
-- `doctor --adherence` reads permission rules at every scope Claude Code merges (user, project `.claude/settings.json`, local `.claude/settings.local.json`, managed): `--fix` no longer writes a user-scope ask or deny over an allow held at another scope, and "Release acts gated" passes when any scope asks for or deliberately allows the act. Its "Plugin bytes current" row now compares in both directions (missing, differing, extra) with the same `src/lib/plugin-bytes.mjs` that `scripts/plugin-refresh.mjs` uses, and that module ships in the npm package, so the row can answer outside a checkout.
-- The inspector MCP's `inspect_tree` is no longer marked `readOnlyHint: true`: its `out` parameter writes a file to any path, so a client must not skip the prompt for it.
-- The executor, orchestrator, deep-worker and staff-reviewer definitions each carry a "Brief fields" block with the labels brief-check reads, and brief-check's deny reason points to that block. The orchestrator's brief template now writes those labels, so its spawns are no longer denied on the first try.
-- `create-cmp harden` merges `.claude/settings.json` cleanly after `add firebase`. A `--minimal` app
-  that ran `add firebase` carries its consent hook and ask rule in that file, and harden's line merge
-  saw both sides move the same lines: the file went to the conflicted bucket with a `.cmp-new`
-  sidecar, and the full lane's Stop gate, hooks and ask rules waited on a hand resolution. The
-  three-way walk (harden and `upgrade --harness`) now merges that file as JSON: objects key by key,
-  `hooks.<event>` by matcher and command text, `permissions.allow`/`ask`/`deny` as sets. A hook or
-  rule either side added survives, and only what one side removed while the other left it alone
-  goes; both sides changing one value differently still falls back to the line merge and its
-  sidecar. `test/a-minimal-app-that-added-firebase-hardens-without-a-settings-conflict.test.mjs`.
-
-- `node scripts/plugin-refresh.mjs --check`, and the SessionStart line built on it, no longer say
-  "current" over older bytes under the right version number. Each scope's `installPath` from
-  `installed_plugins.json` is compared byte for byte with the marketplace clone at HEAD, in both
-  directions, and only a match is current. The refresh no longer removes a version directory a running
-  session holds: when its `.in_use/` names a live process, it refuses and lists the holders, where it
-  used to delete the directory and its leases and then report every session as reloaded. It now takes
-  the documented path first (`claude plugin marketplace update`, then `claude plugin update` per scope),
-  falls back to its own rebuild only when that leaves the install stale, and its closing lines print
-  only what it read back from disk. An ignored nested path (`inspector/mcp/node_modules/`) no longer
-  takes its whole top-level directory out of the byte comparison. `scripts/check-plugin-sync.mjs`,
-  which reported a correctly updated machine as drifted and which nothing but its own test called, is
-  retired (FIX-PLAN slice 13, PK2, C-3, C-9).
-
-### Added
-
-- `create-cmp doctor --adherence` prints the adherence report card (U2). There are nine rows,
-  each derived from this machine and repo: project hooks registered and runnable, no scope
-  disabling hooks, the pre-push gate, CI Verify present and required, the receipt attesting HEAD,
-  user-scope credential-read denies, the release acts decided at user scope, plugin bytes against
-  the marketplace, and cmp-inspector configured. Each row reads PASS, FAIL or UNKNOWN with its
-  fixing command, and UNKNOWN never renders as PASS. `--adherence --fix` asks yes/no per entry
-  before appending PM1's `permissions.deny` and `permissions.ask` entries to
-  `~/.claude/settings.json` in place. It never adds an ask that shadows an existing `allow` or
-  `autoMode.allow`, and reports that conflict instead. The ruleset and the sandbox advice are
-  printed and never applied (FIX-PLAN slice 14; PM1–PM3, D4, B-L-7).
-
-### Changed
-
-- The plugin skills reach plugin files as `${CLAUDE_PLUGIN_ROOT}/…`; cmp-test leads with Maestro (Appium moved to `references/legacy-appium.md`) and cmp-new's guided walk moved to `references/guided-walk.md`; every skill description fits the spec's 1,024 characters (`test/skill-description-budget.test.mjs`); the staff reviewer blocks on a diff that does not do what its brief asked; cmp-orchestrator drops `Task` and `TodoWrite` from its tools.
-
-## [0.28.6] - 2026-09-29
+## [0.28.7] - 2026-09-30
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the
-CI-attested receipt reader, and `@create-cmp/inspector` 0.9.2 carries the server instructions that
-now reach the agent, in a rebuilt bundle. 0.28.5 was set mid-batch and never published; the number moved on with the bytes. Nothing is published.
+CI-attested receipt reader, and `@create-cmp/inspector` 0.9.3 carries the server instructions that
+now reach the agent, in a rebuilt bundle. 0.28.5 and 0.28.6 were set mid-batch and never published; the number moved on with the bytes. Nothing is published.
 
 ### Added
 
@@ -126,6 +44,26 @@ now reach the agent, in a rebuilt bundle. 0.28.5 was set mid-batch and never pub
   with `gh attestation verify`); `qa/receipt-check.mjs` reports which rungs are CI-attested and which
   self-attested; `qa/ruleset.json` and one `gh api` line in the README make the check required on the
   default branch (ADR-0017, proposed).
+- **The auto-mode classifier hears what the schedule owes.** After a Bash call whose program, read by the proof gate's argv reader, is `git`, `gh`, `npm`, `pnpm`, `yarn` or `npx` — or which the gate classifies as a merge, PR or publish — `scripts/hooks/proof-gate.mjs` reads the tree's obligation once on PostToolUse. If a tier is not settled, it emits `{"hookSpecificOutput":{"hookEventName":"PostToolUse","classifierContext":"proof-plan: <tiers> OWED on <branch>; merging or pushing to main now is premature"}}`, with a tier's state in brackets when it is not plain OWED, such as `review (reopened)`. Any other command, a clean trunk and a tree of another repository get nothing. It is steering, not a gate: the classifier misses 17% of overeager actions by Anthropic's own count, and the PreToolUse merge refusal still does the enforcing. The same read now feeds the post-merge `close()`. A matched call cost 0.6–0.73 s wall on this tree, measured 2026-09-30.
+- **A brief is checked at spawn, and a compacted session finds its brief again.** `scripts/hooks/brief-check.mjs` runs on PreToolUse for the `Agent` and `Task` tool names (both until a live session settles which is current), from `.claude/settings.json` and from the plugin's `scripts/hooks/plugin-hooks.json`. For `create-cmp:executor`, `executor`, `create-cmp:cmp-orchestrator`, `cmp-orchestrator` and `deep-worker` the prompt must carry labelled `Objective:`, `Output:` (a path), `Branch:`, `Hand-off:`, `Out of scope:` and `Proof:`; `staff-reviewer` takes `Diff:` and `Brief:` in place of Branch and Hand-off. A missing field is denied, and the reason names it and prints the agent's whole schema. Every other agent type is silent, and a crash exits 0 with nothing, because this is a form check and not a safety gate. Run over the 216 covered spawns in the local transcripts on 2026-09-29, it passed 8 and would have denied 208. `node scripts/proof-plan.mjs --open` now takes `--brief`, `--handoff` and `--round`. The SessionStart schedule adds one line naming them and the latest recorded review round, and says so when the payload's `source` is `compact` or `resume`. The deep-worker's prose sentence about a brief with no branch or hand-off file is removed, because the hook now says it.
+- **A Firebase cloud mutation asks first, in the stamped app.** `create-cmp add firebase` ships `qa/hooks/firebase-consent.mjs` and registers it as a PreToolUse hook on Bash in the app's `.claude/settings.json`. It answers `permissionDecision: "ask"`, with a reason naming the mutation, for `firebase projects:create`, `apps:create`, `firestore:databases:create` and `apps:android:sha:create` — run directly, through `npx`/`npm exec`/`pnpm dlx`/`bunx`, behind a wrapper such as `env` or `timeout`, or inside `sh -c`. It is silent for every other command. It never answers `allow`, and it exits 0 on its own crash, because it is a consent check and not a safety gate. The step also adds `Edit(qa/hooks/firebase-consent.mjs)` to `permissions.ask` unless an ask rule already covers that path, so a minimal app gets it too. The `cmp-firebase-connect` skill points at the hook instead of restating a consent rule, and stays model-invocable. How `ask` behaves under auto mode and under `-p` is not yet checked in a live session.
+- A `claude plugin eval` suite in `evals/`: one natural-phrasing trigger case for each of the 11 plugin skills, and near-miss negatives for cmp-new, grill-me and cmp-doctor. Each case has a `tool_used` grader on the Skill tool and a `regex` result grader, runs 3 times, and is run locally at release (`evals/README.md`, npm-publish step 2). Results go to `evals/results/`, which is gitignored. `test/plugin-evals-are-well-formed.test.mjs` checks the shape.
+- CI asks whether the plugin loads. The new `plugin loads` job installs a pinned Claude Code CLI
+  (`@anthropic-ai/claude-code@2.1.283`) and runs `claude plugin validate --strict --json .`. It is not
+  a required check yet (GATE-RULES Rule 1: calibrate on a recorded run first); if `--strict` is red on
+  the root layout, that red is logged as data for the plugin-root split, and `--strict` stays. The
+  `plugin_errors` check needs an authenticated CLI, so it is a release step in the npm-publish skill
+  (FIX-PLAN slice 13, PK3, C-4).
+- `create-cmp doctor --adherence` prints the adherence report card (U2). There are nine rows,
+  each derived from this machine and repo: project hooks registered and runnable, no scope
+  disabling hooks, the pre-push gate, CI Verify present and required, the receipt attesting HEAD,
+  user-scope credential-read denies, the release acts decided at user scope, plugin bytes against
+  the marketplace, and cmp-inspector configured. Each row reads PASS, FAIL or UNKNOWN with its
+  fixing command, and UNKNOWN never renders as PASS. `--adherence --fix` asks yes/no per entry
+  before appending PM1's `permissions.deny` and `permissions.ask` entries to
+  `~/.claude/settings.json` in place. It never adds an ask that shadows an existing `allow` or
+  `autoMode.allow`, and reports that conflict instead. The ruleset and the sandbox advice are
+  printed and never applied (FIX-PLAN slice 14; PM1–PM3, D4, B-L-7).
 
 ### Security
 
@@ -153,6 +91,25 @@ now reach the agent, in a rebuilt bundle. 0.28.5 was set mid-batch and never pub
   cmp-inspector is a fault to run cmp-doctor on locally and expected in a cloud session or routine;
   and `permissions.ask` guards edits to the gate's own files. `doctor --fix` still heals a 0.26.2
   Stop hook to its anchored form and does not write the launcher an older lane lacks.
+- **The stamped `CLAUDE.md` loads the walk, approvals, comments, lane and UI-loop sections only when they apply.**
+  Approvals, Comments and "The lane is not yours to edit" moved to path-scoped `.claude/rules/approvals.md`,
+  `comments.md` and `lane.md`, whose `paths:` globs name the files they govern (`qa/approvals.json`, `specs/**`,
+  theme, components, screens; `qa/comments.json`; the machine-owned `qa/*.mjs`, `qa/lib/**/*.mjs` and lane
+  declarations). The walk and the UI feedback loop moved to the project skills `walk` and
+  `ui-loop`. `CLAUDE.md` keeps the definition of done, the visible triage and grill rule, a short statement of
+  the lane boundary, and one pointer to each. The harness-mode rendering goes from 395 lines to 190. `--minimal` deletes `.claude/rules` as it
+  deletes `.claude/skills`, and the `ui-loop` skill leaves with the inspector.
+  `test/a-path-scoped-rule-fires-on-a-stamped-file.test.mjs` stamps an app and fails on a rule glob that
+  matches no stamped file, or on a stamped `CLAUDE.md` over 200 lines in full or minimal mode.
+- **`cmp-inspector` tools are found by what they do, and say what they touch.** Each of the 15
+  descriptions opens with the act and a "Use when …" sentence, moves design-doc references to the
+  end, and stays within 1,024 characters. The read tools carry `readOnlyHint: true`, `connect_live`
+  carries `destructiveHint: true`, and `resolve_comment` carries
+  `_meta["anthropic/requiresUserInteraction"]: true`, so the agent can no longer close the human's
+  comments without the human seeing it. `runtime_logs`, `runtime_crashes` and `db_query` label
+  their output as untrusted app-controlled text. `inspector/mcp/test/tool-descriptions.test.mjs`
+  reads all of it back from the raw `tools/list` response of the source server and the bundle.
+- The plugin skills reach plugin files as `${CLAUDE_PLUGIN_ROOT}/…`; cmp-test leads with Maestro (Appium moved to `references/legacy-appium.md`) and cmp-new's guided walk moved to `references/guided-walk.md`; every skill description fits the spec's 1,024 characters (`test/skill-description-budget.test.mjs`); the staff reviewer blocks on a diff that does not do what its brief asked; cmp-orchestrator drops `Task` and `TodoWrite` from its tools.
 
 ### Fixed
 
@@ -176,6 +133,31 @@ now reach the agent, in a rebuilt bundle. 0.28.5 was set mid-batch and never pub
   artifact attestations exist on every plan (ADR-0017, "Private repositories").
 - A stamped app's `.claude/settings.json` asks before edits to `qa/hooks/**`, so the Stop gate's
   fail-closed launcher is guarded like the gate's other files; `--minimal` drops the rule with the lane.
+- `doctor --adherence` reads permission rules at every scope Claude Code merges (user, project `.claude/settings.json`, local `.claude/settings.local.json`, managed): `--fix` no longer writes a user-scope ask or deny over an allow held at another scope, and "Release acts gated" passes when any scope asks for or deliberately allows the act. Its "Plugin bytes current" row now compares in both directions (missing, differing, extra) with the same `src/lib/plugin-bytes.mjs` that `scripts/plugin-refresh.mjs` uses, and that module ships in the npm package, so the row can answer outside a checkout.
+- The inspector MCP's `inspect_tree` is no longer marked `readOnlyHint: true`: its `out` parameter writes a file to any path, so a client must not skip the prompt for it.
+- The executor, orchestrator, deep-worker and staff-reviewer definitions each carry a "Brief fields" block with the labels brief-check reads, and brief-check's deny reason points to that block. The orchestrator's brief template now writes those labels, so its spawns are no longer denied on the first try.
+- `create-cmp harden` merges `.claude/settings.json` cleanly after `add firebase`. A `--minimal` app
+  that ran `add firebase` carries its consent hook and ask rule in that file, and harden's line merge
+  saw both sides move the same lines: the file went to the conflicted bucket with a `.cmp-new`
+  sidecar, and the full lane's Stop gate, hooks and ask rules waited on a hand resolution. The
+  three-way walk (harden and `upgrade --harness`) now merges that file as JSON: objects key by key,
+  `hooks.<event>` by matcher and command text, `permissions.allow`/`ask`/`deny` as sets. A hook or
+  rule either side added survives, and only what one side removed while the other left it alone
+  goes; both sides changing one value differently still falls back to the line merge and its
+  sidecar. `test/a-minimal-app-that-added-firebase-hardens-without-a-settings-conflict.test.mjs`.
+
+- `node scripts/plugin-refresh.mjs --check`, and the SessionStart line built on it, no longer say
+  "current" over older bytes under the right version number. Each scope's `installPath` from
+  `installed_plugins.json` is compared byte for byte with the marketplace clone at HEAD, in both
+  directions, and only a match is current. The refresh no longer removes a version directory a running
+  session holds: when its `.in_use/` names a live process, it refuses and lists the holders, where it
+  used to delete the directory and its leases and then report every session as reloaded. It now takes
+  the documented path first (`claude plugin marketplace update`, then `claude plugin update` per scope),
+  falls back to its own rebuild only when that leaves the install stale, and its closing lines print
+  only what it read back from disk. An ignored nested path (`inspector/mcp/node_modules/`) no longer
+  takes its whole top-level directory out of the byte comparison. `scripts/check-plugin-sync.mjs`,
+  which reported a correctly updated machine as drifted and which nothing but its own test called, is
+  retired (FIX-PLAN slice 13, PK2, C-3, C-9).
 
 
 ## [0.28.4] - 2026-09-27
