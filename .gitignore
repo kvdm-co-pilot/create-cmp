@@ -61,3 +61,7 @@ myapp/
 # sitting inside the repo. `npm test` no longer globs them (it names its roots),
 # but `git status` and every "is the tree clean" check still would.
 .claude/worktrees/
+
+# Plugin eval runs (`claude plugin eval`) — report.html and aggregate-result.json per run; a
+# release-time record kept locally, never committed (evals/README.md).
+evals/results/
