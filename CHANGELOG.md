@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.5] - 2026-09-29
+
+The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the
+CI-attested receipt reader, and `@create-cmp/inspector` 0.9.2 carries the server instructions that
+now reach the agent, in a rebuilt bundle. Nothing is published.
+
 ### Added
 
 - Every gate says what it compensates for. Each tier in `scripts/proof-plan.mjs` `TIERS` and each act
