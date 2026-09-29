@@ -1,4 +1,19 @@
 {
+  "permissions": {
+    "ask": [
+      "Edit(scripts/hooks/**)",
+      "Write(scripts/hooks/**)",
+      "Edit(scripts/proof-plan.mjs)",
+      "Edit(scripts/observed-tree.mjs)",
+      "Edit(scripts/stamped-output.mjs)",
+      "Edit(qa-artifacts/**)",
+      "Write(qa-artifacts/**)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2",
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "4"
+  },
   "hooks": {
     "SessionStart": [
       {
