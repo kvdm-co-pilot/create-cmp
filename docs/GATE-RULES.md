@@ -396,8 +396,13 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   schedule added as context. The gate refuses or adds context; it never grants: a pass carries no
   permissionDecision, so the call still meets the user's own permission rules. `gh pr merge` is
   refused while the tier is owed — the slice closes at
-  merge, so that is where "once, at slice close" is collected. SessionStart puts the schedule in
-  front of the session. The audit the day after this rule landed found the program above existed
+  merge, so that is where "once, at slice close" is collected. The other roads onto trunk —
+  `gh api …/pulls/<n>/merge`, `git push <remote> <src>:main` — meet the merge refusal, and
+  `pnpm`/`bun`/`yarn publish` the publish refusal, however the command is spelled. The gate runs
+  behind `scripts/hooks/fail-closed.sh`, which turns a gate that crashed or outran its 9 s
+  deadline into a refusal for a command its prefilter matches; a hard kill by Claude Code itself
+  stays fail-open, which is what the opt-in `.githooks/pre-push` and CI are for. SessionStart puts
+  the schedule in front of the session. The audit the day after this rule landed found the program above existed
   and **nothing invoked it**: no settings file in this repo, no git hooks, every `--open` in prose.
   A rule made executable and left for the reader to remember to run is the same defect one layer
   up — while the template this repo stamps had carried the equivalent PreToolUse hooks for
@@ -416,8 +421,8 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   **Accepted:** a separator — the start, `;` `&&` `||` `|` `(`, a newline, or `-c "` which is the
   one place a quotation opens a command — then any run, in any order, of `VAR=value` assignments,
   redirections (`2>/dev/null`, `>out`, `2>&1`), and these wrapper words: `!`, `builtin`,
-  `caffeinate`, `command`, `env`, `eval`, `exec`, `nice`, `nohup`, `sudo`, `time`, `timeout`,
-  `xargs`. Each wrapper carries its own options, the values of the options **that wrapper** is
+  `caffeinate`, `command`, `env`, `eval`, `exec`, `nice`, `noglob`, `nohup`, `stdbuf`, `sudo`, `time`,
+  `timeout`, `xargs`. Each wrapper carries its own options, the values of the options **that wrapper** is
   declared to take separately (`sudo -u nobody`, `nice -n 10`, `timeout -s KILL`), and a bare
   operand only where it has one — `timeout`'s duration, and nothing else on the list.
 

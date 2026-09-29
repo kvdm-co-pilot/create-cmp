@@ -23,6 +23,7 @@ cd create-cmp
 node --test                 # run the engine unit tests
 node bin/create-cmp.mjs --help
 node bin/create-cmp.mjs doctor --dry-run   # inspect the toolchain checks, no mutation
+git config core.hooksPath .githooks        # opt in: pre-push refuses landing on main while a slice owes
 ```
 
 To try a real stamp:

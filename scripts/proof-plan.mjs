@@ -30,6 +30,7 @@
 //   node scripts/proof-plan.mjs --rekey             re-derive an OLD-rule fleet record's digest under
 //                                                   the current rule (a stamp of its commit, no L2 run)
 //   node scripts/proof-plan.mjs --close             refuse if anything is still owed
+//   node scripts/proof-plan.mjs --pre-push          git's pre-push hook: refuse a push onto main while owed
 //   node scripts/proof-plan.mjs --history [--json]  what settled slices cost, from the kept records
 //
 // NOTHING IS DELETED WITHOUT BEING KEPT. A settled plan, every review record and
@@ -226,8 +227,35 @@ const TIERS = Object.freeze({
   },
 });
 
+/**
+ * The moment every git call must have answered by, or null for "no deadline".
+ *
+ * Set by the proof gate from what is left of ITS budget (B-L-2): a PreToolUse
+ * hook Claude Code kills at its declared timeout delivers no decision, and an
+ * undelivered decision is a PERMITTED command. Before this, `sh()` had no
+ * bound at all, so a git call stalled by a slow disk after the Mac woke could
+ * spend the whole budget and the merge it was judging would run. A call past
+ * the deadline answers like any failed git call — a null change set, which
+ * owes the tier — so running out of time is a refusal, never a pass.
+ */
+let gitDeadline = null;
+
+/** `ms` from now is when git must have answered; a number ≤ 0 means already out of time; null clears it. */
+export function setGitDeadline(ms) {
+  gitDeadline = typeof ms === "number" && Number.isFinite(ms) ? Date.now() + Math.max(0, ms) : null;
+}
+
 function sh(cmd, args, cwd = REPO_ROOT) {
-  return spawnSync(cmd, args, { cwd, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  const opts = { cwd, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 };
+  // A read-only question must not take the index lock a concurrent `git`
+  // (another worktree's commit, an editor) is holding — nor wait on it.
+  if (cmd === "git") opts.env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
+  if (gitDeadline !== null) {
+    const left = gitDeadline - Date.now();
+    if (left <= 0) return { status: null, signal: null, stdout: "", stderr: "", error: Object.assign(new Error("the gate's deadline passed before git was asked"), { code: "ETIMEDOUT" }) };
+    opts.timeout = left;
+  }
+  return spawnSync(cmd, args, opts);
 }
 
 /**
@@ -1402,6 +1430,32 @@ export function reviewDischarge(record, now) {
 function main() {
   const argv = process.argv.slice(2);
   const flag = (n) => argv.indexOf(n);
+
+  if (flag("--pre-push") !== -1) {
+    // Git's pre-push hook (.githooks/pre-push): stdin is one line per ref,
+    // `<local ref> <local sha> <remote ref> <remote sha>`. A push that lands on
+    // trunk is judged exactly as `gh pr merge` is — the at-close tiers of THIS
+    // checkout — because it is the same act by another road (B-3/B-4: `git push
+    // origin HEAD:main` walked past the Claude Code hook). Every other push
+    // costs one stdin read and nothing else.
+    const input = process.stdin.isTTY ? "" : fs.readFileSync(0, "utf8");
+    const toMain = input
+      .split("\n")
+      .map((l) => l.trim().split(/\s+/))
+      .filter((f) => f.length >= 4 && f[2] === "refs/heads/main" && !/^0+$/.test(f[1]));
+    if (!toMain.length) process.exit(0);
+    const head = sh("git", ["rev-parse", "HEAD"]);
+    const foreign = toMain.filter((f) => head.status !== 0 || f[1] !== head.stdout.trim());
+    if (foreign.length) {
+      process.stderr.write(`pre-push: refusing — this push lands ${foreign.map((f) => f[0]).join(", ")} on main, which is not the checked-out commit, and the schedule is read from the checkout only. Check out what you are landing, or merge it through a PR.\n`);
+      process.exit(1);
+    }
+    const o = obligation();
+    const owed = outstanding(o);
+    if (!owed.length) process.exit(0);
+    process.stderr.write(`${render(o)}\n\npre-push: refusing — this push lands on main and the slice still owes: ${owed.join(", ")}. Collect them (the lines above say how), or merge through a PR once they are discharged.\n`);
+    process.exit(1);
+  }
 
   if (flag("--open") !== -1) {
     const name = argv[flag("--open") + 1];

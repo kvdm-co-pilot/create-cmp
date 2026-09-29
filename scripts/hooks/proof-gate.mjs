@@ -54,7 +54,11 @@
 // A matched command the gate cannot answer is REFUSED (exit 2, reason on stderr):
 // "I could not check" is not "I checked". An unmatched command never reaches code
 // that can throw — a gate that blocked every Bash call because stdin was odd would
-// be removed within the hour, and rightly.
+// be removed within the hour, and rightly. A gate that cannot run AT ALL — node
+// missing, a segfault, a hang — exits neither 0 nor 2, which Claude Code treats as
+// permission; so the PreToolUse wiring runs this file behind scripts/hooks/fail-closed.sh,
+// which turns that into a refusal for a command its prefilter matches and into
+// silence for any other (B-L-1). Only a hard kill of the launcher itself stays open.
 //
 // AND EVERY ONE OF THOSE VERDICTS IS ABOUT THE TREE THE COMMAND WILL ACT ON, which
 // is not necessarily the tree this file was loaded from. See "WHICH TREE IS THIS
@@ -186,7 +190,13 @@ const WRAPPER_ARITY = Object.freeze({
   eval: { flags: "", operand: null },
   exec: { flags: "a", operand: null },
   nice: { flags: "n", operand: null },
+  noglob: { flags: "", operand: null },
   nohup: { flags: "", operand: null },
+  // GNU coreutils; not on macOS. `-i`/`-o`/`-e` each take the buffering mode as a
+  // separate word when not joined (`stdbuf -o 0`); `-o0` is one token. Claude
+  // Code's own permission matcher strips `stdbuf` and `noglob` (note 07:44), so a
+  // gate that did not was narrower than the prompt it sits beside (B-3).
+  stdbuf: { flags: "ioe", operand: null },
   sudo: { flags: "ugprtUC", operand: null },
   time: { flags: "of", operand: null },
   timeout: { flags: "sk", operand: "\\d+(?:\\.\\d+)?[smhd]?" },
@@ -265,7 +275,7 @@ const MASKED_SEPARATOR = `(?:^|[${SEPARATORS}){}])`;
  * boundary only when it opens a `-c` script, which is the one place a quoted
  * string IS a command.
  */
-const invocation = (prog) => new RegExp(`${RAW_SEPARATOR}\\s*${COMMAND_PREFIX}${prog}(?=\\s|$|["')])`);
+const invocation = (prog) => new RegExp(`${RAW_SEPARATOR}\\s*${COMMAND_PREFIX}(${prog})(?=\\s|$|["')])`);
 
 /**
  * One piece of a shell word: an unquoted character, a backslash escape, or a
@@ -289,8 +299,13 @@ const WORD_PIECE = `(?:[^\\s;&|()<>"'\\\\]|\\\\[^\\n]|"[^"\\n]*"|'[^'\\n]*')`;
  */
 const FLEET_CHECK_WORD = `(?:${WORD_PIECE}*(?:/|"[^"\\n]*/"?|'[^'\\n]*/'?)|["'])?fleet-check\\.mjs`;
 
-/** The same word, captured, for the reader that must resolve it to a directory. */
-const FLEET_CHECK_OPERAND = new RegExp(`node\\s+(${FLEET_CHECK_WORD})`);
+/**
+ * The same word, captured, for the reader that must resolve it to a directory —
+ * behind any run of node's own one-word flags (`--max-old-space-size=4096`), which
+ * `locate()`'s argv reader sees through. A flag that takes its value as a separate
+ * word (`-r x`) leaves the word unreadable here, and the run is refused by name.
+ */
+const FLEET_CHECK_OPERAND = new RegExp(`node(?:\\s+-[^\\s;&|()<>]*)*\\s+(${FLEET_CHECK_WORD})`);
 
 /** What may stand where that word ENDS. Anything else and the shell's word is longer than the one read — `"…/fleet-check.mjs"x` runs a file this gate did not see. */
 const WORD_END = /^[\s;&|()<>"']/;
@@ -302,9 +317,363 @@ export const WATCHED = Object.freeze({
   publish: invocation("npm\\s+publish"),
 });
 
+/** Each watched pattern, global and with match indices, so a match that is only a quoted MENTION can be stepped over and the program's own position read. */
+const FIND = Object.entries(WATCHED).map(([kind, re]) => [kind, new RegExp(re.source, "dg")]);
+
 export function classify(command) {
-  for (const [kind, re] of Object.entries(WATCHED)) if (re.test(command)) return kind;
+  return locate(command)?.kind ?? null;
+}
+
+/**
+ * Which gated act a command invokes, and WHERE the command that invokes it
+ * begins (`index`, what `commandCwd` cuts the prefix at) — or null.
+ *
+ * TWO READERS, ONE ANSWER, and the second exists because the first reads TEXT.
+ * The patterns above find a program named at a command position, and they are
+ * kept: they are what sees `sh -c "…"`, `$(…)`, `xargs` and every shape the
+ * `/bin/sh` oracles sweep. What they cannot see is a program spelled any way but
+ * its bare name, or a subcommand behind a global flag — and B-3 (the
+ * 2026-09-28 pattern review) executed fourteen such spellings to `null`, i.e. to
+ * NO GATE AT ALL: `gh -R o/r pr merge 1`, `npm -w pkg publish`,
+ * `/opt/homebrew/bin/gh pr merge 1`, `"gh" pr merge 1`, `g\h pr merge 1`,
+ * `stdbuf -o0 gh pr merge 1`, `noglob gh pr merge 1`, `npx -y npm publish`,
+ * `npm exec -- npm publish`, `pnpm publish`, `bun publish`,
+ * `gh api -X PUT …/pulls/1/merge`, `git push origin HEAD:main` and
+ * `node --max-old-space-size=4096 scripts/fleet-check.mjs`. So when the
+ * patterns find nothing, the command is split into its top-level simple commands
+ * and each one's ARGV is read: assignments and the wrapper table stepped over,
+ * the program's basename taken, `npx`/`npm exec` launchers unwrapped, global
+ * flags and their values skipped, and then the subcommand matched (`act`).
+ *
+ * WHERE IT STOPS, stated so nobody mistakes it for a shell: the argv of simple
+ * commands at the top level, separated by `;` `&&` `||` `|` `&` `(` `)` and
+ * newlines, with quotes, escapes, comments and heredoc bodies honoured. It does
+ * not expand variables or aliases, does not read `bash -c "$(…)"`, a brace group
+ * or an `if`, and does not follow a script that calls `gh` itself. Those remain
+ * outside this gate; the pre-push hook (.githooks/pre-push) and CI are the
+ * layers that see effects rather than spellings.
+ *
+ * A QUOTED MENTION IS NOT A COMMAND (B-L-11). A pattern match whose program
+ * stands inside a closed quotation that is not a script — not opened by `-c`
+ * (`sh -c "…"`, `bash -lc '…'`) or `eval` — is text: the argument of `echo`, a
+ * line of a heredoc body, a commit message. The live gate refused an audit's own
+ * heredoc for "a quotation still open where the command begins" because a line of
+ * its body read `"bash -c 'gh pr merge 1'"`. Such a match is stepped over, and
+ * the gated command itself left unquoted is still found. Where the quotation
+ * reader could be wrong about where a quote ends — a backquote or `$'…'`
+ * anywhere, a `$(` inside double quotes or inside an unquoted heredoc body — no
+ * match is stepped over, so an unreadable command is judged, never waved on.
+ */
+export function locate(command) {
+  const cmd = String(command ?? "");
+  let lexed = null;
+  for (const [kind, re] of FIND) {
+    re.lastIndex = 0;
+    for (let m = re.exec(cmd); m; m = re.exec(cmd)) {
+      lexed ??= lex(cmd);
+      if (!quotedMention(lexed, m.indices[1][0])) return { kind, index: m.index };
+      if (re.lastIndex <= m.index) re.lastIndex = m.index + 1;
+    }
+  }
+  for (const c of (lexed ?? lex(cmd)).commands) {
+    const kind = act(c.words);
+    if (kind) return { kind, index: c.start };
+  }
   return null;
+}
+
+/** A quotation that opens a SCRIPT rather than an argument: behind `-c` (any `-…c` cluster, `bash -lc`) or `eval`. */
+const SCRIPT_OPENER = /(?:^|[\s;&|(])(?:-[A-Za-z]*c|eval)\s+$/;
+
+function quotedMention({ spans, unsure }, pos) {
+  if (unsure) return false;
+  const q = spans.find((s) => s.start < pos && pos < s.end);
+  return Boolean(q) && !q.script;
+}
+
+/**
+ * The command split into top-level simple commands — `{ start, words }`, each
+ * word with its quotes and escapes removed — plus every closed quotation it
+ * met, and `unsure` when a construct this reader does not pair (a backquote,
+ * `$'…'`, a `$(` inside double quotes or an unquoted heredoc body) could move
+ * where a quotation really ends. Linear in the command's length: one pass, no
+ * backtracking, so it spends none of the gate's budget on a long command.
+ */
+function lex(cmd) {
+  const n = cmd.length;
+  const commands = [];
+  const spans = [];
+  let unsure = /`|\$'/.test(cmd);
+  let words = [];
+  let word = null;
+  let start = -1;
+  let heredocs = [];
+  const add = (s, at) => {
+    if (word === null) {
+      word = "";
+      if (start < 0) start = at;
+    }
+    word += s;
+  };
+  const endWord = () => {
+    if (word !== null) words.push(word);
+    word = null;
+  };
+  const endCommand = () => {
+    endWord();
+    if (words.length) commands.push({ start, words });
+    words = [];
+    start = -1;
+  };
+  /** The quotation opening at `i`, closed before `limit` — or null when it never closes. */
+  const quoted = (i, from, limit = n) => {
+    const q = cmd[i];
+    let j = i + 1;
+    let value = "";
+    while (j < limit && cmd[j] !== q) {
+      if (q === '"' && cmd[j] === "\\" && j + 1 < limit) {
+        value += '"\\$`\n'.includes(cmd[j + 1]) ? cmd[j + 1] : cmd[j] + cmd[j + 1];
+        j += 2;
+        continue;
+      }
+      value += cmd[j];
+      j += 1;
+    }
+    if (j >= limit) return null;
+    if (q === '"' && cmd.slice(i + 1, j).includes("$(")) unsure = true;
+    spans.push({ start: i, end: j, script: SCRIPT_OPENER.test(cmd.slice(Math.max(from, i - 80), i)) });
+    return { end: j, value };
+  };
+  /** One shell word from `i` (a redirection's target, a heredoc's delimiter). */
+  const readWord = (i) => {
+    while (i < n && (cmd[i] === " " || cmd[i] === "\t")) i += 1;
+    let value = "";
+    let wasQuoted = false;
+    while (i < n && !/[\s;&|()<>]/.test(cmd[i])) {
+      const c = cmd[i];
+      if (c === "\\") {
+        value += cmd[i + 1] ?? "";
+        wasQuoted = true;
+        i += 2;
+        continue;
+      }
+      if (c === "'" || c === '"') {
+        const j = cmd.indexOf(c, i + 1);
+        if (j < 0) return { end: n, value, quoted: true };
+        value += cmd.slice(i + 1, j);
+        wasQuoted = true;
+        i = j + 1;
+        continue;
+      }
+      value += c;
+      i += 1;
+    }
+    return { end: i, value, quoted: wasQuoted };
+  };
+  /** The bodies of the heredocs opened on the line just ended: not commands, and their quotations are line-local. */
+  const bodies = (i) => {
+    for (const h of heredocs) {
+      while (i < n) {
+        const nl = cmd.indexOf("\n", i);
+        const eol = nl < 0 ? n : nl;
+        const line = cmd.slice(i, eol);
+        if ((h.dash ? line.replace(/^\t+/, "") : line) === h.delim) {
+          i = eol + 1;
+          break;
+        }
+        if (!h.quoted && /\$\(|`/.test(line)) unsure = true;
+        for (let k = i; k < eol; k += 1) {
+          if (cmd[k] !== "'" && cmd[k] !== '"') continue;
+          const q = quoted(k, i, eol);
+          if (!q) break;
+          k = q.end;
+        }
+        i = eol + 1;
+      }
+    }
+    heredocs = [];
+    return Math.min(i, n);
+  };
+
+  let i = 0;
+  while (i < n) {
+    const c = cmd[i];
+    if (c === "\n") {
+      endCommand();
+      i += 1;
+      if (heredocs.length) i = bodies(i);
+      continue;
+    }
+    if (c === " " || c === "\t" || c === "\r") {
+      endWord();
+      i += 1;
+      continue;
+    }
+    if (";&|()".includes(c)) {
+      endCommand();
+      i += 1;
+      continue;
+    }
+    if (c === "#" && word === null) {
+      while (i < n && cmd[i] !== "\n") i += 1;
+      continue;
+    }
+    if (c === "\\") {
+      if (cmd[i + 1] !== "\n") add(cmd[i + 1] ?? "", i);
+      i += 2;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      const q = quoted(i, 0);
+      if (!q) break; // never closes: the shell refuses the whole line, and what was read so far is still judged
+      add(q.value, i);
+      i = q.end + 1;
+      continue;
+    }
+    if (c === "<" || c === ">") {
+      if (word !== null && /^\d+$/.test(word)) word = null;
+      else endWord();
+      if (cmd.startsWith("<<", i) && cmd[i + 2] !== "<") {
+        i += 2;
+        const dash = cmd[i] === "-";
+        if (dash) i += 1;
+        const w = readWord(i);
+        heredocs.push({ delim: w.value, quoted: w.quoted, dash });
+        i = w.end;
+        continue;
+      }
+      while (i < n && "<>&|".includes(cmd[i])) i += 1;
+      i = readWord(i).end;
+      continue;
+    }
+    add(c, i);
+    i += 1;
+  }
+  endCommand();
+  return { commands, spans, unsure };
+}
+
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const basename = (w) => w.slice(w.lastIndexOf("/") + 1);
+
+/**
+ * The program and its arguments, past what stands in front of it: `VAR=value`
+ * assignments and the wrapper table above — the SAME table the patterns read,
+ * each wrapper with the flags its own entry declares, so there is still one
+ * list. `eval` re-splits what it is handed, because that is what it runs.
+ */
+function argvOf(words) {
+  let w = words;
+  let i = 0;
+  for (;;) {
+    while (i < w.length && ASSIGNMENT.test(w[i])) i += 1;
+    if (i >= w.length) return null;
+    const name = basename(w[i]);
+    if (!Object.hasOwn(WRAPPER_ARITY, name)) return { prog: name, args: w.slice(i + 1) };
+    i += 1;
+    if (name === "eval") {
+      w = [...w.slice(0, i), ...w.slice(i).join(" ").split(/\s+/).filter(Boolean)];
+      continue;
+    }
+    const { flags, operand } = WRAPPER_ARITY[name];
+    while (i < w.length && /^-./.test(w[i])) {
+      const f = w[i++];
+      if (f === "--") break;
+      if (f.length === 2 && flags.includes(f[1])) i += 1;
+    }
+    if (operand && i < w.length && new RegExp(`^(?:${operand})$`).test(w[i])) i += 1;
+  }
+}
+
+/** Past a run of flags, each flag in `takesValue` with its separate value; a `--` is consumed and ends the run. */
+function skipFlags(args, j, takesValue) {
+  while (j < args.length && /^-./.test(args[j])) {
+    const f = args[j++];
+    if (f === "--") break;
+    if (!f.includes("=") && takesValue.has(f)) j += 1;
+  }
+  return j;
+}
+
+// The global flags each program takes a SEPARATE value for, so the value is not read as the subcommand.
+const GH_VALUE = new Set(["-R", "--repo", "--hostname"]);
+const NPM_VALUE = new Set(["-w", "--workspace", "-C", "--prefix", "--cache", "--loglevel", "--registry", "--userconfig"]);
+const PM_VALUE = new Set(["-C", "--dir", "--cwd", "-F", "--filter", "--registry"]);
+const NPX_VALUE = new Set(["-p", "--package", "-c", "--call"]);
+const GIT_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace"]);
+const PUSH_VALUE = new Set(["-o", "--push-option", "--repo", "--receive-pack", "--exec"]);
+const NODE_VALUE = new Set(["-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--input-type", "--env-file", "--title", "--inspect-port"]);
+const NODE_EVAL = new Set(["-e", "--eval", "-p", "--print"]);
+/** `gh api` merging a pull request: `repos/{owner}/{repo}/pulls/1/merge`, any method. */
+const PULL_MERGE = /(?:^|\/)pulls\/[^/\s]+\/merge\/?$/;
+/** A push refspec whose destination is trunk: `HEAD:main`, `x:main`, `+x:refs/heads/main`. */
+const TO_MAIN = /^\+?[^:]*:(?:refs\/heads\/)?main$/;
+/** A launcher's package spec may name a version: `npx npm@10 publish` runs npm. */
+const unversioned = (words) => (words.length ? [words[0].replace(/^((?:.*\/)?(?:npm|pnpm|yarn|bun))@[^/]*$/, "$1"), ...words.slice(1)] : words);
+
+/**
+ * The gated act one simple command performs, read from its argv — or null.
+ * A push of any ref to `main` is judged as the merge it is: it lands on trunk
+ * exactly as `gh pr merge` does, and owes what the merge owes.
+ */
+function act(words, depth = 0) {
+  const argv = depth > 3 ? null : argvOf(words);
+  if (!argv) return null;
+  const { prog, args } = argv;
+  let j;
+  switch (prog) {
+    case "gh":
+      j = skipFlags(args, 0, GH_VALUE);
+      if (args[j] === "pr") {
+        j = skipFlags(args, j + 1, GH_VALUE);
+        return args[j] === "merge" ? "merge" : args[j] === "create" ? "create" : null;
+      }
+      if (args[j] === "api") return args.slice(j + 1).some((a) => PULL_MERGE.test(a)) ? "merge" : null;
+      return null;
+    case "npm":
+      j = skipFlags(args, 0, NPM_VALUE);
+      if (args[j] === "publish") return "publish";
+      if (args[j] === "exec" || args[j] === "x") return act(unversioned(args.slice(skipFlags(args, j + 1, NPX_VALUE))), depth + 1);
+      return null;
+    case "npx":
+      return act(unversioned(args.slice(skipFlags(args, 0, NPX_VALUE))), depth + 1);
+    case "pnpm":
+    case "bun":
+    case "yarn":
+      j = skipFlags(args, 0, PM_VALUE);
+      if (prog === "yarn" && args[j] === "workspace") j = skipFlags(args, j + 2, PM_VALUE);
+      if (prog === "yarn" && args[j] === "npm") j += 1;
+      return args[j] === "publish" ? "publish" : null;
+    case "git": {
+      j = skipFlags(args, 0, GIT_VALUE);
+      if (args[j] !== "push") return null;
+      const operands = [];
+      for (j += 1; j < args.length; j += 1) {
+        if (args[j] === "--") {
+          operands.push(...args.slice(j + 1));
+          break;
+        }
+        if (/^-./.test(args[j])) {
+          if (!args[j].includes("=") && PUSH_VALUE.has(args[j])) j += 1;
+          continue;
+        }
+        operands.push(args[j]);
+      }
+      return operands.slice(1).some((r) => TO_MAIN.test(r)) ? "merge" : null;
+    }
+    case "node":
+      for (j = 0; j < args.length && /^-./.test(args[j]); j += 1) {
+        if (NODE_EVAL.has(args[j])) return null;
+        if (args[j] === "--") {
+          j += 1;
+          break;
+        }
+        if (NODE_VALUE.has(args[j])) j += 1;
+      }
+      return args[j] !== undefined && basename(args[j]) === "fleet-check.mjs" ? "device" : null;
+    default:
+      return null;
+  }
 }
 
 // A pass is not a grant: the verdict's action stays "allow" inside this file (the
@@ -1090,7 +1459,11 @@ function unclosedQuote(word) {
 export function commandCwd(kind, command, cwd) {
   const cmd = String(command ?? "");
   let dir = typeof cwd === "string" && cwd ? cwd : process.cwd();
-  const at = WATCHED[kind]?.exec(cmd)?.index ?? 0;
+  // Where the command that performs the act begins, as `locate()` found it — the
+  // pattern's match, or the start of the simple command the argv reader matched —
+  // so a leading `cd` in front of `stdbuf -o0 gh pr merge` is still read.
+  const found = locate(cmd);
+  const at = found?.kind === kind ? found.index : (WATCHED[kind]?.exec(cmd)?.index ?? 0);
   const prefix = cmd.slice(0, at);
 
   // THE `gh` COMMAND'S OWN ARGUMENTS, and not the whole string: `cp -R a b && gh
@@ -1100,6 +1473,11 @@ export function commandCwd(kind, command, cwd) {
   const invoked = cmd.slice(at).replace(/^[;&|(\n]+/, "").split(/[;&|)\n]/)[0];
   if ((kind === "merge" || kind === "create") && NAMED_REPO.test(invoked)) {
     return { unknown: "it names its repository out of band (--repo / GH_REPO), which is not a directory on this machine" };
+  }
+  // `gh api repos/OWNER/REPO/pulls/1/merge` names its repository in the path;
+  // only the `{owner}/{repo}` placeholders are filled from the directory it runs in.
+  if (kind === "merge" && /(?:^|[\s/])repos\/(?!\{owner\}\/\{repo\}\/)[^/\s]+\/[^/\s]+\/pulls\//.test(invoked)) {
+    return { unknown: "it names its repository in the API path (repos/OWNER/REPO/…), which is not a directory on this machine" };
   }
   // WHAT IN FRONT OF THE COMMAND IS ACTUALLY A COMMAND. Everything that is not
   // gets blanked first; what cannot be blanked is refused rather than guessed at.
@@ -1281,7 +1659,12 @@ async function verdict(kind, command, cwd) {
   if (where.unknown) return kind === "create" ? pass(cannotTellCreate(where.unknown)) : deny(cannotTell(where.unknown));
 
   const root = where.root;
-  const { obligation, TIERS, isTrunk } = await planOf(root);
+  const plan = await planOf(root);
+  const { obligation, TIERS, isTrunk } = plan;
+  // Every git call the schedule makes draws on what is left of THIS hook's
+  // budget, less what answering costs (B-L-2). A worktree checked out before
+  // the deadline existed has no setter, and is read as before.
+  plan.setGitDeadline?.(declaredBudgetMs() - (Date.now() - STARTED_MS) - ANSWER_RESERVE_MS);
   const o = obligation();
   let ctx;
   if (kind === "publish") ctx = await releaseContext(root);

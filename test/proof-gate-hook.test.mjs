@@ -507,3 +507,181 @@ test("an obligation with no review block is not a licence to merge — the live 
   const { obligation } = await import("../scripts/proof-plan.mjs");
   assert.ok(obligation().review, "the live obligation carries a review block");
 });
+
+// ─── Slice 5 (2026-09-28 pattern review, B-3 / B-L-11 / B-L-1): the gate reads what will run, and fails closed ───
+
+/**
+ * The fourteen spellings B-3 executed to `null` — no gate at all, the command
+ * simply ran — each with the act it performs. Two of them (`-R`, `-w`) are the
+ * forms docs/GATE-RULES.md already said were refused.
+ */
+const EVADING = [
+  ["gh -R kvdm-co-pilot/create-cmp pr merge 1", "merge"],
+  ["npm -w packages/harness publish", "publish"],
+  ["/opt/homebrew/bin/gh pr merge 1", "merge"],
+  ['"gh" pr merge 1', "merge"],
+  ["g\\h pr merge 1", "merge"],
+  ["stdbuf -o0 gh pr merge 1", "merge"],
+  ["noglob gh pr merge 1", "merge"],
+  ["npx -y npm publish", "publish"],
+  ["npm exec -- npm publish", "publish"],
+  ["pnpm publish", "publish"],
+  ["bun publish", "publish"],
+  ["gh api -X PUT repos/kvdm-co-pilot/create-cmp/pulls/1/merge", "merge"],
+  ["git push origin HEAD:main", "merge"],
+  [`node --max-old-space-size=4096 ${FC}`, "device"],
+];
+
+/** A quoted string or a heredoc body that NAMES a gated act runs none of it (B-L-11: the live gate refused an audit's own heredoc). */
+const QUOTED_MENTIONS = [
+  "cat <<'X'\n\"bash -c 'gh pr merge 1'\",\nX",
+  "echo \"bash -c 'gh pr merge 1'\"",
+  `printf '%s\\n' "npx -y npm publish" "git push origin HEAD:main"`,
+];
+
+test("classify: the spellings that walked past the gate are read as the acts they are; a quoted mention still is not", () => {
+  for (const [cmd, want] of EVADING) assert.equal(classify(cmd), want, JSON.stringify(cmd));
+  const more = [
+    ["yarn npm publish", "publish"],
+    ["gh api -X PUT repos/{owner}/{repo}/pulls/1/merge", "merge"],
+    ["git push origin feature:refs/heads/main", "merge"],
+    ["cd /x && stdbuf -o 0 gh pr merge 1", "merge"],
+    // A quotation that opens a SCRIPT is a command, and the gated act inside it stays found.
+    ['sh -c "cd /x && gh pr merge 1"', "merge"],
+    ["bash -lc 'cd /x && gh pr merge 1'", "merge"],
+    // A comment's apostrophe opens no quotation, so what follows it is still read.
+    ["# don't\ngh pr merge 1", "merge"],
+    // Where the quotation reader could be wrong about where a quote ends, nothing is stepped over.
+    ["cat <<EOF\n'$(gh pr merge 1)'\nEOF", "merge"],
+    ['echo "x" && gh pr merge 1', "merge"],
+    ["git push origin HEAD", null],
+    ["git push -u origin slice-5", null],
+    ["gh api repos/{owner}/{repo}/pulls/1", null],
+    [`node -e 'x' ${FC}`, null],
+    ["npm --registry https://r.example view pkg", null],
+  ];
+  for (const [cmd, want] of more) assert.equal(classify(cmd), want, JSON.stringify(cmd));
+  for (const cmd of QUOTED_MENTIONS) assert.equal(classify(cmd), null, JSON.stringify(cmd));
+});
+
+/**
+ * A worktree of its own that OWES: a slice branch with an undeclared change
+ * under `packages/harness/src/`, which no declaration makes unable to reach the
+ * L2 run — the same synthetic shape
+ * test/the-proof-gate-judges-the-tree-the-command-acts-on.test.mjs builds. The
+ * hook runs from the tree's own copy of scripts/, through the tree's own copy of
+ * .claude/settings.json, so what is measured is the wiring, not the module.
+ */
+let owing = null;
+function owingTree() {
+  if (owing) return owing;
+  const live = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "gate-reads-what-will-run-")));
+  const T = path.join(tmp, "tree");
+  const git = (args) => {
+    const r = spawnSync("git", args, { cwd: T, encoding: "utf8" });
+    assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+  };
+  fs.mkdirSync(path.join(T, "packages", "harness", "src", "lib"), { recursive: true });
+  fs.cpSync(path.join(live, "scripts"), path.join(T, "scripts"), { recursive: true });
+  fs.copyFileSync(path.join(live, "packages", "harness", "src", "lib", "affected-tests.mjs"), path.join(T, "packages", "harness", "src", "lib", "affected-tests.mjs"));
+  fs.mkdirSync(path.join(T, ".claude"), { recursive: true });
+  fs.copyFileSync(path.join(live, ".claude", "settings.json"), path.join(T, ".claude", "settings.json"));
+  fs.writeFileSync(path.join(T, ".gitignore"), ".claude/worktrees/\nqa-artifacts/\n");
+  git(["init", "-q", "-b", "main"]);
+  git(["add", "-A"]);
+  git(["-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "-c", "commit.gpgsign=false", "commit", "-qm", "base"]);
+  git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+  git(["checkout", "-q", "-b", "slice"]);
+  fs.writeFileSync(path.join(T, "packages", "harness", "src", "x.mjs"), "export const x = 1;\n");
+  // No lane is running, whatever the machine is doing: `runningLane()` asks pgrep.
+  const bin = path.join(tmp, "bin");
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(path.join(bin, "pgrep"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+  const env = {
+    ...process.env,
+    PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    CLAUDE_PROJECT_DIR: T,
+    PROOFLANE_HISTORY_DIR: path.join(tmp, "history"),
+    PROOFLANE_SUITE_ROOT: path.join(tmp, "suite"),
+  };
+  const wiring = JSON.parse(fs.readFileSync(path.join(T, ".claude", "settings.json"), "utf8")).hooks.PreToolUse.flatMap((e) => e.hooks).find((h) => h.command.includes("scripts/hooks/proof-gate.mjs")).command;
+  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  owing = { T, env, wiring };
+  return owing;
+}
+
+function preInOwingTree(command) {
+  const { T, env, wiring } = owingTree();
+  const r = spawnSync("sh", ["-c", wiring], {
+    input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command }, cwd: T }),
+    cwd: T,
+    env,
+    encoding: "utf8",
+    timeout: 20000,
+  });
+  assert.equal(r.signal, null, `the hook was killed rather than answering: ${r.stderr}`);
+  assert.equal(r.status, 0, `the hook failed rather than deciding on ${JSON.stringify(command)}: ${r.stderr}`);
+  return r.stdout ? JSON.parse(r.stdout).hookSpecificOutput : null;
+}
+
+test("the spellings that walked past the gate are REFUSED on a tree that owes — through the wiring the settings file runs", { skip: process.platform === "win32" ? "POSIX shell" : false }, () => {
+  const missed = [];
+  for (const [command, kind] of EVADING) {
+    const out = preInOwingTree(command);
+    // A merge or a publish over owed tiers is refused. An L2 run while the tier
+    // is OWED is the one run the gate lets through (with the schedule as
+    // context) — so for that row "judged" is the claim: before, it was silence.
+    const judged = kind === "device" ? out?.permissionDecision === undefined && /OWED/.test(out?.additionalContext ?? "") : out?.permissionDecision === "deny";
+    if (!judged) missed.push(`${JSON.stringify(command)} -> ${out ? JSON.stringify(out).slice(0, 160) : "SILENCE"}`);
+  }
+  assert.deepEqual(missed, [], `${missed.length} of ${EVADING.length} spellings of a gated act were not refused on a tree that owes:\n${missed.join("\n")}`);
+});
+
+test("a heredoc or quoted string that merely names a gated act is SILENT on a tree that owes", { skip: process.platform === "win32" ? "POSIX shell" : false }, () => {
+  for (const command of QUOTED_MENTIONS) assert.equal(preInOwingTree(command), null, `refused a mention: ${JSON.stringify(command)}`);
+});
+
+const FAIL_CLOSED = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/hooks/fail-closed.sh");
+
+test("fail-closed: a gate that cannot answer refuses a command it gates, and never blocks one it does not (B-L-1)", { skip: process.platform === "win32" ? "POSIX shell" : false }, () => {
+  const settings = JSON.parse(fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.claude/settings.json"), "utf8"));
+  const entry = settings.hooks.PreToolUse.flatMap((e) => e.hooks).find((h) => h.command.includes("scripts/hooks/proof-gate.mjs"));
+  assert.match(entry.command, /scripts\/hooks\/fail-closed\.sh" "[^"]*scripts\/hooks\/proof-gate\.mjs" "/, "the PreToolUse gate runs behind the fail-closed launcher");
+  const prefilter = /proof-gate\.mjs" "([^"]+)"/.exec(entry.command)[1];
+  const deadline = Number(/proof-gate\.mjs" "[^"]+" (\d+)/.exec(entry.command)?.[1] ?? 9);
+  assert.ok(deadline < entry.timeout, `the launcher's own deadline (${deadline}s) must fall inside the registered timeout (${entry.timeout}s), or a hang is killed by Claude Code and permitted`);
+
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "fail-closed-")));
+  try {
+    const crash = path.join(tmp, "crash.mjs");
+    const hang = path.join(tmp, "hang.mjs");
+    fs.writeFileSync(crash, "process.exit(139);\n");
+    fs.writeFileSync(hang, "setTimeout(() => {}, 8000);\n");
+    const via = (gate, command, args = []) =>
+      spawnSync("sh", [FAIL_CLOSED, gate, prefilter, ...args], {
+        input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command } }),
+        encoding: "utf8",
+        timeout: 15000,
+      });
+
+    for (const command of ["gh pr merge 1", "npm publish", "git push origin HEAD:main", `node ${FC}`]) {
+      const r = via(crash, command);
+      assert.equal(r.status, 2, `a crashed gate let ${command} through: ${r.stderr}`);
+      assert.match(r.stderr, /gate could not run \(rc=139\) — refusing/);
+    }
+    assert.equal(via(crash, "ls -la").status, 0, "an unmatched command never blocks, even when the gate is broken");
+    assert.equal(via(path.join(tmp, "missing.mjs"), "gh pr merge 1").status, 2, "a missing gate file refuses a gated command");
+
+    const t0 = Date.now();
+    const slow = via(hang, "gh pr merge 1", ["1"]);
+    assert.equal(slow.status, 2, `a gate that outran the launcher's deadline let the merge through: ${slow.stderr}`);
+    assert.ok(Date.now() - t0 < 5000, "the launcher kills a hung gate at its own deadline");
+
+    const live = via(HOOK, "npm test");
+    assert.equal(live.status, 0, live.stderr);
+    assert.equal(live.stdout, "", "an ordinary command through the launcher is still silent");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

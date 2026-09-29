@@ -1,0 +1,9 @@
+#!/bin/sh
+# pre-push: refuse a push that lands on main while this checkout still owes an at-close tier
+# (the L2 run, the Firebase L2 run, a review) — the question `gh pr merge` meets in the Claude
+# Code hook, asked here where git itself asks it: whatever spelled the push, whatever tool ran
+# it, whether or not any Claude Code hook loaded. Pushes to any other ref cost one stdin read.
+#
+# Opt in once per clone: git config core.hooksPath .githooks   (CONTRIBUTING.md)
+# A missing node exits non-zero, and git refuses the push: this hook fails closed.
+exec node "$(git rev-parse --show-toplevel)/scripts/proof-plan.mjs" --pre-push "$@"
