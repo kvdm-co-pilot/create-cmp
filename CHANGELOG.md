@@ -69,6 +69,10 @@ All notable changes to this project are documented here. The format is based on
   `autoMode.allow`, and reports that conflict instead. The ruleset and the sandbox advice are
   printed and never applied (FIX-PLAN slice 14; PM1–PM3, D4, B-L-7).
 
+### Changed
+
+- The plugin skills reach plugin files as `${CLAUDE_PLUGIN_ROOT}/…`; cmp-test leads with Maestro (Appium moved to `references/legacy-appium.md`) and cmp-new's guided walk moved to `references/guided-walk.md`; every skill description fits the spec's 1,024 characters (`test/skill-description-budget.test.mjs`); the staff reviewer blocks on a diff that does not do what its brief asked; cmp-orchestrator drops `Task` and `TodoWrite` from its tools.
+
 ## [0.28.6] - 2026-09-29
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the

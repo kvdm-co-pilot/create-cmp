@@ -2,17 +2,15 @@
 name: cmp-doctor
 description: >-
   Diagnose and heal both the toolchain AND the project a Kotlin/Compose Multiplatform (CMP/KMP)
-  build needs. Use this when the user wants to set up or fix their CMP/KMP toolchain, install
-  the Android SDK / AVD / emulator for KMP, install Appium and its drivers for a Compose
-  Multiplatform app, set up JDK 17 / Xcode / CocoaPods / XcodeGen for KMP, or asks "set up CMP
-  toolchain", "install Appium for KMP", "install Android SDK for Compose Multiplatform", "why won't
-  my KMP project build", "my Compose Multiplatform build fails", "kotlin and ksp version mismatch",
-  "check my version catalog", "prepare my machine for KMP Android + iOS", or "fix my Kotlin
-  Multiplatform environment". When run inside ANY Gradle/KMP project (not just create-cmp-scaffolded
-  ones) it additionally diagnoses the project itself: kotlin↔ksp lockstep, drift vs proven-green
-  version sets, the KSP2/iOS Room catch-22, local.properties/SDK wiring, ~/.konan bloat, and free
-  disk space — with --fix applying the safe heals. Idempotent, OS-aware, and consent-gated — shows
-  each exact command and asks before installing. Ends with a per-dependency GREEN/FAIL verdict.
+  build needs. Use this when the user wants to set up or fix their CMP/KMP toolchain — Android SDK
+  / AVD / emulator, JDK 17, Xcode / CocoaPods / XcodeGen, Appium and its drivers — or asks "set up
+  CMP toolchain", "install Appium for KMP", "install Android SDK for Compose Multiplatform", "why
+  won't my KMP project build", "my Compose Multiplatform build fails", "kotlin and ksp version
+  mismatch", "check my version catalog", "prepare my machine for KMP Android + iOS", or "fix my
+  Kotlin Multiplatform environment". Inside ANY Gradle/KMP project it also diagnoses the project:
+  kotlin↔ksp lockstep, drift from proven-green version sets, the KSP2/iOS Room catch-22, SDK
+  wiring, ~/.konan bloat and free disk — --fix applies the safe heals. Consent-gated: shows each
+  exact command and asks before installing. Ends with a per-dependency GREEN/FAIL verdict.
 ---
 
 # cmp-doctor — bootstrap the CMP toolchain & diagnose the project
@@ -21,7 +19,7 @@ Your job: get the machine to a state where a CMP/KMP project can build (Android,
 and run device tests — and, when run inside a project, get the *project* to a buildable state too.
 (The stamped E2E harness is Maestro — `curl -fsSL https://get.maestro.mobile.dev | bash`; the
 Appium drivers below serve the legacy pre-Maestro path.)
-You wrap the engine's bootstrap (`src/doctor.mjs` per CONTRACT/DESIGN; exposed on the CLI as the
+You wrap the engine's bootstrap (`${CLAUDE_PLUGIN_ROOT}/src/doctor.mjs` per CONTRACT/DESIGN; exposed on the CLI as the
 `doctor` subcommand). **Do not hand-roll installs in bash** when the engine can do
 it — the engine is idempotent and verifies each tool. Use this skill to drive it and to relay its
 consent prompts.
@@ -89,7 +87,7 @@ your session. Report each as GREEN/FAIL with the next command.
    mechanism is the plugin marketplace update flow); the manual fallback that always works
    is `git -C <marketplace-copy> pull`. Then restart the session.
 4. **Bundled server starts** — prove the server binary answers a JSON-RPC initialize:
-   `echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}' | node <plugin-root>/inspector/mcp/dist/server.mjs`
+   `echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}' | node "${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs"`
    — any `"result"` line back = GREEN. A crash or silence = FAIL: the copy is broken or
    half-updated; re-run check 3's remediation, then this again.
 
@@ -107,14 +105,14 @@ Two device-side notes that fit here (field lessons, both reproduced on real apps
 
 ```bash
 # Diagnose + heal, consent-gated (default — asks before each install):
-node <repo>/bin/create-cmp.mjs doctor
+node "${CLAUDE_PLUGIN_ROOT}/bin/create-cmp.mjs" doctor
 
 # Unattended / CI — auto-accept every install:
-node <repo>/bin/create-cmp.mjs doctor --yes
+node "${CLAUDE_PLUGIN_ROOT}/bin/create-cmp.mjs" doctor --yes
 
 # Inside (or pointed at) a KMP project — adds the project diagnosis;
 # --fix applies the safe heals:
-node <repo>/bin/create-cmp.mjs doctor --target-dir . --fix
+node "${CLAUDE_PLUGIN_ROOT}/bin/create-cmp.mjs" doctor --target-dir . --fix
 ```
 
 (If invoked from the published package: `npx create-cmp-cli@latest doctor`.)

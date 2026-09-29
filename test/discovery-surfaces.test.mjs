@@ -27,6 +27,8 @@ test("versions are in lockstep across package.json, plugin.json, and marketplace
 });
 
 test("cmp-new triggers on framework-agnostic mobile-app requests, not only Kotlin vocabulary", () => {
+  // These phrases are a floor, not a push to grow: test/skill-description-budget.test.mjs holds
+  // every description to the spec's 1,024 characters, so a new phrase here displaces prose there.
   const skill = read("skills/cmp-new/SKILL.md");
   const description = skill.split("---")[1]; // frontmatter block
   for (const phrase of [

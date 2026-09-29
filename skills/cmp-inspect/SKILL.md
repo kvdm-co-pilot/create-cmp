@@ -248,11 +248,13 @@ headless loop transfers to the live app:
 The `create-cmp` plugin ships this server; it's registered via the repo-root `.mcp.json`
 (`cmp-inspector` → `node ${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs`), so it loads
 wherever the plugin is active. To wire it into another project by hand, give an ABSOLUTE path to
-the bundle — the variable only substitutes for a plugin's own config, and `bin/server.mjs` needs
-node_modules a plugin install does not have:
+the bundle. `${CLAUDE_PLUGIN_ROOT}` is substituted in the plugin's own config, hooks and skill
+bodies (so in this skill it already reads as an absolute path), but not in a command a user types
+into another project. Point at `dist/server.mjs`, the self-contained bundle, rather than
+`bin/server.mjs`, which imports the inspector's dependencies from `node_modules`:
 
 ```bash
-claude mcp add cmp-inspector -- node /absolute/path/to/create-cmp/inspector/mcp/dist/server.mjs
+claude mcp add cmp-inspector -- node "${CLAUDE_PLUGIN_ROOT}/inspector/mcp/dist/server.mjs"
 ```
 
-See `inspector/mcp/README.md` for the full tool reference and the tier roadmap.
+See `${CLAUDE_PLUGIN_ROOT}/inspector/mcp/README.md` for the full tool reference and the tier roadmap.

@@ -1,7 +1,7 @@
 ---
 name: cmp-orchestrator
 description: Coordinator for multi-step Kotlin/Compose Multiplatform harness work — plans, writes self-contained briefs, delegates execution to Opus subagents, and gates everything through the project's own verify lane before reporting done. Use for milestone-sized or multi-file CMP tasks (add a feature end-to-end, a spec-driven change, a conformance/test build-out, a docs+code sweep) where the work should be decomposed, delegated, and independently verified rather than done inline. Reasoning stays here; execution is delegated and gated.
-tools: Agent, Task, TodoWrite, Read, Grep, Glob, Edit, Write, Bash, SendMessage, TaskStop
+tools: Agent, Read, Grep, Glob, Edit, Write, Bash, SendMessage, TaskStop
 model: opus
 effort: xhigh
 ---
@@ -110,7 +110,9 @@ every step of the second.
 **A brief for a REVIEW carries one fact more: which round it is.** Only you hold it — a reviewer
 cannot see its own place in a sequence — and it decides both what that round has to read and what
 its record is worth to everything downstream. So name the number, say whether the round is a fresh
-read or a re-confirmation of bytes that moved under an earlier one, and hand over what it reads.
+read or a re-confirmation of bytes that moved under an earlier one, and hand over what it reads —
+always including the path of the brief or spec the work answered to, so the reviewer can check
+what was asked for against what the diff does, not only the diff against itself.
 In create-cmp, `node scripts/change-price.mjs` prints which round is next, the literal command for
 it, and whether it is owed. Whether a review is owed AT ALL is `node scripts/proof-plan.mjs`'s
 answer, under `review`: a docs-only diff owes none, it prints NOT OWED with its reason, and a round

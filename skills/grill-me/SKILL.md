@@ -1,19 +1,16 @@
 ---
 name: grill-me
 description: >-
-  Settle the load-bearing questions about a request BEFORE the first line of work — the
-  decide step's opening act. Walks the decision tree one frontier at a time: reads what the
-  repo already answers (signed briefs and specs are closed — cited, never re-asked), then
-  asks the unsettled decisions whose prerequisites are settled, in numbered rounds of at most
-  five, each question carrying WHY it matters and a RECOMMENDED answer, and waits. Stops when
-  no remaining question would change the work. Invoke it at genesis (before the
-  intent interview) and on every brief-lane request (before the brief is drafted); the human
-  can invoke it anytime with "grill me", "interrogate this plan", "poke holes in this", "what
-  am I missing", "ask me the hard questions", "settle the open questions before we start".
-  Never grills the direct lane, a bug fix, an emergency fix, or a spike. Produces no new
-  artifact: answers land in the intent brief or the feature brief — settled decisions with
-  their why, the human's own calls under Open decisions — and the brief's signature is what
-  closes them.
+  Settle the load-bearing questions about a request BEFORE the first line of work — the decide
+  step's opening act. Walks the decision tree one frontier at a time: reads what the repo already
+  answers (signed briefs and specs are closed — cited, never re-asked), then asks the unsettled
+  decisions in numbered rounds of at most five, each carrying WHY it matters and a RECOMMENDED
+  answer, and waits. Invoke it at genesis (before the intent interview) and on every brief-lane
+  request (before the brief is drafted); the human can invoke it anytime with "grill me",
+  "interrogate this plan", "poke holes in this", "what am I missing", "ask me the hard questions",
+  "settle the open questions before we start". Never grills the direct lane, a bug fix, an
+  emergency fix, or a spike. Answers land in the intent brief or the feature brief, and the
+  brief's signature closes them.
 ---
 
 # grill-me — settle the load-bearing questions before the first line of work

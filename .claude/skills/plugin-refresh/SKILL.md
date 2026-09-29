@@ -1,17 +1,16 @@
 ---
 name: plugin-refresh
 description: >-
-  create-cmp's own maintainer-only release-loop skill, local to this repository and not
-  shipped in the plugin: it drives `scripts/plugin-refresh.mjs`, which exists only here.
-  Refresh the installed Claude Code plugin from its marketplace and PROVE the result by
-  content — and answer the question a version number cannot: which running sessions have
-  actually loaded which bytes. Use this when a skill behaves like an older version, after
-  publishing a release, when the SessionStart line says the plugin is STALE, or when
-  someone asks "is my plugin up to date", "reload the plugin", "why is my skill out of
-  date", "refresh the marketplace", "did the reload work". The work is a program —
-  `node scripts/plugin-refresh.mjs` — because every hand-run step here has a silent
-  failure that reports success; this skill exists to say when to run it, how to read
-  what it says, and what it deliberately will not do.
+  Refresh the installed Claude Code plugin from its marketplace and PROVE the result by content —
+  and answer the question a version number cannot: which running sessions have actually loaded
+  which bytes. Use this when a skill behaves like an older version, after publishing a release,
+  when the SessionStart line says the plugin is STALE, or when someone asks "is my plugin up to
+  date", "reload the plugin", "why is my skill out of date", "refresh the marketplace", "did the
+  reload work". This is create-cmp's own maintainer-only release-loop skill, local to this
+  repository and not shipped in the plugin. The work is a program — `node
+  scripts/plugin-refresh.mjs`, which exists only here — because every hand-run step has a silent
+  failure that reports success; this skill says when to run it, how to read what it says, and what
+  it deliberately will not do.
 ---
 
 # plugin-refresh — refresh the plugin, and prove it by content
