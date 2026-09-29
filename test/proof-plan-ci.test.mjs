@@ -74,12 +74,19 @@ test("--ci: a scripts/ PR owes a review — UNKNOWN without GH_TOKEN, exit 0 non
   }
 });
 
-test("--ci: an owed tier is MISSING without a successful check run of its name, PRESENT with one", () => {
+test("--ci: an owed tier is MISSING without a successful check run of its name — exit 0 non-strict, 1 under strict — and PRESENT with one", () => {
   const r = scratchPR(BASE, { "scripts/tool.mjs": "export const x = 3;\n" });
   try {
-    const missing = ciPlan({ root: r.dir, checkRuns: [{ name: CI_CHECK_RUNS.review, status: "completed", conclusion: "failure" }] });
-    assert.equal(missing.exit, 1, missing.lines.join("\n"));
+    const failed = [{ name: CI_CHECK_RUNS.review, status: "completed", conclusion: "failure" }];
+    // Rule 1: not strict reports and does not refuse — the tier line still names it.
+    const missing = ciPlan({ root: r.dir, checkRuns: failed });
+    assert.equal(missing.exit, 0, missing.lines.join("\n"));
     assert.equal(missing.tiers.find((t) => t.tier === "review").state, "missing");
+    assert.match(missing.lines.join("\n"), /OWED, MISSING/);
+    assert.match(missing.lines.join("\n"), /reporting, not strict — review \(MISSING\); --strict would refuse/);
+    const strictMissing = ciPlan({ root: r.dir, strict: true, checkRuns: failed });
+    assert.equal(strictMissing.exit, 1, strictMissing.lines.join("\n"));
+    assert.match(strictMissing.lines.join("\n"), /REFUSED — review \(MISSING\)/);
     const present = ciPlan({ root: r.dir, checkRuns: [{ name: CI_CHECK_RUNS.review, status: "completed", conclusion: "success" }] });
     assert.equal(present.exit, 0, present.lines.join("\n"));
     assert.equal(present.tiers.find((t) => t.tier === "review").state, "present");
