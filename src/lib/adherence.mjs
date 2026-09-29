@@ -22,6 +22,7 @@ import path from "node:path";
 
 import { requiredFromRules, stopHookWired } from "../../template/qa/gates-status.mjs";
 import { tryEditJsonInPlace } from "./json-in-place.mjs";
+import { ignoredPaths, sameBytes } from "./plugin-bytes.mjs";
 
 export const PASS = "PASS";
 export const FAIL = "FAIL";
@@ -209,22 +210,50 @@ export function credentialRow(userFile) {
   return row(label, FAIL, `user-scope permissions.deny lacks ${missing.join(", ")}`, FIX_SELF);
 }
 
-export function releaseActsRow(userFile) {
+/**
+ * How every scope Claude Code merges decides one release act — an ask at ANY scope beats an
+ * allow at any other, so each rule is named with the scope that holds it (D4).
+ * @param {Array<{scope:string} & ReturnType<typeof readSettingsFile>>} scopes
+ */
+export function scopedActDecision(scopes, act) {
+  const asked = [];
+  const allows = [];
+  for (const sc of scopes) {
+    if (sc.state !== "parsed") continue;
+    const d = releaseActDecision(sc.settings, act);
+    asked.push(...d.asked.map((r) => `ask ${r} (${sc.scope} scope)`));
+    allows.push(
+      ...d.allowedBy.map((r) => `permissions.allow ${r} (${sc.scope} scope)`),
+      ...d.autoModeBy.map((e) => `autoMode.allow "${e.length > 60 ? `${e.slice(0, 57)}...` : e}" (${sc.scope} scope)`)
+    );
+  }
+  return { asked, allows };
+}
+
+/** Every scope a caller passed, or the user file alone (the older one-argument call). */
+const asScopes = (userFile, scopes) => (scopes && scopes.length ? scopes : [{ scope: "user", ...userFile }]);
+
+export function releaseActsRow(userFile, scopes) {
   const label = "Release acts gated";
   if (userFile.state === "unreadable") return row(label, UNKNOWN, `${userFile.path} cannot be read (${userFile.reason})`, `fix ${userFile.path}, then ${FIX_SELF}`);
+  const all = asScopes(userFile, scopes);
+  const unread = all.filter((sc) => sc.state === "unreadable");
   const parts = [];
   const undecided = [];
   for (const act of RELEASE_ACTS) {
-    const d = releaseActDecision(userFile.settings, act);
-    const allows = [...d.allowedBy.map((r) => `allow ${r}`), ...d.autoModeBy.map(() => "autoMode.allow")];
-    if (d.asked.length) {
-      parts.push(`${act.rule}: ask${allows.length ? ` (shadows ${allows.join(", ")} — ask wins)` : ""}`);
+    const { asked, allows } = scopedActDecision(all, act);
+    if (asked.length) {
+      parts.push(`${act.rule}: ${asked.join(", ")}${allows.length ? ` (shadows ${allows.join(", ")} — ask wins)` : ""}`);
     } else if (allows.length) {
       parts.push(`${act.rule}: allowed by ${allows.join(", ")} — a deliberate decision, reported and never overwritten (PM2)`);
     } else {
-      parts.push(`${act.rule}: no user-scope rule — the auto-mode classifier alone decides`);
+      parts.push(`${act.rule}: no rule at any scope read — the auto-mode classifier alone decides`);
       undecided.push(act.rule);
     }
+  }
+  if (undecided.length && unread.length) {
+    const where = unread.map((sc) => `${sc.scope} (${sc.path}: ${sc.reason})`).join(", ");
+    return row(label, UNKNOWN, `${parts.join("; ")}; could not read ${where}`, `fix ${unread.map((sc) => sc.path).join(" and ")}, then ${FIX_SELF}`);
   }
   return row(label, undecided.length ? FAIL : PASS, parts.join("; "), undecided.length ? FIX_SELF : null);
 }
@@ -241,7 +270,7 @@ export function pluginRow(plugin) {
   const stale = plugin.scopes.filter((s) => s.identical === false);
   const unchecked = plugin.scopes.filter((s) => s.identical === null);
   if (stale.length) {
-    const what = stale.map((s) => `${s.scope} scope (${s.installPath}): ${s.differing} differing, ${s.missing} missing`).join("; ");
+    const what = stale.map((s) => `${s.scope} scope (${s.installPath}): ${s.differing} differing, ${s.missing} missing${s.extra ? `, ${s.extra} extra` : ""}`).join("; ");
     return row(label, FAIL, `installed bytes differ from the marketplace — ${what}`, refresh);
   }
   if (unchecked.length) return row(label, UNKNOWN, `could not compare ${unchecked.map((s) => `${s.scope} scope (${s.reason})`).join(", ")}`, refresh);
@@ -297,14 +326,9 @@ function ghRequired(projectDir, run) {
   return { required, branch, reason: required === "unknown" ? "gh returned no rule list" : "" };
 }
 
-async function defaultCompareTrees() {
-  try {
-    const mod = await import(new URL("../../scripts/plugin-refresh.mjs", import.meta.url).href);
-    return typeof mod.compareTrees === "function" ? mod.compareTrees : null;
-  } catch {
-    return null;
-  }
-}
+// The same comparison scripts/plugin-refresh.mjs makes — both directions (missing, differing,
+// extra) — from src/, which the npm package ships.
+const defaultCompareTrees = async () => sameBytes;
 
 async function gatherPlugin(claudeDir, loadCompare) {
   const installedPath = path.join(claudeDir, "plugins", "installed_plugins.json");
@@ -316,18 +340,19 @@ async function gatherPlugin(claudeDir, loadCompare) {
   if (!key || !entries.length) return { state: "not-installed" };
   const compare = await loadCompare();
   if (!compare) {
-    return { state: "no-check", reason: "the byte comparison lives in create-cmp's repository (scripts/plugin-refresh.mjs), not in the published package" };
+    return { state: "no-check", reason: "no byte comparison was available to this run" };
   }
   const marketplace = key.slice("create-cmp@".length);
   const marketplaceDir = path.join(claudeDir, "plugins", "marketplaces", marketplace);
   const marketplaceExists = fs.existsSync(marketplaceDir);
+  const ignore = marketplaceExists ? ignoredPaths(marketplaceDir) : new Set();
   const scopes = entries.map((e) => {
     const base = { scope: e.scope ?? "?", installPath: e.installPath };
     if (!marketplaceExists) return { ...base, identical: null, reason: "no marketplace clone" };
     if (!e.installPath || !fs.existsSync(e.installPath)) return { ...base, identical: false, differing: 0, missing: "the whole install" };
     try {
-      const c = compare(e.installPath, marketplaceDir);
-      return { ...base, identical: c.identical, differing: c.differing.length, missing: c.missing.length };
+      const c = compare(e.installPath, marketplaceDir, ignore);
+      return { ...base, identical: c.identical, differing: c.differing.length, missing: c.missing.length, extra: (c.extra ?? []).length };
     } catch (err) {
       return { ...base, identical: null, reason: err.message };
     }
@@ -422,11 +447,11 @@ export async function gatherAdherence({
     ciRow({ projectDir, workflow, gh }),
     receiptRow({ receiptCheckExists, run: plainRun, projectDir }),
     credentialRow(userFile),
-    releaseActsRow(userFile),
+    releaseActsRow(userFile, scopes),
     pluginRow(await gatherPlugin(claudeDir, loadCompare)),
     inspectorRow(inspectorServers({ projectDir, home, claudeDir })),
   ];
-  return { rows, userFile, gh, workflow };
+  return { rows, userFile, scopes, gh, workflow };
 }
 
 // ---------------------------------------------------------------------------
@@ -455,24 +480,31 @@ export function renderRows(rows, paint = (_s, t) => t) {
  * What `--fix` would add to the user scope, and what it refuses to add.
  * @returns {{add:Array<{kind:"deny"|"ask", rule:string}>, conflicts:Array<{kind:string, rule:string, by:string[]}>, blocked:string|null}}
  */
-export function planUserFix(userFile) {
+export function planUserFix(userFile, scopes) {
   if (userFile.state === "unreadable") return { add: [], conflicts: [], blocked: `${userFile.path} cannot be read (${userFile.reason}) — nothing is written to it` };
-  const s = userFile.settings ?? {};
-  const deny = list(s.permissions?.deny);
-  const allow = list(s.permissions?.allow);
+  // Claude Code merges user, project, local and managed rules, and an ask/deny at any scope
+  // beats an allow at any other — so an allow anywhere is one --fix must not shadow (D4).
+  const all = asScopes(userFile, scopes);
+  const unread = all.filter((sc) => sc.state === "unreadable");
+  if (unread.length) {
+    const where = unread.map((sc) => `${sc.scope} (${sc.path}: ${sc.reason})`).join(", ");
+    return { add: [], conflicts: [], blocked: `could not read ${where} — an allow there cannot be ruled out, so nothing is written` };
+  }
+  const parsed = all.filter((sc) => sc.state === "parsed");
+  const deny = parsed.flatMap((sc) => list(sc.settings.permissions?.deny));
+  const allow = parsed.flatMap((sc) => list(sc.settings.permissions?.allow).map((a) => ({ scope: sc.scope, rule: a })));
   const add = [];
   const conflicts = [];
   for (const rule of CREDENTIAL_DENY) {
     if (deny.some((d) => ruleCovers(d, rule))) continue;
-    const by = allow.filter((a) => rulesOverlap(a, rule));
-    if (by.length) conflicts.push({ kind: "deny", rule, by: by.map((a) => `permissions.allow ${a}`) });
+    const by = allow.filter((a) => rulesOverlap(a.rule, rule));
+    if (by.length) conflicts.push({ kind: "deny", rule, by: by.map((a) => `permissions.allow ${a.rule} (${a.scope} scope)`) });
     else add.push({ kind: "deny", rule });
   }
   for (const act of RELEASE_ACTS) {
-    const d = releaseActDecision(s, act);
-    if (d.asked.length) continue;
-    const by = [...d.allowedBy.map((a) => `permissions.allow ${a}`), ...d.autoModeBy.map((e) => `autoMode.allow "${e.length > 60 ? `${e.slice(0, 57)}...` : e}"`)];
-    if (by.length) conflicts.push({ kind: "ask", rule: act.rule, by });
+    const { asked, allows } = scopedActDecision(parsed, act);
+    if (asked.length) continue;
+    if (allows.length) conflicts.push({ kind: "ask", rule: act.rule, by: allows });
     else add.push({ kind: "ask", rule: act.rule });
   }
   return { add, conflicts, blocked: null };
@@ -523,7 +555,7 @@ export function sandboxAdvice() {
  * `prompt(question) → Promise<boolean>` asks one yes/no; there is no auto-yes.
  */
 export async function runAdherence({ projectDir, fix = false, prompt, out = (t) => process.stdout.write(t), paint, ...gatherOpts }) {
-  const { rows, userFile } = await gatherAdherence({ projectDir, ...gatherOpts });
+  const { rows, userFile, scopes } = await gatherAdherence({ projectDir, ...gatherOpts });
   out(`\nAdherence report card — ${projectDir}\n\n`);
   out(renderRows(rows, paint));
   const counts = [PASS, FAIL, UNKNOWN].map((s) => `${rows.filter((r) => statusWord(r.status) === s).length} ${s}`);
@@ -532,7 +564,7 @@ export async function runAdherence({ projectDir, fix = false, prompt, out = (t) 
   out(sandboxAdvice());
 
   if (fix) {
-    const plan = planUserFix(userFile);
+    const plan = planUserFix(userFile, scopes);
     out(`\n--fix: user-scope settings (${userFile.path}), one yes/no per entry\n`);
     if (plan.blocked) out(`  ${plan.blocked}\n`);
     for (const c of plan.conflicts) {

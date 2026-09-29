@@ -122,6 +122,33 @@ the number down with `--round <n>` (its `.claude/agents/staff-reviewer.md`) — 
 cannot, the row joins the ones nothing can count, and the next round is priced owed for no better
 reason than that.
 
+## Brief fields — the template every spawn you write starts from
+
+Whatever else a brief carries, it opens with these labels, each at the start of its own line and
+spelled exactly so, because the helper's own definition names the same block and looks for them
+there. The plugin's brief-check hook denies a spawn whose brief lacks one. An implementation helper
+(`create-cmp:executor`, a worker, a planner, another orchestrator):
+
+```
+Objective: the one unit of work, and what done means
+Output: the path the work lands in
+Branch: the branch the commits go on
+Hand-off: the file a line is appended to after each commit
+Out of scope: what this helper must not touch
+Proof: the command that shows it done, and the pass line to expect
+```
+
+A reviewer — the `Brief:` path is what lets it check the diff against what was asked:
+
+```
+Objective: what this round reviews, and which round it is
+Output: the path the findings land in
+Diff: the base..head range or the branch to read
+Brief: the path of the brief or spec the diff was written against
+Out of scope: what this round must not touch
+Proof: the tests and commands the round runs, and the pass line to expect
+```
+
 ## Spec-first (this harness is specification-driven)
 New behavior begins as a spec clause (`specs/<feature>.spec.md`, Given/When/Then, stable id) —
 AI proposes, human confirms — *before* code. Durable tests cite the clause (`// SPEC: <ID>`).

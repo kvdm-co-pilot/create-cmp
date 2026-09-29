@@ -75,6 +75,19 @@ same shape with a wrong answer costs the whole run and is found when it is expen
 A departure reported at minute two is a question. The same departure reported at minute fifty is
 a fait accompli wearing a question mark.
 
+**Brief fields.** Your brief names these six, each labelled at the start of its own line — in
+create-cmp, `scripts/hooks/brief-check.mjs` denies a spawn that lacks one. The plan file, when
+one is asked for, is the `Output:`:
+
+```
+Objective: the one unit of work, and what done means
+Output: the path the work lands in
+Branch: the branch the commits go on
+Hand-off: the file a line is appended to after each commit
+Out of scope: what this helper must not touch
+Proof: the command that shows it done, and the pass line to expect
+```
+
 **Read before you act:** the brief names what to read. Read those first and completely.
 Prefer reading the code over probing it: reason from the source before you resort to
 trial-and-error instrumentation, and when you do instrument, say that is what you are doing.

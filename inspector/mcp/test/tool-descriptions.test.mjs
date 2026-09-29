@@ -37,7 +37,7 @@ const ACT_VERBS = new Set([
 ]);
 
 const READ_ONLY = [
-  "approval_status", "db_query", "inspect_tree", "preview_diff",
+  "approval_status", "db_query", "preview_diff",
   "preview_status", "review_comments", "runtime_crashes", "runtime_logs",
 ];
 const APP_CONTROLLED_OUTPUT = ["db_query", "runtime_crashes", "runtime_logs"];
@@ -115,6 +115,8 @@ for (const [label, entry] of Object.entries(ENTRIES)) {
     for (const name of READ_ONLY) {
       assert.equal(tools[name].annotations?.readOnlyHint, true, `${name} carries readOnlyHint: true`);
     }
+    // inspect_tree's `out` writes a file to any path, so it is not read-only.
+    assert.equal(tools.inspect_tree.annotations?.readOnlyHint, false, "inspect_tree is not marked read-only");
     // connect_live runs `adb kill-server` and, with clearState, `pm clear`.
     assert.equal(tools.connect_live.annotations?.readOnlyHint, false);
     assert.equal(tools.connect_live.annotations?.destructiveHint, true, "connect_live carries destructiveHint: true");

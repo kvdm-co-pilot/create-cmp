@@ -45,6 +45,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- `doctor --adherence` reads permission rules at every scope Claude Code merges (user, project `.claude/settings.json`, local `.claude/settings.local.json`, managed): `--fix` no longer writes a user-scope ask or deny over an allow held at another scope, and "Release acts gated" passes when any scope asks for or deliberately allows the act. Its "Plugin bytes current" row now compares in both directions (missing, differing, extra) with the same `src/lib/plugin-bytes.mjs` that `scripts/plugin-refresh.mjs` uses, and that module ships in the npm package, so the row can answer outside a checkout.
+- The inspector MCP's `inspect_tree` is no longer marked `readOnlyHint: true`: its `out` parameter writes a file to any path, so a client must not skip the prompt for it.
+- The executor, orchestrator, deep-worker and staff-reviewer definitions each carry a "Brief fields" block with the labels brief-check reads, and brief-check's deny reason points to that block. The orchestrator's brief template now writes those labels, so its spawns are no longer denied on the first try.
 - `create-cmp harden` merges `.claude/settings.json` cleanly after `add firebase`. A `--minimal` app
   that ran `add firebase` carries its consent hook and ask rule in that file, and harden's line merge
   saw both sides move the same lines: the file went to the conflicted bucket with a `.cmp-new`
