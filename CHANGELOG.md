@@ -10,6 +10,17 @@ All notable changes to this project are documented here. The format is based on
 
 - A `claude plugin eval` suite in `evals/`: one natural-phrasing trigger case for each of the 11 plugin skills, and near-miss negatives for cmp-new, grill-me and cmp-doctor. Each case has a `tool_used` grader on the Skill tool and a `regex` result grader, runs 3 times, and is run locally at release (`evals/README.md`, npm-publish step 2). Results go to `evals/results/`, which is gitignored. `test/plugin-evals-are-well-formed.test.mjs` checks the shape.
 
+### Changed
+
+- **`cmp-inspector` tools are found by what they do, and say what they touch.** Each of the 15
+  descriptions opens with the act and a "Use when …" sentence, moves design-doc references to the
+  end, and stays within 1,024 characters. The read tools carry `readOnlyHint: true`, `connect_live`
+  carries `destructiveHint: true`, and `resolve_comment` carries
+  `_meta["anthropic/requiresUserInteraction"]: true`, so the agent can no longer close the human's
+  comments without the human seeing it. `runtime_logs`, `runtime_crashes` and `db_query` label
+  their output as untrusted app-controlled text. `inspector/mcp/test/tool-descriptions.test.mjs`
+  reads all of it back from the raw `tools/list` response of the source server and the bundle.
+
 ## [0.28.6] - 2026-09-29
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the
