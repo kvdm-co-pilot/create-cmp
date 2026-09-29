@@ -761,3 +761,51 @@ reader can check.
 **Fires when:** anyone edits `qa/evidence/latest.json` by hand and commits it — an agent claiming done
 included — and no CI re-run stands between that commit and a merge.
 *Logged 2026-09-29, slice `harness/hooks-never-grant`.*
+
+### KD-272 — proof-gate's argv reader stops at simple commands: compound forms and other launchers pass unjudged
+
+`scripts/hooks/proof-gate.mjs` (`act`, `classify`)
+
+`{ gh pr merge 1; }`, `if …; then gh pr merge 1; fi`, `for … do gh pr merge …; done`, `watch gh …`, `env -S "…"`,
+`corepack npm|pnpm publish` and `gh api graphql` carrying `mergePullRequest` all classify as no gated act (review
+round 1 measured each). The reader was bounded to the argv of top-level simple commands on purpose — the effect-level
+check (CI required status checks, the pre-push hook) is the answer to what argv cannot see — but the three shell
+reserved-word forms are one cheap fix: treat `{`, `if`/`then`, `for`/`do` as transparent before the first word.
+
+**Fires when:** an agent wraps a gated act in a shell compound or one of those launchers on a tree that owes.
+*Logged 2026-09-29, round 1 of slice `harness/hooks-never-grant`.*
+
+### KD-273 — the repository's ask rules guard the in-session gates, not the out-of-session ones
+
+`.claude/settings.json` (`permissions.ask`)
+
+`scripts/hooks/**`, `proof-plan`, `observed-tree`, `stamped-output` and `qa-artifacts/**` prompt before an edit;
+`.githooks/pre-push` and `.github/workflows/ci.yml` — the two gates that exist because the model can end-run the
+in-session ones — do not. An agent can edit the pre-push hook or the `proof owed` job unasked.
+
+**Fires when:** an agent edits either file in auto or acceptEdits mode.
+*Logged 2026-09-29, round 1 of slice `harness/hooks-never-grant`.*
+
+### KD-274 — the stamped SessionStart line can spend eleven seconds and misreads two states
+
+`template/qa/gates-status.mjs`
+
+It makes up to two 4 s `gh api` calls plus a 3 s `git` call on every SessionStart. It reports `core.hooksPath`
+spelled `.githooks/` (trailing slash) as "off". `rules/branches` does not see classic branch protection, so the
+line says no ruleset requires the check while classic protection may. None of these wrongly serves an adopter — the
+line is context, never a decision — but a truthful line should not be slow or wrong.
+
+**Fires when:** `gh` is authenticated but slow, or the hooks path carries a trailing slash, or classic protection is
+in use.
+*Logged 2026-09-29, round 1 of slice `harness/hooks-never-grant`.*
+
+### KD-275 — the template's ask rules pair `Write` with `Edit` for one path and not the others
+
+`template/.claude/settings.json` (`permissions.ask`)
+
+`qa/evidence/**` has an `Edit(...)` and a `Write(...)` rule; `qa/receipt-check.mjs`, `qa/lib/**`, `qa/hooks/**` and
+`.githooks/**` have `Edit(...)` only. The repository's own settings pair them everywhere. Harmless if `Edit` rules
+cover every file-editing tool, as the permissions docs say; inconsistent either way.
+
+**Fires when:** a reader compares the two files, or the docs' claim about `Edit` rules turns out narrower than read.
+*Logged 2026-09-29, round 1 of slice `harness/hooks-never-grant`.*
