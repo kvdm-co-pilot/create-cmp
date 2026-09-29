@@ -312,7 +312,9 @@ test("the wiring: .claude/settings.json registers all three events on this hook 
     const entries = settings.hooks?.[event] ?? [];
     const cmds = entries.flatMap((e) => e.hooks.map((h) => h.command));
     assert.ok(cmds.some((c) => c.includes("scripts/hooks/proof-gate.mjs")), `${event} must run the proof gate; found ${JSON.stringify(cmds)}`);
-    if (event !== "SessionStart") assert.ok(entries.every((e) => e.matcher === "Bash"), `${event} watches Bash`);
+    // Other hooks share the event (brief-check on Agent/Task); every entry that runs THIS gate watches Bash.
+    const mine = entries.filter((e) => e.hooks.some((h) => h.command.includes("scripts/hooks/proof-gate.mjs")));
+    if (event !== "SessionStart") assert.ok(mine.length > 0 && mine.every((e) => e.matcher === "Bash"), `${event} watches Bash`);
   }
 });
 

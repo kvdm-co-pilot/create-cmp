@@ -2175,8 +2175,20 @@ async function main() {
 
   if (event === "SessionStart") {
     try {
-      const { obligation, render } = await import("../proof-plan.mjs");
+      const { obligation, render, resumeLine, readReviewRecord } = await import("../proof-plan.mjs");
       const { suiteStatus } = await import("../suite-record.mjs");
+      const o = obligation();
+      // CX2: the slice's brief, hand-off and review round, one line, on every
+      // SessionStart — startup, resume, clear and compact alike (matcher "").
+      // `source` is read defensively: when present and "compact" or "resume",
+      // the line says so; absent, the line is the same without the note.
+      let sliceLine = "";
+      try {
+        const line = resumeLine(o.plan, readReviewRecord(), typeof input.source === "string" ? input.source : null);
+        if (line) sliceLine = `\n\n${line}`;
+      } catch {
+        /* the schedule still renders without the line */
+      }
       // The installed plugin's staleness, one line. It is here and not in a
       // document because the two days it went unnoticed were exactly the days
       // nobody thought to look — and a session reads this before anything else.
@@ -2194,7 +2206,8 @@ async function main() {
           hookEventName: "SessionStart",
           additionalContext:
             "Proof schedule for this tree — GATE-RULES Rule 4, enforced by scripts/hooks/proof-gate.mjs on fleet-check and gh pr merge, not by any document:\n" +
-            render({ ...obligation(), suite: suiteStatus() }) +
+            render({ ...o, suite: suiteStatus() }) +
+            sliceLine +
             pluginLine +
             (await memoryRestatements()),
         },

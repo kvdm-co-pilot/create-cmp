@@ -206,6 +206,8 @@ than the size of the change (mutant count, corpus size, fleet size) belongs in a
 scheduled job no matter how fast it looks on a toy input — measure it on
 something real before deciding.
 
+A gate on the harness's own agents is calibrated on the harness's own briefs: `scripts/hooks/brief-check.mjs` keeps as its plant the briefs of the 2026-09-28 pattern review (A-4) — the audit's brief that named an output file and neither a branch nor a hand-off file is denied by name, a complete one passes, and `test/brief-check.test.mjs` holds both.
+
 ---
 
 ## Rule 2 — The layer you changed cannot certify itself

@@ -86,6 +86,14 @@ function payloadsFor(matcher, scratch) {
     }
   }
   if (matcher === "" || new RegExp(`^(?:${matcher})$`).test("SendMessage")) out.push(sendMessagePayload(scratch));
+  // A subagent spawn (brief-check), under both tool names it is registered on:
+  // one complete brief and one missing every field, so the hook answers at least once.
+  for (const tool of ["Agent", "Task"]) {
+    if (matcher !== "" && !new RegExp(`^(?:${matcher})$`).test(tool)) continue;
+    for (const prompt of ["Objective: x\nOutput: a/b.md\nBranch: b\nHand-off: h.md\nOut of scope: y\nProof: z", "do the thing"]) {
+      out.push({ hook_event_name: "PreToolUse", tool_name: tool, tool_input: { subagent_type: "create-cmp:executor", description: "d", prompt }, cwd: ROOT });
+    }
+  }
   return out;
 }
 
