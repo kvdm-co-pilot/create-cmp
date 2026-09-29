@@ -72,6 +72,7 @@ test("the lane and governance surfaces are gone", () => {
     "qa/evidence",
     "specs",
     ".claude/skills",
+    ".claude/rules",
     ".githooks",
   ]) {
     assert.ok(!exists(rel), `minimal scaffold still carries ${rel}`);
@@ -169,7 +170,11 @@ test("a default (full) stamp is untouched by the mode split", async () => {
   assert.ok(settings.hooks.Stop, "full stamp lost the Stop hook");
   const claude = fs.readFileSync(path.join(fullOut, "CLAUDE.md"), "utf8");
   assert.match(claude, /AI delivery contract/);
-  assert.ok(claude.split("\n").length > 300, "full CLAUDE.md lost its body");
+  // The body is what full mode owes, not a length: slice 15 (CX1) moved the walk, approvals,
+  // comments and UI loop out to .claude/skills and .claude/rules to bring the file under 200 lines.
+  for (const re of [/## Definition of done/, /## The lane is not yours to edit/, /\.claude\/rules\/approvals\.md/]) {
+    assert.match(claude, re, "full CLAUDE.md lost its body");
+  }
   const record = JSON.parse(fs.readFileSync(path.join(fullOut, "create-cmp.json"), "utf8"));
   assert.equal(record.harness, true);
 });

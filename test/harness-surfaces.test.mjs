@@ -108,18 +108,20 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.match(claudeMd, /qa\/verify\.mjs/);
     });
 
-    await t.test("CLAUDE.md teaches the UI feedback loop; AGENTS.md points at it", () => {
+    await t.test("CLAUDE.md points at the UI feedback loop skill, which teaches it; AGENTS.md points at it", () => {
       const claudeMd = fs.readFileSync(path.join(out, "CLAUDE.md"), "utf8");
       assert.match(claudeMd, /UI feedback loop/);
-      assert.match(claudeMd, /preview_status \{ waitForRender: true \}/);
-      assert.match(claudeMd, /renderScreens/, "no-plugin fallback documented");
+      assert.match(claudeMd, /\.claude\/skills\/ui-loop\/SKILL\.md/, "CLAUDE.md names where the loop lives");
+      const skill = fs.readFileSync(path.join(out, ".claude/skills/ui-loop/SKILL.md"), "utf8");
+      assert.match(skill, /preview_status \{ waitForRender: true \}/);
+      assert.match(skill, /renderScreens/, "no-plugin fallback documented");
       const agentsMd = fs.readFileSync(path.join(out, "AGENTS.md"), "utf8");
       assert.match(agentsMd, /CLAUDE\.md/);
       assert.match(agentsMd, /UI feedback loop/);
     });
 
     await t.test("skills exist, non-empty, with name: frontmatter", () => {
-      for (const skill of ["add-feature", "add-screen", "add-repository"]) {
+      for (const skill of ["add-feature", "add-screen", "add-repository", "walk", "ui-loop"]) {
         const p = path.join(out, ".claude/skills", skill, "SKILL.md");
         assert.ok(fs.existsSync(p), `${p} exists`);
         const content = fs.readFileSync(p, "utf8");

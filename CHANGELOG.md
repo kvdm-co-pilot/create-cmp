@@ -12,6 +12,15 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- **The stamped `CLAUDE.md` loads the walk, approvals, comments and UI loop only when they apply.**
+  Approvals and Comments moved to path-scoped `.claude/rules/approvals.md` and `.claude/rules/comments.md`,
+  whose `paths:` globs name the files they govern (`qa/approvals.json`, `specs/**`, theme, components,
+  screens; `qa/comments.json`). The walk and the UI feedback loop moved to the project skills `walk` and
+  `ui-loop`. `CLAUDE.md` keeps the definition of done, the visible triage and grill rule, and one pointer to
+  each. The harness-mode rendering goes from 395 lines to 219. `--minimal` deletes `.claude/rules` as it
+  deletes `.claude/skills`, and the `ui-loop` skill leaves with the inspector.
+  `test/a-path-scoped-rule-fires-on-a-stamped-file.test.mjs` stamps an app and fails on a rule glob that
+  matches no stamped file.
 - **`cmp-inspector` tools are found by what they do, and say what they touch.** Each of the 15
   descriptions opens with the act and a "Use when …" sentence, moves design-doc references to the
   end, and stays within 1,024 characters. The read tools carry `readOnlyHint: true`, `connect_live`
