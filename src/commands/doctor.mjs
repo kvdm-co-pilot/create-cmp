@@ -36,7 +36,6 @@ import { fileURLToPath } from "node:url";
 import { flagBool } from "../lib/args.mjs";
 import { colors, ok } from "../lib/log.mjs";
 import { consent, probe } from "../bootstrap/exec.mjs";
-import { runAdherence } from "../lib/adherence.mjs";
 import { doctor as toolchainDoctor } from "../doctor.mjs";
 import { anchorViolations, unfixedHookAnchors } from "../lib/hooks.mjs";
 import {
@@ -855,6 +854,8 @@ export async function runDoctor(flags, positional) {
   if (flagBool(flags, "adherence", false)) {
     const dir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
     const paint = (s, t) => (s === "PASS" ? colors.green(t) : s === "FAIL" ? colors.red(t) : colors.yellow(t));
+    // Imported here, not at the top: plain doctor and doctor --fix never load the report card.
+    const { runAdherence } = await import("../lib/adherence.mjs");
     const code = await runAdherence({
       projectDir: path.resolve(dir),
       fix: flagBool(flags, "fix", false),

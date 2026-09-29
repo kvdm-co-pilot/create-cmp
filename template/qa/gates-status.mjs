@@ -108,10 +108,16 @@ export function gatherFacts() {
   };
 }
 
+// Importing this module does nothing but define the exports above: doctor --adherence imports
+// stopHookWired and requiredFromRules from here. So the guard itself touches no path it was not
+// run as. Under `node -e`, argv[1] is the script's first ARGUMENT, any path at all — and Node's JS
+// `realpathSync` never returns on a link like `linked/../settings.json` (the heal-write test's
+// corpus). A basename check first, and the system's realpath (`.native`) after it.
 const isMain = (() => {
   try {
-    if (!process.argv[1]) return false;
-    return fs.realpathSync(path.resolve(process.argv[1])) === fs.realpathSync(fileURLToPath(import.meta.url));
+    const self = fileURLToPath(import.meta.url);
+    if (!process.argv[1] || path.basename(process.argv[1]) !== path.basename(self)) return false;
+    return fs.realpathSync.native(path.resolve(process.argv[1])) === fs.realpathSync.native(self);
   } catch {
     return false;
   }
