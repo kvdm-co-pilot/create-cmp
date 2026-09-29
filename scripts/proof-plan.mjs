@@ -21,7 +21,8 @@
 //
 // SO: the obligation ACCRUES across a slice and is DISCHARGED once, at the end.
 //
-//   node scripts/proof-plan.mjs --open "<what this slice is>"
+//   node scripts/proof-plan.mjs --open "<what this slice is>" [--brief <path>] [--handoff <path>] [--round <n>]
+//                                                   brief, hand-off and round are re-read at SessionStart (CX2)
 //   node scripts/proof-plan.mjs                     what is owed right now
 //   node scripts/proof-plan.mjs --discharge         record that the device tier ran
 //   node scripts/proof-plan.mjs --record-review --round <n> [--kind round|rerecord]
@@ -1180,7 +1181,7 @@ function withoutManifest(plan) {
  * in the history as `replaced`, because a slice abandoned for another is still a
  * slice that cost something.
  */
-export function openPlan({ name, branch, base = null }, { planPath = PLAN_PATH, historyFile = historyPath(REPO_ROOT, "plans"), now = new Date() } = {}) {
+export function openPlan({ name, branch, base = null, brief = null, handoff = null, round = null }, { planPath = PLAN_PATH, historyFile = historyPath(REPO_ROOT, "plans"), now = new Date() } = {}) {
   let existing = null;
   try {
     const p = JSON.parse(fs.readFileSync(planPath, "utf8"));
@@ -1198,10 +1199,37 @@ export function openPlan({ name, branch, base = null }, { planPath = PLAN_PATH, 
     declared: Object.fromEntries(Object.entries(TIERS).map(([k, v]) => [k, v.when])),
     discharged: null,
     reviewDischarged: null,
+    // CX2: what a compacted or resumed session must find again. Written only
+    // when --open was told, so an absent key means "not declared", never "".
+    ...(brief ? { brief } : {}),
+    ...(handoff ? { handoff } : {}),
+    ...(round === null ? {} : { round }),
   };
   fs.mkdirSync(path.dirname(planPath), { recursive: true });
   fs.writeFileSync(planPath, `${JSON.stringify(plan, null, 2)}\n`);
   return plan;
+}
+
+/**
+ * CX2 — the one line a compacted or resumed session reads to find its brief,
+ * its hand-off file and its review round again: re-derived from the plan on
+ * disk, not remembered. The round is the review record's when that record was
+ * written after this slice opened (it moves as rounds are recorded), else the
+ * round --open was told. Null when there is no plan or nothing to name.
+ */
+export function resumeLine(plan, review = null, source = null) {
+  if (!plan || typeof plan !== "object") return null;
+  const opened = Date.parse(plan.openedAt ?? "");
+  const reviewed = review && Number.isInteger(review.round) && Date.parse(review.ranAt ?? "") >= opened ? review.round : null;
+  const round = reviewed ?? (Number.isInteger(plan.round) ? plan.round : null);
+  const parts = [];
+  if (plan.brief) parts.push(`brief ${plan.brief}`);
+  if (plan.handoff) parts.push(`hand-off ${plan.handoff}`);
+  if (round !== null) parts.push(`review round ${round}${reviewed !== null ? " recorded" : ""}`);
+  if (!parts.length) return null;
+  const why = typeof source === "string" && (source === "compact" || source === "resume") ? ` (session ${source === "compact" ? "compacted" : "resumed"} — read these again)` : "";
+  // The slice's name is already on the schedule's second line; it is not repeated.
+  return `this slice${why}: ${parts.join("; ")}`;
 }
 
 /** What is still outstanding, by tier name — the sentence `--close` refuses with. */
@@ -1666,7 +1694,14 @@ function main() {
       process.exit(2);
     }
     const base = sh("git", ["merge-base", "HEAD", "origin/main"]);
-    openPlan({ name, branch, base: base.status === 0 ? base.stdout.trim() : null });
+    const val = (n) => (flag(n) !== -1 && argv[flag(n) + 1] && !argv[flag(n) + 1].startsWith("--") ? argv[flag(n) + 1] : null);
+    const roundArg = val("--round");
+    const round = roundArg === null ? null : Number(roundArg);
+    if (roundArg !== null && (!Number.isInteger(round) || round < 1)) {
+      process.stderr.write(`--round takes a whole number from 1 — "${roundArg}" is not one\n`);
+      process.exit(2);
+    }
+    openPlan({ name, branch, base: base.status === 0 ? base.stdout.trim() : null, brief: val("--brief"), handoff: val("--handoff"), round });
     process.stdout.write(`${render(obligation())}\n`);
     process.exit(0);
   }

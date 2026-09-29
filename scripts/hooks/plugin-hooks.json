@@ -1,5 +1,5 @@
 {
-  "description": "resume-price: prices a SendMessage that would resume a helper carrying more context than a fresh one starts with. Advisory; it refuses nothing (scripts/hooks/resume-price.mjs).",
+  "description": "resume-price: prices a SendMessage that would resume a helper carrying more context than a fresh one starts with. Advisory; it refuses nothing (scripts/hooks/resume-price.mjs). brief-check: denies an executor, cmp-orchestrator, deep-worker or staff-reviewer spawn whose brief is missing a labelled field, and names the schema; a form check that fails open (scripts/hooks/brief-check.mjs).",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,26 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/resume-price.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/brief-check.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/brief-check.mjs\"",
             "timeout": 10
           }
         ]

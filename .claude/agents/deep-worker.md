@@ -35,8 +35,7 @@ bottom, reported honestly.
   names, and after each commit bring the hand-off file it names up to date: what is done, what is
   left, what you learned. Then a host that sleeps, a rate limit, a hang or your own context filling
   up costs nothing — a fresh worker starts from that file and those commits, not from your history,
-  which every step of a resumed worker re-reads in full. A brief that names no branch or no
-  hand-off file is a question for your plan stop.
+  which every step of a resumed worker re-reads in full.
 
 **Checkpoints — stop twice, and neither is a clock (ADR-0015).**
 
