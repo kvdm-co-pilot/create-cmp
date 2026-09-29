@@ -139,6 +139,12 @@ function projectFor(commands) {
       fs.mkdirSync(path.dirname(path.join(dir, m[0])), { recursive: true });
       fs.writeFileSync(path.join(dir, m[0]), `process.stdout.write(${JSON.stringify(MARKER)});\n`);
     }
+    // A shell launcher in front of a gate is the template's own file, copied: the form
+    // is credited for what the real launcher does, not for what a stub would.
+    for (const m of command.matchAll(/qa\/hooks\/[A-Za-z0-9_.-]+\.sh/g)) {
+      fs.mkdirSync(path.dirname(path.join(dir, m[0])), { recursive: true });
+      fs.copyFileSync(path.join(ROOT, "template", m[0]), path.join(dir, m[0]));
+    }
   }
   return dir;
 }

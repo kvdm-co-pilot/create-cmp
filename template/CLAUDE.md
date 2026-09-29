@@ -32,7 +32,7 @@ once — when you believe the change is done.
   you catch your own mistakes.
 - **Checkpoint — run once, at done:** `node qa/verify.mjs`. It writes the receipt (a `--fast` run writes
   `qa/evidence/latest-fast.json` instead, so the watcher can keep running); commit
-  the receipt with your change. The Stop hook (`qa/receipt-check.mjs`) then confirms — with a
+  the receipt with your change. The Stop hook (`qa/receipt-check.mjs`, run through `qa/hooks/fail-closed.sh` so a gate that cannot run refuses) then confirms — with a
   cheap hash check, not another lane run — that a valid receipt attests this tree, and CI
   re-runs the full lane on push. After a green checkpoint, do not re-run the lane unless you
   change the tree again.

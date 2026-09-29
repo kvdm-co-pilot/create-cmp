@@ -35,6 +35,18 @@ All notable changes to this project are documented here. The format is based on
   Apps stamped before this keep the granting forms until their `.claude/settings.json` is edited;
   `doctor --fix` does not rewrite reminder text.
 
+### Changed
+
+- The stamped app's gates say what is active and fail closed. Its Stop hook runs
+  `qa/receipt-check.mjs` through `qa/hooks/fail-closed.sh`, so a gate that crashes, finds no `node`
+  or passes its own deadline refuses by name instead of letting the session stop (once — never when
+  the payload says `stop_hook_active`; a hard kill by Claude Code still fails open). SessionStart adds
+  `qa/gates-status.mjs --line`, one derived line naming the Stop hook, the pre-push hook and the CI
+  Verify workflow (whether GitHub requires it is `unknown locally` unless `gh` answers); a missing
+  cmp-inspector is a fault to run cmp-doctor on locally and expected in a cloud session or routine;
+  and `permissions.ask` guards edits to the gate's own files. `doctor --fix` still heals a 0.26.2
+  Stop hook to its anchored form and does not write the launcher an older lane lacks.
+
 ### Fixed
 
 - `proof-plan` no longer owes a review for a release bump, and a bump after a discharged review no

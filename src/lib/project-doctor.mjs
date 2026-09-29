@@ -557,14 +557,14 @@ export function diagnoseProject(input) {
           "create-cmp itself shipped and has since replaced",
         detail:
           sentence(`${healable.map((h) => `${where(h)} runs \`${h.command}\`, which ${h.why}`).join("; ")}. `) +
-          `The form the current template ships differs by the anchor alone (${PROJECT_DIR_ANCHOR}), which ` +
+          `The form the heal writes differs from it by the anchor alone (${PROJECT_DIR_ANCHOR}), which ` +
           "Claude Code sets for every hook command — so the rewrite runs the same script from the project " +
           "root and the right one from every other directory, whatever version of the lane this app carries.",
         fix: {
           auto: true,
           description:
-            "`create-cmp doctor --fix` rewrites exactly these commands to the form the current template " +
-            "ships, and changes no other byte of .claude/settings.json. It asks first, because the file is " +
+            "`create-cmp doctor --fix` rewrites exactly these commands to their anchored form, which " +
+            "create-cmp shipped, and changes no other byte of .claude/settings.json. It asks first, because the file is " +
             "your app's: --yes approves, --dry-run previews.",
         },
       });
@@ -579,14 +579,14 @@ export function diagnoseProject(input) {
           "create-cmp itself shipped and has since replaced, which doctor --fix does not rewrite where it stands",
         detail:
           sentence(`${byHand.map((h) => `${where(h)} runs \`${h.command}\`, which ${h.why}`).join("; ")}. `) +
-          `The form the current template ships differs by the anchor alone (${PROJECT_DIR_ANCHOR}).`,
+          `The form the heal would write differs from it by the anchor alone (${PROJECT_DIR_ANCHOR}).`,
         // The offer is the heal's own judgement, never a second one (KD-237): `byHand` is
         // what planShippedHookHeal leaves, with its reason, via shippedHookHealVerdict.
         fix: {
           auto: false,
           description:
             `doctor --fix does not rewrite ${byHand.map((h) => `${h.location}: ${h.reason}`).join("; ")}. ` +
-            `By hand: set ${one ? "that command" : "each command"} to the form the current template ships — ` +
+            `By hand: set ${one ? "that command" : "each command"} to its anchored form — ` +
             `${byHand.map((h) => `${h.location} as "command": ${JSON.stringify(h.successor)}`).join("; ")} — ` +
             "or keep one copy of each key written twice, then run create-cmp doctor --fix.",
         },

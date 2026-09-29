@@ -140,7 +140,7 @@ export function sessionStartCommand(context) {
 
 /**
  * The minimal-mode hook set, DERIVED from the full one rather than kept as a
- * second file to hold in sync (light is a filter, not a fork). Five edits:
+ * second file to hold in sync (light is a filter, not a fork). Six edits:
  *
  *   (a) enforcement goes — the Stop hook is Act 3;
  *   (b) lane-advisory goes — a nudge naming qa/ presupposes the lane;
@@ -157,6 +157,12 @@ export function sessionStartCommand(context) {
  *   (e) a `permissions.allow` rule naming qa/ goes, by that same rule: the
  *       template declares the lane's own two commands there, and a scaffold
  *       without the lane would carry a grant for a command it cannot run.
+ *       `permissions.ask` rules naming qa/ or .githooks/ go too — they guard
+ *       the gate's own files, which a minimal scaffold does not carry.
+ *   (f) SessionStart is ONE hook here. The full template carries two: the
+ *       narration printf and `qa/gates-status.mjs --line`, which derives the
+ *       active gates and presupposes qa/. The first is re-authored as (c)
+ *       says; every other SessionStart hook goes.
  *
  * @param {object} settings parsed .claude/settings.json content
  * @param {object} opts
@@ -169,12 +175,25 @@ export function minimalHookSettings(settings, { sessionContext }) {
   if (Array.isArray(out.permissions?.allow)) {
     out.permissions.allow = out.permissions.allow.filter((rule) => !referencesLane({ command: rule }));
     if (out.permissions.allow.length === 0) delete out.permissions.allow;
-    if (Object.keys(out.permissions).length === 0) delete out.permissions;
+  }
+  if (Array.isArray(out.permissions?.ask)) {
+    out.permissions.ask = out.permissions.ask.filter((rule) => !/qa\/|\.githooks\//.test(String(rule)));
+    if (out.permissions.ask.length === 0) delete out.permissions.ask;
+  }
+  if (out.permissions && typeof out.permissions === "object" && Object.keys(out.permissions).length === 0) {
+    delete out.permissions;
   }
   if (typeof out.hooks !== "object" || out.hooks === null) return out;
+  let authored = false;
   for (const group of out.hooks.SessionStart ?? []) {
     if (!Array.isArray(group?.hooks)) continue;
+    group.hooks = authored ? [] : group.hooks.slice(0, 1);
+    if (group.hooks.length > 0) authored = true;
     for (const hook of group.hooks) hook.command = sessionStartCommand(sessionContext);
+  }
+  if (Array.isArray(out.hooks.SessionStart)) {
+    out.hooks.SessionStart = out.hooks.SessionStart.filter((g) => !Array.isArray(g?.hooks) || g.hooks.length > 0);
+    if (out.hooks.SessionStart.length === 0) delete out.hooks.SessionStart;
   }
   return out;
 }
