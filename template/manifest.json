@@ -63,9 +63,11 @@
         ".githooks",
         "qa/approvals.json",
         "qa/comments.json",
-        "qa/evidence"
+        "qa/evidence",
+        "qa/hooks",
+        "qa/ruleset.json"
       ],
-      "notes": "The verification harness — the mode split (`--minimal` disables it; `create-cmp harden` installs it back). Three mechanisms share the subtraction, each already owned by the engine: (1) the paths above delete the app-owned governance surfaces (specs/, approvals+comments ledgers, evidence, generator skills, the pre-push receipt hook); (2) `cmp:feature harness`/`!harness` marker blocks give CLAUDE.md, AGENTS.md, README.md, CONTRIBUTING.md, docs/TESTING.md and .github/workflows/verify.yml their two honest renderings from one file; (3) the machine-owned lane region is subtracted by the ENGINE (src/lib/minimal.mjs), which keeps qa/preview-gallery.mjs plus its transitive qa/lib imports — derived from import statements, never listed here, so it cannot rot. .claude/settings.json is rewritten to the advisory-only hook set via the src/lib/hooks.mjs classifier (Stop hook and qa/-referencing nudges are full-mode only). qa/golden/ stays in BOTH modes — the desktopTest golden-tree tests read it and minimal keeps the full JVM test tier. qa/e2e is its own feature and stays orthogonal (Maestro flows run standalone)."
+      "notes": "The verification harness — the mode split (`--minimal` disables it; `create-cmp harden` installs it back). Three mechanisms share the subtraction, each already owned by the engine: (1) the paths above delete the app-owned governance surfaces (specs/, approvals+comments ledgers, evidence, generator skills, the pre-push receipt hook, the Stop hook's fail-closed launcher qa/hooks/ and the CI-required-check ruleset qa/ruleset.json — both presuppose the lane); (2) `cmp:feature harness`/`!harness` marker blocks give CLAUDE.md, AGENTS.md, README.md, CONTRIBUTING.md, docs/TESTING.md and .github/workflows/verify.yml their two honest renderings from one file; (3) the machine-owned lane region is subtracted by the ENGINE (src/lib/minimal.mjs), which keeps qa/preview-gallery.mjs plus its transitive qa/lib imports — derived from import statements, never listed here, so it cannot rot. .claude/settings.json is rewritten to the advisory-only hook set via the src/lib/hooks.mjs classifier (Stop hook and qa/-referencing nudges are full-mode only). qa/golden/ stays in BOTH modes — the desktopTest golden-tree tests read it and minimal keeps the full JVM test tier. qa/e2e is its own feature and stays orthogonal (Maestro flows run standalone)."
     },
     "ios": {
       "enabledByDefault": true,
