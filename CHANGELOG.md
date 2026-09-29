@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Security
+
+- A hook never grants. The three PreToolUse reminders a stamped app carries answered
+  `permissionDecision: "allow"`, which approves the matched Bash call and skips the permission
+  prompt; they now add their reminder as `additionalContext` and decide nothing. The lane's own two
+  commands are declared instead in the template's `permissions.allow` (`node qa/verify.mjs`, with and
+  without `--fast`; a minimal scaffold drops them with the lane). This repository's proof gate
+  likewise refuses or adds context, and no longer grants `npm publish` or `gh pr create` on a pass.
+  Apps stamped before this keep the granting forms until their `.claude/settings.json` is edited;
+  `doctor --fix` does not rewrite reminder text.
+
 ## [0.28.4] - 2026-09-27
 
 The notary and the refusal demo tell the truth. Ships with `prooflane-harness` 0.23.5 and

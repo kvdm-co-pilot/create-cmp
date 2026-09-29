@@ -388,8 +388,10 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
 - **Enforced at the decision point, never by reading.** `.claude/settings.json` runs
   `scripts/hooks/proof-gate.mjs` on every Bash call. An invocation of `fleet-check.mjs` is
   refused when nothing is owed, when the tier is already discharged for this exact tree, or when
-  no slice is declared (the run could discharge nothing); it is allowed while owed, with the
-  schedule as the reason. `gh pr merge` is refused while the tier is owed — the slice closes at
+  no slice is declared (the run could discharge nothing); while owed it passes, with the
+  schedule added as context. The gate refuses or adds context; it never grants: a pass carries no
+  permissionDecision, so the call still meets the user's own permission rules. `gh pr merge` is
+  refused while the tier is owed — the slice closes at
   merge, so that is where "once, at slice close" is collected. SessionStart puts the schedule in
   front of the session. The audit the day after this rule landed found the program above existed
   and **nothing invoked it**: no settings file in this repo, no git hooks, every `--open` in prose.

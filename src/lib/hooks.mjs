@@ -7,7 +7,9 @@
 //     to let a session claim "done" without a fresh PASS receipt. It is the
 //     harness's teeth, it presupposes the lane, and it ships only in full
 //     mode. Classified BY EVENT: Stop/SubagentStop are where Claude Code can
-//     block, so any hook registered there is enforcement by construction.
+//     block, so any hook registered there is enforcement by construction —
+//     and BY DECISION: a hook on any event whose command carries a
+//     permissionDecision is deciding, and deciding is enforcement.
 //
 //   LANE ADVISORY — wall-time nudges whose command text names `qa/` (the
 //     verify-fast reminder, the device-lease reminder). They constrain
@@ -17,10 +19,18 @@
 //     lane does. Classified by reference: naming the lane is depending on it.
 //
 //   PORTABLE ADVISORY — everything else that informs (the screenshots-lose-
-//     structure nudge). True in every mode; ships in every mode. An advisory
-//     hook always resolves to permissionDecision "allow" — if a future
-//     PreToolUse hook wanted to DENY, that is an enforcement decision to make
-//     deliberately here, not a string to pattern-match.
+//     structure nudge). True in every mode; ships in every mode.
+//
+// An advisory hook adds context and never decides: it answers with
+// hookSpecificOutput.additionalContext and carries no permissionDecision at
+// all. A hook that decides is enforcement and is placed here deliberately.
+// "allow" is a decision too, and the dangerous one — a PreToolUse "allow"
+// approves the call and skips the permission prompt, so a reminder that
+// answered "allow" was quietly granting whatever Bash command it matched
+// (the permission-modes doc; see
+// docs/reference/anthropic-agentic-engineering-2026-09-27/notes/07-security-permissions-governance.md §1).
+// What a project means to let through without a prompt it declares in
+// `permissions.allow`, where grants belong.
 //
 // SessionStart is deliberately exempt from the lane-reference rule, and the
 // distinction is not a special case but the actual difference between the two
@@ -40,6 +50,15 @@ export const ENFORCEMENT_EVENTS = new Set(["Stop", "SubagentStop"]);
 /** Events whose hooks can constrain the agent (vs inform it). */
 export function isEnforcementEvent(event) {
   return ENFORCEMENT_EVENTS.has(event);
+}
+
+/**
+ * Does this hook decide — allow, deny or ask — rather than inform? Any
+ * permissionDecision in its command makes it enforcement, whatever its event:
+ * an advisory hook carries additionalContext and nothing else. See the header.
+ */
+export function decides(hook) {
+  return String(hook?.command ?? "").includes("permissionDecision");
 }
 
 /**
@@ -63,7 +82,7 @@ const REWRITTEN_EVENTS = new Set(["SessionStart"]);
  * @param {object} hook one entry of a group's `hooks` array
  */
 export function classifyHook(event, hook) {
-  if (isEnforcementEvent(event)) return "enforcement";
+  if (isEnforcementEvent(event) || decides(hook)) return "enforcement";
   if (REWRITTEN_EVENTS.has(event)) return "advisory";
   if (referencesLane(hook)) return "lane-advisory";
   return "advisory";
@@ -95,7 +114,7 @@ function filterHooks(settings, drop) {
  * @param {object} settings parsed .claude/settings.json content
  */
 export function stripEnforcementHooks(settings) {
-  return filterHooks(settings, (event) => isEnforcementEvent(event));
+  return filterHooks(settings, (event, hook) => classifyHook(event, hook) === "enforcement");
 }
 
 /**
@@ -121,7 +140,7 @@ export function sessionStartCommand(context) {
 
 /**
  * The minimal-mode hook set, DERIVED from the full one rather than kept as a
- * second file to hold in sync (light is a filter, not a fork). Four edits:
+ * second file to hold in sync (light is a filter, not a fork). Five edits:
  *
  *   (a) enforcement goes — the Stop hook is Act 3;
  *   (b) lane-advisory goes — a nudge naming qa/ presupposes the lane;
@@ -135,6 +154,9 @@ export function sessionStartCommand(context) {
  *       survive review: dead config that fails silently. The lane-reference
  *       rule is the same one that drops lane-advisory hooks; it just has to be
  *       applied to every surface that carries a command, not only to `hooks`.
+ *   (e) a `permissions.allow` rule naming qa/ goes, by that same rule: the
+ *       template declares the lane's own two commands there, and a scaffold
+ *       without the lane would carry a grant for a command it cannot run.
  *
  * @param {object} settings parsed .claude/settings.json content
  * @param {object} opts
@@ -144,6 +166,11 @@ export function minimalHookSettings(settings, { sessionContext }) {
   const out = filterHooks(settings, (event, hook) => classifyHook(event, hook) !== "advisory");
   if (!out || typeof out !== "object") return out;
   if (referencesLane(out.statusLine)) delete out.statusLine;
+  if (Array.isArray(out.permissions?.allow)) {
+    out.permissions.allow = out.permissions.allow.filter((rule) => !referencesLane({ command: rule }));
+    if (out.permissions.allow.length === 0) delete out.permissions.allow;
+    if (Object.keys(out.permissions).length === 0) delete out.permissions;
+  }
   if (typeof out.hooks !== "object" || out.hooks === null) return out;
   for (const group of out.hooks.SessionStart ?? []) {
     if (!Array.isArray(group?.hooks)) continue;
