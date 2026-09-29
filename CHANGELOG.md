@@ -6,19 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-### Fixed
-
-- A stamped app's Verify workflow no longer fails on a private repository outside GitHub Enterprise
-  Cloud: the `actions/attest-build-provenance` step runs only when the repository is public, where
-  artifact attestations exist on every plan (ADR-0017, "Private repositories").
-- A stamped app's `.claude/settings.json` asks before edits to `qa/hooks/**`, so the Stop gate's
-  fail-closed launcher is guarded like the gate's other files; `--minimal` drops the rule with the lane.
-
-## [0.28.5] - 2026-09-29
+## [0.28.6] - 2026-09-29
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the
 CI-attested receipt reader, and `@create-cmp/inspector` 0.9.2 carries the server instructions that
-now reach the agent, in a rebuilt bundle. Nothing is published.
+now reach the agent, in a rebuilt bundle. 0.28.5 was set mid-batch and never published; the number moved on with the bytes. Nothing is published.
 
 ### Added
 
@@ -97,6 +89,12 @@ now reach the agent, in a rebuilt bundle. Nothing is published.
 - The proof gate's git calls draw on what is left of the hook's budget and set
   `GIT_OPTIONAL_LOCKS=0`, so a slow git answers as "could not tell" (owed) instead of running out
   the clock.
+- A stamped app's Verify workflow no longer fails on a private repository outside GitHub Enterprise
+  Cloud: the `actions/attest-build-provenance` step runs only when the repository is public, where
+  artifact attestations exist on every plan (ADR-0017, "Private repositories").
+- A stamped app's `.claude/settings.json` asks before edits to `qa/hooks/**`, so the Stop gate's
+  fail-closed launcher is guarded like the gate's other files; `--minimal` drops the rule with the lane.
+
 
 ## [0.28.4] - 2026-09-27
 
