@@ -185,6 +185,11 @@ function appDir() {
   for (const [name, marker] of Object.entries(MARKERS)) {
     fs.writeFileSync(path.join(dir, "qa", name), `process.stdout.write(${JSON.stringify(marker)});\n`);
   }
+  // The shipped Stop hook reaches TWO files: the fail-closed launcher, and the
+  // gate it runs (slice 8B). Plant the launcher the template really ships, so
+  // the behaviour measured is the shipped command's, not a fixture's gap.
+  fs.mkdirSync(path.join(dir, "qa", "hooks"), { recursive: true });
+  fs.copyFileSync(path.join(ROOT, "template", "qa", "hooks", "fail-closed.sh"), path.join(dir, "qa", "hooks", "fail-closed.sh"));
   // The shape payment-blueprint was in when it hit this: a project root whose
   // sessions are opened one directory down.
   fs.mkdirSync(path.join(dir, "services", "app"), { recursive: true });
@@ -300,11 +305,17 @@ test("behavioural: with CLAUDE_PROJECT_DIR unset the anchor degrades to the rela
 
     // And it degrades to exactly the old failure, not to a worse one: `/qa/...`
     // at the filesystem root is what a bare ${CLAUDE_PROJECT_DIR} would give.
+    // The shipped form is two-argument since slice 8B (`sh <launcher> <gate>`),
+    // so the first word to go unresolved is the LAUNCHER, and it must go
+    // unresolved against the cwd. Not worse also means not BLOCKING: the old
+    // form's miss was a non-blocking error, and so is this one (exit 2 would
+    // refuse every stop of a session opened one directory down).
     const subDir = path.join(dir, "services", "app");
     const sub = runHook(shippedCommand.stop, { cwd: subDir, projectDir: undefined });
     assert.notEqual(sub.status, 0);
+    assert.notEqual(sub.status, 2, `the degraded Stop hook BLOCKS — worse than the relative form it replaced: ${sub.stderr.slice(0, 200)}`);
     assert.ok(
-      sub.stderr.includes(path.join(subDir, "qa", "receipt-check.mjs")),
+      sub.stderr.includes("./qa/hooks/fail-closed.sh") && !sub.stderr.includes(": /qa/"),
       `unset CLAUDE_PROJECT_DIR resolved somewhere other than the cwd — the ':-.' default is not doing its job: ${sub.stderr.slice(0, 200)}`
     );
   } finally {
