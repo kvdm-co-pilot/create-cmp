@@ -143,6 +143,11 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
         commands.some((c) => typeof c === "string" && /qa\/receipt-check\.mjs"?\s+--hook\b/.test(c)),
         `Stop hook command runs qa/receipt-check.mjs --hook (got: ${JSON.stringify(commands)})`
       );
+      // …through the fail-closed launcher, which the stamp must therefore carry: a Stop
+      // hook naming a launcher the tree lacks would fail open on every stop.
+      assert.ok(commands.some((c) => typeof c === "string" && c.includes("qa/hooks/fail-closed.sh")), "Stop hook runs through qa/hooks/fail-closed.sh");
+      assert.ok(fs.existsSync(path.join(out, "qa/hooks/fail-closed.sh")), "stamp carries qa/hooks/fail-closed.sh");
+      assert.ok(fs.existsSync(path.join(out, "qa/gates-status.mjs")), "stamp carries qa/gates-status.mjs (the SessionStart gates line)");
     });
 
     await t.test("every HOOK command the STAMPED settings.json executes resolves from any directory", () => {

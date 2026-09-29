@@ -29,9 +29,12 @@
 //
 // WHAT THE HEAL MAY REWRITE (`healedForm`), which is narrower than "superseded":
 //
-//   - a superseded form whose successor differs from it ONLY BY THE ANCHOR — derived,
-//     not declared: strip `"${CLAUDE_PROJECT_DIR:-.}/…"` back to `…` in the successor
-//     and the old command comes back byte-for-byte. That rewrite runs the same script
+//   - a superseded form to the form in this table that differs from it ONLY BY THE
+//     ANCHOR — derived, not declared: strip `"${CLAUDE_PROJECT_DIR:-.}/…"` back to `…`
+//     in that form and the old command comes back byte-for-byte. That form is usually the
+//     successor; for the Stop hook it is the anchored form the successor itself replaced,
+//     because the current Stop form runs qa/hooks/fail-closed.sh, a file an app stamped
+//     before it does not carry — writing it there would break the gate it exists to harden. That rewrite runs the same script
 //     at the project root and the right one everywhere else, whatever lane version the
 //     app carries;
 //   - on a surface where the anchor works at all (ANCHORABLE_SURFACES). The status line
@@ -65,7 +68,7 @@ export const SHIPPED_COMMANDS = Object.freeze(
       id: "stop-receipt-relative",
       surface: "Stop",
       status: "superseded",
-      successor: "stop-receipt-anchored",
+      successor: "stop-receipt-fail-closed",
       shipped: "fc4dd3e … ff6c304 (through 0.26.2)",
       why: "names qa/receipt-check.mjs relative to the SESSION's directory, so a session started anywhere but the project root loses the Stop gate",
       command: "node qa/receipt-check.mjs --hook",
@@ -73,10 +76,19 @@ export const SHIPPED_COMMANDS = Object.freeze(
     {
       id: "stop-receipt-anchored",
       surface: "Stop",
+      status: "superseded",
+      successor: "stop-receipt-fail-closed",
+      shipped: "e326c24 (0.26.3) … 8945566",
+      why: "runs the gate directly, and Claude Code blocks on exit 2 alone — a gate that crashes, finds no node on the PATH or hangs lets the session stop ungated; the successor runs it through qa/hooks/fail-closed.sh, which turns those into a named refusal (a file only a newer lane carries, so doctor --fix does not write it)",
+      command: "node \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook",
+    },
+    {
+      id: "stop-receipt-fail-closed",
+      surface: "Stop",
       status: "current",
       anchored: true,
-      shipped: "e326c24 (0.26.3) …",
-      command: "node \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook",
+      shipped: "after 8945566 (fail-closed Stop launcher) …",
+      command: "sh \"${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook",
     },
     {
       id: "prompt-walk-relative",
@@ -109,7 +121,7 @@ export const SHIPPED_COMMANDS = Object.freeze(
       id: "session-start-committed-receipt",
       surface: "SessionStart",
       status: "superseded",
-      successor: "session-start-attesting-receipt",
+      successor: "session-start-inspector-local-or-cloud",
       shipped: "0efa131 … 8f09cc7",
       why: "said done is a committed receipt; done is a receipt that attests this tree",
       command: "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This app is governed by its delivery contract (CLAUDE.md): behavior starts in specs/, done is `node qa/verify.mjs` with a committed receipt, approvals gate signed artifacts. The cmp-inspector MCP tools (preview loop, live tier) are the expected eyes \u2014 if they are absent from this session, that is a fault to diagnose (plugin disabled, session predates plugin enablement, or stale plugin copy; see cmp-doctor), not a cue to fall back to screenshots or blind adb.\"}}'",
@@ -117,9 +129,27 @@ export const SHIPPED_COMMANDS = Object.freeze(
     {
       id: "session-start-attesting-receipt",
       surface: "SessionStart",
-      status: "current",
-      shipped: "f77e1cf …",
+      status: "superseded",
+      successor: "session-start-inspector-local-or-cloud",
+      shipped: "f77e1cf … 8945566",
+      why: "called absent cmp-inspector tools a fault in every session, including cloud sessions and routines, where plugins do not load",
       command: "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This app is governed by its delivery contract (CLAUDE.md): behavior starts in specs/, done is `node qa/verify.mjs` with a receipt that attests this tree (commit it with the change), approvals gate signed artifacts. The cmp-inspector MCP tools (preview loop, live tier) are the expected eyes \u2014 if they are absent from this session, that is a fault to diagnose (plugin disabled, session predates plugin enablement, or stale plugin copy; see cmp-doctor), not a cue to fall back to screenshots or blind adb.\"}}'",
+    },
+    {
+      id: "session-start-inspector-local-or-cloud",
+      surface: "SessionStart",
+      status: "current",
+      shipped: "after 8945566 (fail-closed Stop launcher) …",
+      command: "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This app is governed by its delivery contract (CLAUDE.md): behavior starts in specs/, done is `node qa/verify.mjs` with a receipt that attests this tree (commit it with the change), approvals gate signed artifacts. The cmp-inspector MCP tools (preview loop, live tier) are the expected eyes — absent in a local session → run cmp-doctor (plugin disabled, session predates plugin enablement, or stale plugin copy), not a cue to fall back to screenshots or blind adb; absent in a cloud session or routine → expected, plugins do not load there.\"}}'",
+    },
+    {
+      // The derived line: which gates are active, read from the tree (qa/gates-status.mjs).
+      id: "session-start-gates-status",
+      surface: "SessionStart",
+      status: "current",
+      anchored: true,
+      shipped: "after 8945566 (fail-closed Stop launcher) …",
+      command: "node \"${CLAUDE_PROJECT_DIR:-.}/qa/gates-status.mjs\" --line",
     },
     {
       id: "pretooluse-screenshots-grant",
@@ -236,15 +266,17 @@ export function withoutAnchor(command) {
 
 /**
  * The command the heal may write in place of this form, or null when it may not.
- * See the header: superseded, on an anchorable surface, and differing from its
- * successor by the anchor alone — which is checked here, not declared in the table.
+ * See the header: superseded (with a current successor), on an anchorable surface, and
+ * rewritten only to a form this table holds that differs from it by the anchor alone —
+ * which is found here, not declared in the table.
  */
 export function healedForm(form) {
-  const next = successorOf(form);
-  if (next === null) return null;
+  if (successorOf(form) === null) return null;
   if (ANCHORABLE_SURFACES[surfaceKind(form.surface)] !== true) return null;
-  if (next.command === form.command || withoutAnchor(next.command) !== form.command) return null;
-  return next.command;
+  const target = SHIPPED_COMMANDS.find(
+    (e) => e.surface === form.surface && e.command !== form.command && withoutAnchor(e.command) === form.command
+  );
+  return target ? target.command : null;
 }
 
 /**

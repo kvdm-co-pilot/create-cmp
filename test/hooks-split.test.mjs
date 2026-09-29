@@ -95,6 +95,33 @@ test("minimalHookSettings: enforcement and lane-advisory go, the portable nudge 
   assert.deepEqual(minimalPreToolUse, fullPortable, "portable nudges did not pass through untouched");
 });
 
+test("the full SessionStart carries the narration and the derived gates line; minimal keeps one hook", () => {
+  const commands = settings.hooks.SessionStart.flatMap((g) => g.hooks).map((h) => h.command);
+  assert.equal(commands.length, 2, "expected the narration printf and the gates-status line");
+  assert.match(commands[0], /absent in a local session \u2192 run cmp-doctor/);
+  assert.match(commands[0], /absent in a cloud session or routine \u2192 expected, plugins do not load there/);
+  assert.equal(commands[1], 'node "${CLAUDE_PROJECT_DIR:-.}/qa/gates-status.mjs" --line');
+  const minimal = minimalHookSettings(settings, { sessionContext: MINIMAL_SESSION_CONTEXT });
+  const kept = (minimal.hooks.SessionStart ?? []).flatMap((g) => g.hooks).map((h) => h.command);
+  assert.ok(!kept.some((c) => c.includes("gates-status")), "minimal kept a hook naming qa/gates-status.mjs, which it deletes");
+});
+
+test("the Stop hook runs the gate through the fail-closed launcher; minimal drops the gate's ask rules", () => {
+  const stop = settings.hooks.Stop.flatMap((g) => g.hooks).map((h) => h.command);
+  assert.deepEqual(stop, [
+    'sh "${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh" "${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook',
+  ]);
+  assert.deepEqual(settings.permissions.ask, [
+    "Edit(qa/receipt-check.mjs)",
+    "Edit(qa/lib/**)",
+    "Edit(qa/evidence/**)",
+    "Write(qa/evidence/**)",
+    "Edit(.githooks/**)",
+  ]);
+  const minimal = minimalHookSettings(settings, { sessionContext: MINIMAL_SESSION_CONTEXT });
+  assert.equal(minimal.permissions, undefined, "minimal kept a permission rule for a lane it does not carry");
+});
+
 test("the minimal SessionStart hook parses and tells the truth about this scaffold", () => {
   const minimal = minimalHookSettings(settings, { sessionContext: MINIMAL_SESSION_CONTEXT });
   const commands = (minimal.hooks.SessionStart ?? []).flatMap((g) => g.hooks).map((h) => h.command);

@@ -142,7 +142,9 @@ For AI sessions using Claude Code, a **Stop hook** (`.claude/settings.json`) mak
 `CLAUDE.md`'s definition of done mechanical instead of honor-system.
 
 **What it does:** when a session tries to end, the hook runs
-`node "${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook`. The path is anchored to the
+`qa/receipt-check.mjs --hook` through `qa/hooks/fail-closed.sh`, which turns a gate that
+crashes, finds no `node`, or outlives its own deadline into a named refusal rather than a
+silent pass (a hard kill by Claude Code itself still lets the stop through). The paths are anchored to the
 project root because Claude Code runs a hook in the *session's* working directory, which is not
 always this one — a session opened in a subdirectory would otherwise fail to find the script.
 (`:-.` means an unset `CLAUDE_PROJECT_DIR` falls back to the current directory, so the hook is
@@ -153,7 +155,11 @@ verified surface (`composeApp/`, `specs/`, `qa/`, and the Gradle build files —
 silently. Source changed without a fresh `PASS` — or a missing, failed, or pre-mechanism
 receipt — blocks with the specific reason and asks for `node qa/verify.mjs` plus a committed
 receipt. It runs no build and no tests, only file hashing, so it costs milliseconds, and it
-never fires twice in a row for the same stop.
+never fires twice in a row for the same stop. Each session also opens with one derived line,
+`node qa/gates-status.mjs --line`, naming which gates are active here — the Stop hook, the
+pre-push hook (`.githooks` on or off), and the CI Verify workflow (whether GitHub requires it is
+unknown locally unless an authenticated `gh` answers). Edits to the gate's own files
+(`qa/receipt-check.mjs`, `qa/lib/`, `qa/evidence/`, `.githooks/`) ask for your approval first.
 
 Doc-only edits (`*.md`, `README`, `.github/`, `.claude/`) are deliberately outside the
 verified surface: editing docs never invalidates a good receipt. The intent is transparent

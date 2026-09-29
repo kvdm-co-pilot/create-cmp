@@ -1,6 +1,13 @@
 {
   "permissions": {
-    "allow": ["Bash(node qa/verify.mjs)", "Bash(node qa/verify.mjs --fast)"]
+    "allow": ["Bash(node qa/verify.mjs)", "Bash(node qa/verify.mjs --fast)"],
+    "ask": [
+      "Edit(qa/receipt-check.mjs)",
+      "Edit(qa/lib/**)",
+      "Edit(qa/evidence/**)",
+      "Write(qa/evidence/**)",
+      "Edit(.githooks/**)"
+    ]
   },
   "hooks": {
     "SessionStart": [
@@ -9,7 +16,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This app is governed by its delivery contract (CLAUDE.md): behavior starts in specs/, done is `node qa/verify.mjs` with a receipt that attests this tree (commit it with the change), approvals gate signed artifacts. The cmp-inspector MCP tools (preview loop, live tier) are the expected eyes \u2014 if they are absent from this session, that is a fault to diagnose (plugin disabled, session predates plugin enablement, or stale plugin copy; see cmp-doctor), not a cue to fall back to screenshots or blind adb.\"}}'"
+            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This app is governed by its delivery contract (CLAUDE.md): behavior starts in specs/, done is `node qa/verify.mjs` with a receipt that attests this tree (commit it with the change), approvals gate signed artifacts. The cmp-inspector MCP tools (preview loop, live tier) are the expected eyes \u2014 absent in a local session \u2192 run cmp-doctor (plugin disabled, session predates plugin enablement, or stale plugin copy), not a cue to fall back to screenshots or blind adb; absent in a cloud session or routine \u2192 expected, plugins do not load there.\"}}'"
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/qa/gates-status.mjs\" --line"
           }
         ]
       }
@@ -39,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook"
+            "command": "sh \"${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook"
           }
         ]
       }
