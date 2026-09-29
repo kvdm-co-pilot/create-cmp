@@ -45,6 +45,13 @@
 // rule 1), and `node scripts/proof-plan.mjs --rekey` re-derives an older
 // record's digest under the current rule from the commit it ran on — never by
 // editing the record.
+//
+// Rule 3 (2026-09-29) is rule 2 with five more files held at the placeholder,
+// under the same NOT-READ proof (UNOBSERVED_BY_PROFILE): `.claude/settings.json`
+// — the agent's session runs its hooks, the L2 run never opens it — and the
+// prose `CHANGELOG.md`, `CONTRIBUTING.md`, `docs/TESTING.md` and
+// `docs/dev-client.md`, which cost a full L2 run per typo (review D-2). Rule 2
+// stays computable byte for byte, so its records rekey rather than rerun.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -154,13 +161,13 @@ export const FIREBASE_FLEET_RECORD = "qa-artifacts/fleet-firebase-latest.json";
  * laptop reads as `other-rule` the moment it moves, until
  * `node scripts/proof-plan.mjs --rekey` re-derives it (a stamp, no L2 run).
  */
-export const STAMPED_OUTPUT_RULE = 2;
+export const STAMPED_OUTPUT_RULE = 3;
 
 /** The rule a record's digest was taken under when the record does not say. */
 export const LEGACY_STAMPED_OUTPUT_RULE = 1;
 
-/** Every rule `hashStampedTree` can still compute — rule 1 stays, byte-identical, so an old record can be re-derived. */
-export const STAMPED_OUTPUT_RULES = Object.freeze([1, 2]);
+/** Every rule `hashStampedTree` can still compute — rules 1 and 2 stay, byte-identical, so an old record can be re-derived. */
+export const STAMPED_OUTPUT_RULES = Object.freeze([1, 2, 3]);
 
 /** The rule a fleet record's digest was taken under. Absent → rule 1: the field did not exist before rule 2. */
 export function ruleOfRecord(record) {
@@ -345,6 +352,7 @@ function lockTellsTheTruth(lock, appDir) {
 const NORMALISERS_BY_RULE = Object.freeze({
   1: Object.freeze([STAMPED_AT, ADR_DATE, SDK_POINTER]),
   2: Object.freeze([...VERSION_NORMALISERS, ADR_DATE, SDK_POINTER]),
+  3: Object.freeze([...VERSION_NORMALISERS, ADR_DATE, SDK_POINTER]),
 });
 
 /**
@@ -378,10 +386,35 @@ const NORMALISERS_BY_RULE = Object.freeze({
  * calls `updateReadmeBadge(ROOT)`, which reads and may rewrite README.md on
  * every lane run (template/qa/lib/evidence-badge.mjs:159). `specs/` and
  * `docs/features/` are read by the lane and stay observed.
+ *
+ * RULE 3 ADDS FIVE, measured 2026-09-29 by `grep -rn` over template/qa,
+ * packages/harness/src (console excluded), template/composeApp and the Gradle
+ * files for each name:
+ *   - `.claude/settings.json`: the only reference is PROSE, a comment at
+ *     template/qa/receipt-check.mjs:8; its hooks run in the agent's session,
+ *     and the SessionStart string above is the one this proof already named;
+ *   - `CHANGELOG.md`, `CONTRIBUTING.md`: no reference at all;
+ *   - `docs/TESTING.md`: prose only — template/qa/scaffold-feature.mjs:432
+ *     writes the name into a generated comment, and three Kotlin KDoc comments
+ *     under composeApp/src/androidInstrumentedTest cite it;
+ *   - `docs/dev-client.md`: no reference; `dev-client` in
+ *     template/composeApp/build.gradle.kts is a feature-marker name, not the file.
+ * None sits under a memoised step's input directory. TWO CANDIDATES ARE NOT
+ * HERE and stay observed: `qa/e2e/README.md` and `docs/adr/template.md`. No
+ * step reads their content (flows are `.yaml`/`.yml` and citations `.kt`/`.kts`,
+ * template/qa/lib/profiles/cmp/declarations.mjs:42-43; arch-doc.mjs:24 excludes
+ * the ADR template), but both sit inside a directory a memoised step names as
+ * its input (steps-cmp.mjs:1377-1381), which this proof's third clause says of
+ * none of these — so that clause would have to be extended first.
  */
-const UNOBSERVED_BY_PROFILE = Object.freeze({
+const UNOBSERVED_RULE_2 = Object.freeze({
   cmp: Object.freeze(["AGENTS.md", "CLAUDE.md", ".claude/**/*.md"]),
 });
+const UNOBSERVED_BY_PROFILE = Object.freeze({
+  cmp: Object.freeze([...UNOBSERVED_RULE_2.cmp, ".claude/settings.json", "CHANGELOG.md", "CONTRIBUTING.md", "docs/TESTING.md", "docs/dev-client.md"]),
+});
+/** Each rule's unobserved lists — rule 1 had none; rule 2's stays frozen as it was, so its records can be re-derived. */
+const UNOBSERVED_BY_RULE = Object.freeze({ 1: Object.freeze({}), 2: UNOBSERVED_RULE_2, 3: UNOBSERVED_BY_PROFILE });
 const UNOBSERVED = Buffer.from("# not read by this profile's L2 run: content held by scripts/stamped-output.mjs (UNOBSERVED_BY_PROFILE); presence and mode still hashed\n", "utf8");
 
 /** `dir/**\/*.ext` or an exact relative path — the only two shapes the list uses. */
@@ -401,10 +434,11 @@ function profileIdOf(appDir) {
   }
 }
 
-/** The unobserved list a stamp's own profile declares — empty for any profile not named, which hashes every byte. */
-export function unobservedFor(appDir) {
+/** The unobserved list a stamp's own profile declares under `rule` — empty for any profile not named, which hashes every byte. */
+export function unobservedFor(appDir, rule = STAMPED_OUTPUT_RULE) {
+  const lists = UNOBSERVED_BY_RULE[rule] ?? {};
   const id = profileIdOf(appDir);
-  return id && Object.hasOwn(UNOBSERVED_BY_PROFILE, id) ? UNOBSERVED_BY_PROFILE[id] : [];
+  return id && Object.hasOwn(lists, id) ? lists[id] : [];
 }
 
 /**
@@ -442,7 +476,7 @@ export function hashStampedTree(appDir, { rule = STAMPED_OUTPUT_RULE } = {}) {
   if (!STAMPED_OUTPUT_RULES.includes(rule)) throw new Error(`no stamped-output rule ${JSON.stringify(rule)} — this module computes rules ${STAMPED_OUTPUT_RULES.join(", ")}`);
   const normalisers = NORMALISERS_BY_RULE[rule];
   const normaliserFor = (rel) => normalisers.find((n) => n.match(rel)) ?? null;
-  const unobserved = rule >= 2 ? unobservedFor(appDir) : [];
+  const unobserved = unobservedFor(appDir, rule);
   const isUnobserved = (rel) => unobserved.some((p) => matchesUnobserved(p, rel));
   const files = {};
   const walk = (dir) => {
