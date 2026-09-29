@@ -79,6 +79,11 @@ function pre(command, cwd) {
   assert.equal(r.status, 0, `the hook failed rather than deciding: ${r.stderr}`);
   if (!r.stdout) return { action: "silent", reason: "" };
   const out = JSON.parse(r.stdout).hookSpecificOutput;
+  // The gate refuses or adds context; it never grants. A pass
+  // on the wire is additionalContext with no permissionDecision, read back here
+  // as the internal verdict "allow" the assertions below name.
+  if (out.permissionDecision === undefined) return { action: "allow", reason: out.additionalContext };
+  assert.equal(out.permissionDecision, "deny", `the gate decided something other than a refusal: ${r.stdout}`);
   return { action: out.permissionDecision, reason: out.permissionDecisionReason };
 }
 

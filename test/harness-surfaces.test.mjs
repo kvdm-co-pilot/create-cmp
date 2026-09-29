@@ -177,7 +177,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
         "SessionStart hook injects the capability-contract banner"
       );
       // PreToolUse on Bash: pixel/blind-tap fallbacks get a structured-eyes reminder —
-      // allow (never block), silent on every non-matching command.
+      // add context (never decide), silent on every non-matching command.
       const preEntries = settings.hooks?.PreToolUse || [];
       const bashEntry = preEntries.find((e) => e.matcher === "Bash");
       assert.ok(bashEntry, "PreToolUse has a Bash matcher entry");
@@ -188,7 +188,8 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       );
       const preCmd = (bashEntry.hooks || []).map((h) => h.command).join("\n");
       assert.ok(/screencap\|uiautomator dump/.test(preCmd), "reminder triggers on screencap/uiautomator dump");
-      assert.ok(preCmd.includes('"permissionDecision\":\"allow'), "reminder allows — it never blocks");
+      assert.ok(preCmd.includes('"additionalContext\":\"Reminder:'), "the reminder reaches the model as added context");
+      assert.ok(!preCmd.includes("permissionDecision"), "a reminder never decides — no allow, deny or ask");
       assert.ok(preCmd.includes("|| true"), "non-matching commands stay silent and successful");
       // The device-evidence deterrent: hand-driven device commands get the
       // lane-owned-and-batched reminder (machine-global lease; device proof is a
@@ -197,10 +198,11 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       assert.ok(preCmd.includes("maestro test"), "reminder triggers on hand-run maestro test");
       assert.ok(/adb \(-s \[\^ \]\+ \)\?\(install\|uninstall\)/.test(preCmd), "reminder triggers on adb install/uninstall (with or without -s)");
       assert.ok(preCmd.includes("device-lease.mjs"), "the reason names the machine-global lease");
-      // EVERY hook under the Bash matcher carries the allow + silent-no-match
-      // properties individually — joining must not hide a blocking or noisy one.
+      // EVERY hook under the Bash matcher carries the context-only + silent-no-match
+      // properties individually — joining must not hide a deciding or noisy one.
       for (const h of bashEntry.hooks || []) {
-        assert.ok(h.command.includes('"permissionDecision\":\"allow'), "every Bash reminder allows — never blocks/denies");
+        assert.ok(h.command.includes('"additionalContext\":'), "every Bash reminder adds context");
+        assert.ok(!h.command.includes("permissionDecision"), "every Bash reminder decides nothing — a PreToolUse allow is a grant");
         assert.ok(h.command.trimEnd().endsWith("|| true"), "every Bash reminder is silent and successful on no match");
       }
     });
@@ -594,7 +596,7 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       }
     });
 
-    await t.test("the Bash reminder hook nudges bare full-lane runs toward --fast — allow-only, silent when --fast is present", () => {
+    await t.test("the Bash reminder hook nudges bare full-lane runs toward --fast — context only, silent when --fast is present", () => {
       const settings = JSON.parse(fs.readFileSync(path.join(out, ".claude/settings.json"), "utf8"));
       const bashEntry = (settings.hooks?.PreToolUse || []).find((e) => e.matcher === "Bash");
       const cmd = (bashEntry?.hooks || []).map((h) => h.command).find((c) => c.includes("qa/verify\\.mjs"));
@@ -604,7 +606,8 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       const run = (json) => spawnSync("sh", ["-c", cmd], { input: json, encoding: "utf8" });
       const fired = run('{"tool_input":{"command":"node qa/verify.mjs"}}');
       assert.equal(fired.status, 0);
-      assert.match(fired.stdout, /permissionDecision.*allow/, "fires (allow-only) on a bare full-lane run");
+      assert.match(fired.stdout, /"additionalContext":"Reminder:/, "fires, as added context, on a bare full-lane run");
+      assert.doesNotMatch(fired.stdout, /permissionDecision/, "and decides nothing");
       assert.match(fired.stdout, /--fast/, "the reminder points at --fast");
       const silentFast = run('{"tool_input":{"command":"node qa/verify.mjs --fast"}}');
       assert.equal(silentFast.status, 0);

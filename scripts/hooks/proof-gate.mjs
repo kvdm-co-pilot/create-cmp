@@ -20,15 +20,15 @@
 //                       because that run could discharge nothing, or when this branch
 //                       does not contain origin/main, because the merge will bring it
 //                       in and the run would describe bytes that never land (2026-09-16:
-//                       four emulator runs for one merge). ALLOWED while owed, with the
-//                       schedule as the reason.
+//                       four emulator runs for one merge). PASSED while owed, with the
+//                       schedule as added context.
 //     gh pr merge       REFUSED while EITHER at-close tier is owed — the device tier, and
 //                       (ADR-0014) a review record describing this exact tree. The slice
 //                       closes at merge, so this is where "once, at slice close" is
 //                       collected, and both refusals are reported together rather than
 //                       one round trip each. The review half checks that a record EXISTS
 //                       and is bound to these bytes; it never reads what the review found.
-//     gh pr create      allowed, reminded.
+//     gh pr create      passed, reminded.
 //     npm publish       REFUSED unless on a clean trunk with a fleet record that is PASS at
 //                       L2 on THIS tree — the npm-publish skill's steps 1 and 2, which were
 //                       prose, and 0.11.0 shipped a release build nobody had run.
@@ -42,6 +42,14 @@
 // waste — but a release proof over trunk is exactly what publishing needs, and it
 // is the release manager's explicit act, not an inner loop. `proof-plan` marks
 // that state `trunk`; a docs-only branch is not trunk and is still refused.
+//
+// THE GATE REFUSES OR STAYS SILENT; IT NEVER GRANTS. A pass reaches Claude Code as
+// hookSpecificOutput.additionalContext (the reason, as a reminder) and carries no
+// permissionDecision, so the call still meets the user's own permission rules and
+// prompt. A PreToolUse "allow" would approve it and skip that prompt — for
+// `npm publish` and `gh pr create`, the most outward acts in the repository
+// (the permission-modes doc; docs/reference/anthropic-agentic-engineering-2026-09-27/notes/07-security-permissions-governance.md
+// §1). Only a refusal decides: permissionDecision "deny".
 //
 // A matched command the gate cannot answer is REFUSED (exit 2, reason on stderr):
 // "I could not check" is not "I checked". An unmatched command never reaches code
@@ -299,7 +307,10 @@ export function classify(command) {
   return null;
 }
 
-const allow = (reason) => ({ action: "allow", reason });
+// A pass is not a grant: the verdict's action stays "allow" inside this file (the
+// decision tables read it), but on the wire it is additionalContext or nothing —
+// see main(). Only a refusal carries a permissionDecision.
+const pass = (reason) => ({ action: "allow", reason });
 const deny = (reason) => ({ action: "deny", reason });
 const SILENT = Object.freeze({ action: "silent" });
 const DECLARE = 'node scripts/proof-plan.mjs --open "<what you are building>" (on a branch — trunk is not a slice)';
@@ -393,7 +404,7 @@ export function decide(kind, o, tiers, ctx) {
     if (undeclared) return deny(`no slice is declared, so this run could discharge nothing — ${undeclared.need.reason}. Declare first: ${DECLARE}. Then run the tier once, at close.`);
     switch (o.state) {
       case "none":
-        if (o.trunk) return allow(`nothing is owed per slice — this is trunk — so this can only be a RELEASE proof (npm-publish skill step 2): allowed. Then npm publish reads its record.`);
+        if (o.trunk) return pass(`nothing is owed per slice — this is trunk — so this can only be a RELEASE proof (npm-publish skill step 2): allowed. Then npm publish reads its record.`);
         return deny(`nothing is owed — ${o.need.reason}. An L2 run over this tree proves nothing this slice needs (GATE-RULES Rule 4: the tier runs once, at the close of a slice that changed something it can see).`);
       case "discharged": {
         // Read from whatever attests THESE bytes — the run recorded on disk, or
@@ -473,7 +484,7 @@ export function decide(kind, o, tiers, ctx) {
     if (!ctx?.meets) return deny(`this gate could not put the fleet record to the L2 run's requirement, so it cannot say whether this tree has a release proof. Refusing rather than guessing — run ${cmd} and try again.`);
     if (!ctx.meets.ok) return deny(`${ctx.meets.reason} (npm-publish skill step 2).${ctx.meets.code === "verdict" ? " The scratch app is the crime scene; do not bump the version." : ""}`);
     const p = ctx.meets.proof;
-    return allow(`release proof on this tree: ${p.verdict} at ${p.rung} (the tier requires ${p.requires}), ran ${p.at}.`);
+    return pass(`release proof on this tree: ${p.verdict} at ${p.rung} (the tier requires ${p.requires}), ran ${p.at}.`);
   }
   if (kind === "create") {
     const open = (s) => s === "owed" || s === "reopened" || s === "undeclared";
@@ -485,7 +496,7 @@ export function decide(kind, o, tiers, ctx) {
     // before a refusal the merge does make is the same lie the other way.
     if (open(fb?.state)) notes.push(`the Firebase L2 run is ${fb.state.toUpperCase()}; gh pr merge will refuse until a run with Firebase compiled in is recorded against these bytes (${fbCmd}, then node scripts/proof-plan.mjs --discharge)`);
     if (open(o.review?.state)) notes.push(`a review is ${o.review.state.toUpperCase()}; gh pr merge will refuse until a review of these bytes is recorded (${tiers?.review?.cmd ?? "node scripts/proof-plan.mjs --discharge-review"})`);
-    return notes.length ? allow(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
+    return notes.length ? pass(`reminder: ${notes.join(" — and ")}. Open the PR, finish everything else, run the at-close tiers last.`) : SILENT;
   }
   return SILENT;
 }
@@ -521,7 +532,7 @@ function orderedRun(o, runs, { cmd, fbCmd }, base) {
       : `${what} and ${last} Run: ${cmd} — then node scripts/proof-plan.mjs --discharge`;
   const why = `An L2 run proves an APP, and the merge brings origin/main into this tree — if that moves what the tree stamps, the tier REOPENS and the run is bought a second time. Measured 2026-09-16: four emulator runs for one merge, each one owed by this program and none of them needed.`;
   const fix = `git fetch origin && git rebase origin/main`;
-  if (!base) return allow(owed);
+  if (!base) return pass(owed);
 
   if (base.contained === false) {
     const at = String(base.sha ?? "").slice(0, 7);
@@ -539,17 +550,17 @@ function orderedRun(o, runs, { cmd, fbCmd }, base) {
   }
 
   if (base.contained === null) {
-    return allow(
+    return pass(
       `${owed}\n\nORDERING UNCHECKED: ${base.reason ?? "this gate could not ask where trunk is"}. Whether this branch contains origin/main is what makes an L2 run a proof of the tree the merge will keep — this gate could not tell, so it is not refusing. If trunk has moved, ${fix} before the run: ${why}`,
     );
   }
 
   if (base.source !== "remote") {
-    return allow(
+    return pass(
       `${owed}\n\nORDERING read from the local ref (this checkout's own origin/main at ${String(base.sha ?? "").slice(0, 7)}), not from origin: ${base.reason ?? "origin was not asked"}. By that ref this branch contains trunk — but a ref is only as fresh as its last fetch, and a stale one is exactly the 2026-09-16 case. If in doubt: ${fix}`,
     );
   }
-  return allow(owed);
+  return pass(owed);
 }
 
 /**
@@ -1267,7 +1278,7 @@ const cannotTellCreate = (why) =>
 async function verdict(kind, command, cwd) {
   const where = judgedTree(kind, command, cwd);
   if (where.foreign) return SILENT;
-  if (where.unknown) return kind === "create" ? allow(cannotTellCreate(where.unknown)) : deny(cannotTell(where.unknown));
+  if (where.unknown) return kind === "create" ? pass(cannotTellCreate(where.unknown)) : deny(cannotTell(where.unknown));
 
   const root = where.root;
   const { obligation, TIERS, isTrunk } = await planOf(root);
@@ -1623,7 +1634,11 @@ async function main() {
     try {
       const d = await verdict(kind, command, input.cwd);
       if (d.action === "silent") return;
-      emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: d.action, permissionDecisionReason: d.reason } });
+      if (d.action === "deny") {
+        emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: d.reason } });
+      } else if (d.reason) {
+        emit({ hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: d.reason } });
+      }
     } catch (e) {
       process.stderr.write(`proof gate could not answer for "${kind}": ${e?.message ?? e} — refusing rather than allowing\n`);
       process.exit(2);

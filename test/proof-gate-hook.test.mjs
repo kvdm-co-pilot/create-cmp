@@ -411,8 +411,13 @@ test("protocol: a matched command answers in Claude Code's PreToolUse shape, fro
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout).hookSpecificOutput;
   assert.equal(out.hookEventName, "PreToolUse");
-  assert.ok(["allow", "deny"].includes(out.permissionDecision), out.permissionDecision);
-  assert.ok(out.permissionDecisionReason.length > 40);
+  // A refusal decides ("deny"); a pass adds context and decides nothing — never "allow".
+  if (out.permissionDecision !== undefined) {
+    assert.equal(out.permissionDecision, "deny", r.stdout);
+    assert.ok(out.permissionDecisionReason.length > 40);
+  } else {
+    assert.ok(out.additionalContext.length > 40, r.stdout);
+  }
 });
 
 test("protocol: SessionStart puts the schedule in front of the session, and names what enforces it", () => {
