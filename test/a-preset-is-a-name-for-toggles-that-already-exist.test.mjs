@@ -169,7 +169,8 @@ test("the help names --preset, and cmp-new passes it without a --room that would
   assert.match(help.stdout, /--preset full\|lean/);
 
   const skill = fs.readFileSync(path.join(ROOT, "skills", "cmp-new", "SKILL.md"), "utf8");
-  const invocation = skill.match(/node <repo>\/bin\/create-cmp\.mjs[\s\S]*?--yes/);
+  // The plugin's own engine, by ${CLAUDE_PLUGIN_ROOT} (SK2), quoted or not.
+  const invocation = skill.match(/node "?\$\{CLAUDE_PLUGIN_ROOT\}\/bin\/create-cmp\.mjs"?[\s\S]*?--yes/);
   assert.ok(invocation, "cmp-new no longer shows the engine invocation this test reads");
   assert.match(invocation[0], /--preset (lean|full)/, "cmp-new's invocation passes the shape");
   assert.doesNotMatch(
