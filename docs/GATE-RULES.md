@@ -216,6 +216,11 @@ runs; a template or harness change is not done until a **fresh app is stamped**
 (`node scripts/fleet-check.mjs`); an environment-sensitive change is not done
 until **CI** runs it.
 
+The gate applies this rule to itself: an agent's edit to `scripts/hooks/**`, `scripts/proof-plan.mjs`,
+`scripts/observed-tree.mjs`, `scripts/stamped-output.mjs` or `qa-artifacts/**` prompts first (`permissions.ask`
+in `.claude/settings.json`), and the reader that certifies a gate change is CI judging with the base branch's
+plan code, never the changed gate judging itself.
+
 ### Why: three instances in two days, all the same shape
 
 | Change | Verified at | Broke in |

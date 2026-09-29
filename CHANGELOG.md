@@ -16,8 +16,6 @@ All notable changes to this project are documented here. The format is based on
   while the checkout's slice still owes an at-close tier. Opt in with
   `git config core.hooksPath .githooks`.
 
-||||||| parent of dbc945a (feat(receipts): CI attests the receipt it produced, and the reader names each rung's attester — a stamped app's verify.yml signs its own receipt keylessly, receipt-check reports CI-attested vs self-attested per rung, and qa/ruleset.json makes the check required (ADR-0017, proposed; FIX-PLAN slice 8A))
-### Added
 
 - A stamped app's CI attests the receipt it produced (keyless GitHub artifact attestation, checked
   with `gh attestation verify`); `qa/receipt-check.mjs` reports which rungs are CI-attested and which
@@ -37,6 +35,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- This repository's own gate programs and proof records prompt before an agent edits them:
+  `permissions.ask` covers `scripts/hooks/**`, `scripts/proof-plan.mjs`, `scripts/observed-tree.mjs`,
+  `scripts/stamped-output.mjs` and `qa-artifacts/**` (a Bash-launched lane still writes there unasked).
+  Subagent fan-out is capped in settings `env` (spawn depth 2, four concurrent) instead of in prose.
 - The stamped app's gates say what is active and fail closed. Its Stop hook runs
   `qa/receipt-check.mjs` through `qa/hooks/fail-closed.sh`, so a gate that crashes, finds no `node`
   or passes its own deadline refuses by name instead of letting the session stop (once — never when
