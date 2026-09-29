@@ -552,10 +552,14 @@ Code session can extend it correctly — **the create-cmp plugin is not required
    is attached) — into one typed PASS/FAIL/SKIP/ERROR verdict (ERROR = the step could not run: a deadline, zero tests executed, a throw — it fails the lane but never accuses the change) + a schema-validated evidence-pack JSON
    (`qa/evidence/latest.json`).
 4. The PASS receipt gets committed. The generated `.claude/settings.json` **Stop hook**
-   (`qa/receipt-check.mjs`) blocks "done" if the verified surface has changed since the last PASS
-   receipt — validity is a content hash of that surface (`inputs.hash`; see
+   (`qa/receipt-check.mjs`) refuses "done" — once per stop — if the verified surface has changed
+   since the last PASS receipt — validity is a content hash of that surface (`inputs.hash`; see
    [ADR-0005](./adr/0005-evidence-binding-by-inputs-hash.md)), so a later rebase/merge doesn't
-   invalidate an honest receipt. CI re-checks the committed receipt still attests `HEAD` on every push.
+   invalidate an honest receipt. CI re-checks the committed receipt still attests `HEAD` on every push,
+   and refuses the merge where you make the Verify workflow a required check. The hash catches a stale
+   receipt, not a hand-edited one; CI's re-run of the lane is what catches a forged L1 result
+   ([KD-271](./KNOWN-DEFECTS.md)). The local refusal holds only while hooks load — `disableAllHooks`,
+   `--bare`, `allowManagedHooksOnly`, an untrusted folder or a non-Claude agent skips it; CI does not.
 5. **Refusal is named, not silent.** If Claude hardcodes a color, imports the data layer from UI,
    deletes or weakens a spec-linked test, or regresses a screen's structure, the matching gate
    fails and cites the clause: `ARCH-05` (hardcoded color), `ARCH-01` (illegal import),

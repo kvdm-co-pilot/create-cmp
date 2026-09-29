@@ -55,8 +55,11 @@ jobs:
       # still matching the verified surface — BEFORE we spend a runner re-running the
       # lane. Robust to rebase/merge/squash: validity is a content hash of the inputs,
       # not a parent SHA (docs/adr/0005). This is the same predicate the local Stop
-      # hook runs (qa/receipt-check.mjs) — one check, two locations — so a stale or
-      # hand-edited receipt fails here even if the author bypassed the local hook.
+      # hook runs (qa/receipt-check.mjs) — one check, two locations — so a stale
+      # receipt fails here even if the author bypassed the local hook. A receipt
+      # whose verdict was hand-edited still passes this step (qa/evidence is outside
+      # the hash, and nothing signs it); the lane re-run below is what catches a
+      # forged L1 result. L2 rungs are attested only by the machine that ran them.
       - name: Receipt attests HEAD
         run: node qa/receipt-check.mjs
 

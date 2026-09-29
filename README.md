@@ -6,7 +6,8 @@
 
 Gives AI coding agents *eyes* and a *machine-enforced definition of done* on mobile: scaffold a
 green-building Android + iOS app in minutes, then let AI extend it — seeing every screen it
-renders, and blocked from "done" without proof.
+renders, and refused "done" without proof — once by a local Stop hook, and by CI wherever you
+make it a required check.
 
 [![CI](https://github.com/kvdm-co-pilot/create-cmp/actions/workflows/ci.yml/badge.svg)](https://github.com/kvdm-co-pilot/create-cmp/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/create-cmp-cli.svg)](https://www.npmjs.com/package/create-cmp-cli)
@@ -42,7 +43,7 @@ three steps, each priced in what you have at that moment:
 |---|---|---|---|
 | **Try** | a five-second decision | a green Android + iOS build; the emulator/testing/dependency walls pre-solved | `npm create kmp@latest my-app` (add `--minimal` for the light scaffold) |
 | **Work** | attention, repaid immediately | preview on save, a live on-device inspector, a doctor at every wall, feature generators | commands shipped inside the repo — nothing to install, no plugin required |
-| **Trust** | constraint | specs, an executable verify lane, tamper-evident evidence receipts, a Stop hook + CI that refuse "done" without proof | on by default; `--minimal` defers it, one command installs it later: `npx create-cmp-cli harden` |
+| **Trust** | constraint | specs, an executable verify lane, stale-evident evidence receipts, a Stop hook that refuses "done" once and a CI check that refuses it where required | on by default; `--minimal` defers it, one command installs it later: `npx create-cmp-cli harden` |
 
 **See the trust layer live:**
 [create-cmp-showcase](https://github.com/kvdm-co-pilot/create-cmp-showcase) is a public repo
@@ -55,13 +56,17 @@ a bad change and naming the exact rule it broke.
 ```
   spec clause  →  generate from exemplar  →  verify lane  →  evidence receipt
       ↑                                                              │
-      └────────────── enforcement: Stop hook + CI refuse "done" without it ──┘
+      └────────────── refused: once by the Stop hook, by CI where required ──┘
 ```
 
 Behavior starts as a written spec clause. Code is cloned from a proven exemplar. The verify lane
 checks everything — spec coverage, build, tests, architecture, UI structure, design tokens,
 accessibility, on-device E2E, and more — and writes a receipt bound to a content hash of the code
-it verified. You cannot hand-forge it, and a stale one doesn't pass.
+it verified. A stale receipt — one that no longer matches its tree — fails every reader. A forged
+one is caught only where the lane is re-run: CI re-runs the L1 rungs (and once CI attests that run,
+the attestation is checkable too), while an L2 rung is attested only by the machine that ran it.
+The local refusal holds while hooks load: `disableAllHooks`, `--bare`, `allowManagedHooksOnly`, an
+untrusted folder or a non-Claude agent skips it. CI does not.
 
 ## Quick start
 

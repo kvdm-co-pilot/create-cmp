@@ -18,9 +18,15 @@ Binding to content instead of a commit SHA buys two properties at once:
 - **Robust where it's honest.** Rebase, squash, or merge without touching a
   verified byte and the receipt still attests the tree — history moved, the
   content didn't.
-- **Fragile where it's forged.** Change one verified byte and the recomputed
-  hash stops matching. Hand-edit the receipt's verdict and the same thing
-  happens — the receipt is inside its own attested world.
+- **Fragile where it's stale.** Change one verified byte and the recomputed
+  hash stops matching — every reader of this predicate refuses the receipt.
+
+What the hash does not do is prove who wrote the receipt. `qa/evidence/` sits
+outside the hashed surface and nothing signs the file, so a receipt whose
+verdict was hand-edited consistently still validates here. A forgery is caught
+only where the lane is re-run: CI re-runs the L1 rungs (and once CI attests
+that run, the attestation is checkable), while an L2 rung is self-attested by
+the machine that ran it.
 
 This package is the predicate for that check, published standalone so
 anything — a CI job, a bot reviewing a PR, a script over a cloned repo — can
