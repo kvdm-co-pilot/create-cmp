@@ -22,6 +22,9 @@ All notable changes to this project are documented here. The format is based on
 - `proof-plan` no longer owes a review for a release bump, and a bump after a discharged review no
   longer reopens it; an uncommitted path with a space in its name is classified by its own name
   (KD-270).
+- An edit to a stamped app's `.claude/settings.json`, `CHANGELOG.md`, `CONTRIBUTING.md`,
+  `docs/TESTING.md` or `docs/dev-client.md` no longer owes an L2 run: the L2 run never opens them, and
+  stamped-digest rule 3 holds their content. A rule-2 record is re-derived by `proof-plan --rekey`.
 
 ## [0.28.4] - 2026-09-27
 

@@ -287,10 +287,10 @@ export const REVIEW_TIER_IRRELEVANT = Object.freeze(["docs/", "*.md", "*.gitkeep
  *  - single FILES, because a repo's root holds `package.json`, `LICENSE` and
  *    `.gitignore`, and a change to any of them can change what runs;
  *  - dot-directories named EXPLICITLY (`template/.claude/`, `.claude/settings.json`),
- *    because the walker skips dot-entries it meets INSIDE a root. `template/` is
- *    a device trigger and its `.claude/` has never been hashed by that tier
- *    either — that gap is the device tier's and is left alone here; this set
- *    simply does not inherit it.
+ *    because the walker skips dot-entries it meets INSIDE a root. (The L2 run
+ *    is keyed on the stamped digest, whose walk DOES include dotfiles; it holds
+ *    `.claude/settings.json` and `.claude/**\/*.md` by its own not-read proof,
+ *    scripts/stamped-output.mjs UNOBSERVED_BY_PROFILE, digest rule 3.)
  *
  * `.claude/` is NOT a root, and `.claude/settings.json` is named instead: agent
  * worktrees live under `.claude/worktrees/` in the main checkout, so walking

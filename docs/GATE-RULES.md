@@ -338,9 +338,11 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   device run proves is that the app `create-cmp` stamps out of this tree runs on a phone, so that
   app is what the run is bound to: `scripts/stamped-output.mjs` stamps it into a temp dir, hashes
   what the L2 run executes or reads, and deletes it — 0.35s, measured, against the 3.5 minutes it
-  schedules. Every file it wrote is listed; under digest rule 2 the CONTENT of the few files the
+  schedules. Every file it wrote is listed; under digest rule 3 the CONTENT of the few files the
   profile's L2 run never opens, and of the release numbers the stamp writes, is held (the list and
-  its not-read proof are in that file, and a record names the rule its digest was taken under). It
+  its not-read proof are in that file, and a record names the rule its digest was taken under).
+  Rule 3 (2026-09-29) adds the hook settings and four prose files to rule 2's list; a rule-2 record
+  is rekeyed by `proof-plan --rekey`, never rerun. It
   used to be bound to input paths (`deviceTreeHash` over `template/` + `packages/harness/src/` +
   `packages/receipts/src/`), which is a proxy and was wrong in both directions: an edit under
   `packages/harness/src/` that never reached `template/qa/` reopened a discharged slice over a

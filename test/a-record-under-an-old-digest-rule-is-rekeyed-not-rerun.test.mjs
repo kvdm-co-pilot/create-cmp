@@ -2,7 +2,8 @@
 //
 // Raising STAMPED_OUTPUT_RULE (scripts/stamped-output.mjs) makes every record
 // on every laptop incomparable with the tree beside it: its digest was taken
-// under rule 1, and this tree's is taken under rule 2. Calling that "another
+// under an older rule (1, or 2 since rule 3 landed on 2026-09-29), and this
+// tree's is taken under the current one. Calling that "another
 // app" would send every slice to a 3.5-minute L2 run to re-prove an app that
 // may not have moved. So `recordMeetsTier` answers `other-rule` and names
 // `node scripts/proof-plan.mjs --rekey`, which re-stamps the record's commit,
@@ -65,6 +66,8 @@ test("a record under another rule is OTHER-RULE, not another app — and the ans
   }
   // Explicit rule 1 reads the same as absent.
   assert.equal(recordMeetsTier(oldRecord({ stampedOutputRule: 1 }), TIERS.device, NOW, { rekey: null }).code, "other-rule");
+  // And a rule-2 record, the whole population rule 3 retired, is not "another app" either.
+  assert.equal(recordMeetsTier(oldRecord({ stampedOutputRule: 2 }), TIERS.device, NOW, { rekey: null }).code, "other-rule");
 });
 
 test("a record under THIS rule never reads the rekey at all — it is read lazily, only when the rules differ", () => {

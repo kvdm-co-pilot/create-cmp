@@ -7,10 +7,11 @@
 // first, and the other three differ only in release numbers the stamp writes.
 // Under rule 1 the digest moved and the tier asked for a fresh L2 run.
 //
-// Rule 2 (scripts/stamped-output.mjs) hashes what the L2 run executes or reads.
-// Each case below asserts BOTH directions where it can: rule 2 holds still for
-// what the run never reads, rule 1 did not (so the case is not vacuous), and
-// rule 2 still moves for every byte the run does read. A digest that stopped
+// Rule 2 (scripts/stamped-output.mjs) hashes what the L2 run executes or reads,
+// and rule 3 (2026-09-29) holds five more files the run never opens. Each case
+// below asserts BOTH directions where it can: the current rule holds still for
+// what the run never reads, an older rule did not (so the case is not vacuous),
+// and the current rule still moves for every byte the run does read. A digest that stopped
 // moving for a `.kt` byte would be a tier that proves nothing.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -61,9 +62,24 @@ test("rule 1 reproduces the digest the pre-rule-2 module computed, byte for byte
       "6444e30c094a49b9bfcf4c27d4a1a44edb13331a89e4be8e83614455861f51c9",
       "rule 1 no longer computes what every record before 2026-09-24 carries, so `proof-plan --rekey` can no longer prove it is re-deriving the record's own app",
     );
-    assert.notEqual(hashStampedTree(dir).hash, hashStampedTree(dir, { rule: 1 }).hash, "the default is rule 2, and on this fixture rule 2 is a different digest");
+    assert.notEqual(hashStampedTree(dir).hash, hashStampedTree(dir, { rule: 1 }).hash, "the default is the current rule, and on this fixture it is a different digest");
     assert.equal(hashStampedTree(dir).rule, STAMPED_OUTPUT_RULE);
-    assert.throws(() => hashStampedTree(dir, { rule: 3 }), /no stamped-output rule 3/, "a rule this module cannot compute is refused, never approximated");
+    assert.throws(() => hashStampedTree(dir, { rule: 4 }), /no stamped-output rule 4/, "a rule this module cannot compute is refused, never approximated");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("rule 2 still reproduces its own digest, byte for byte, now that rule 3 is the default", () => {
+  const dir = fixtureApp();
+  try {
+    // Computed by the module at 0c36859, the last commit where rule 2 was the default.
+    assert.equal(
+      hashStampedTree(dir, { rule: 2 }).hash,
+      "98010d96568641513598121df484149e746728c8323dc6dc4c8c539129448d96",
+      "rule 2 no longer computes what every rule-2 record carries, so `proof-plan --rekey` can no longer re-derive one",
+    );
+    assert.equal(STAMPED_OUTPUT_RULE, 3);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -80,7 +96,7 @@ function variant(mutate) {
   fs.cpSync(stamp.appDir, app, { recursive: true, verbatimSymlinks: true });
   try {
     mutate(app);
-    return { rule2: hashStampedTree(app).hash, rule1: hashStampedTree(app, { rule: 1 }).hash, files: hashStampedTree(app).files };
+    return { current: hashStampedTree(app).hash, rule2: hashStampedTree(app, { rule: 2 }).hash, rule1: hashStampedTree(app, { rule: 1 }).hash, files: hashStampedTree(app).files };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -110,7 +126,21 @@ test("prose in a file the cmp L2 run never opens does not move the digest — an
     assert.ok(fs.existsSync(path.join(stamp.appDir, rel)), `premise: the stamp writes ${rel}`);
     const v = variant(append(rel, "\nOne more sentence an agent reads and no program in the L2 run opens.\n"));
     assert.notEqual(v.rule1, BASE.rule1, `premise: rule 1 saw the edit to ${rel}`);
-    assert.equal(v.rule2, BASE.rule2, `rule 2 moved for prose in ${rel}, which the cmp profile's L2 run never reads (scripts/stamped-output.mjs UNOBSERVED_BY_PROFILE)`);
+    assert.equal(v.current, BASE.current, `the current rule moved for prose in ${rel}, which the cmp profile's L2 run never reads (scripts/stamped-output.mjs UNOBSERVED_BY_PROFILE)`);
+  }
+});
+
+test("RULE 3: the hook settings and four prose files the cmp L2 run never opens do not move the digest — and did under rule 2", () => {
+  for (const rel of [".claude/settings.json", "CHANGELOG.md", "CONTRIBUTING.md", "docs/TESTING.md", "docs/dev-client.md"]) {
+    assert.ok(fs.existsSync(path.join(stamp.appDir, rel)), `premise: the stamp writes ${rel}`);
+    const v = variant(append(rel, "\n"));
+    assert.notEqual(v.rule2, BASE.rule2, `premise: rule 2 saw the edit to ${rel}`);
+    assert.equal(v.current, BASE.current, `rule 3 moved for ${rel}, which the cmp profile's L2 run never opens (scripts/stamped-output.mjs UNOBSERVED_BY_PROFILE)`);
+  }
+  // Left observed on purpose: each sits inside a memoised step's input directory.
+  for (const rel of ["qa/e2e/README.md", "docs/adr/template.md"]) {
+    assert.ok(fs.existsSync(path.join(stamp.appDir, rel)), `premise: the stamp writes ${rel}`);
+    assert.notEqual(variant(append(rel, "\nOne more sentence.\n")).current, BASE.current, `${rel} is not on the unobserved list, and its edit must still move the digest`);
   }
 });
 
@@ -137,7 +167,7 @@ test("a stamp-written release bump does not move the digest — create-cmp.json,
   };
   const v = variant(bump);
   assert.notEqual(v.rule1, BASE.rule1, "premise: rule 1 saw the bump");
-  assert.equal(v.rule2, BASE.rule2, "rule 2 moved for release numbers the stamp writes and no verdict reads");
+  assert.equal(v.current, BASE.current, "the current rule moved for release numbers the stamp writes and no verdict reads");
 });
 
 test("every byte the L2 run reads still moves the digest: a .kt byte, a resource byte, a spec, the README the badge rewrites", () => {
@@ -150,7 +180,7 @@ test("every byte the L2 run reads still moves the digest: a .kt byte, a resource
     "README.md": append("README.md", "\nqa/verify.mjs rewrites this file's badge on every run.\n"),
   };
   for (const [rel, mutate] of Object.entries(cases)) {
-    assert.notEqual(variant(mutate).rule2, BASE.rule2, `rule 2 did not move for ${rel} — a digest that cannot see what the L2 run reads proves nothing about it`);
+    assert.notEqual(variant(mutate).current, BASE.current, `the current rule did not move for ${rel} — a digest that cannot see what the L2 run reads proves nothing about it`);
   }
 });
 
@@ -172,12 +202,12 @@ test("a lock that LIES is not normalised: a false per-file hash, or a false top-
     lock.files[first] = "0".repeat(64);
     recompute(lock);
   }));
-  assert.notEqual(perFile.rule2, BASE.rule2, "a lock whose per-file hash is false was normalised to look like the true one — the lane would FAIL on it");
+  assert.notEqual(perFile.current, BASE.current, "a lock whose per-file hash is false was normalised to look like the true one — the lane would FAIL on it");
   // Every per-file hash true, and a top-level hash that is not.
   const top = variant(lie((lock) => {
     lock.sha256 = "f".repeat(64);
   }));
-  assert.notEqual(top.rule2, BASE.rule2, "a lock whose top-level hash is false was normalised to look like the true one");
+  assert.notEqual(top.current, BASE.current, "a lock whose top-level hash is false was normalised to look like the true one");
 });
 
 test("an unobserved file added, removed or made executable still moves the digest — only its CONTENT is held", () => {
@@ -185,10 +215,10 @@ test("an unobserved file added, removed or made executable still moves the diges
     fs.mkdirSync(path.join(app, ".claude/skills/new-skill"), { recursive: true });
     fs.writeFileSync(path.join(app, ".claude/skills/new-skill/SKILL.md"), "# new\n");
   });
-  assert.notEqual(added.rule2, BASE.rule2, "a new unobserved file is a new entry in the manifest");
+  assert.notEqual(added.current, BASE.current, "a new unobserved file is a new entry in the manifest");
   assert.ok(".claude/skills/new-skill/SKILL.md" in added.files, "and it is listed, not excluded");
-  assert.notEqual(variant((app) => fs.rmSync(path.join(app, "CLAUDE.md"))).rule2, BASE.rule2, "a removed unobserved file is a missing entry");
-  assert.notEqual(variant((app) => fs.chmodSync(path.join(app, "AGENTS.md"), 0o755)).rule2, BASE.rule2, "the mode bit rides on the value, unobserved or not");
+  assert.notEqual(variant((app) => fs.rmSync(path.join(app, "CLAUDE.md"))).current, BASE.current, "a removed unobserved file is a missing entry");
+  assert.notEqual(variant((app) => fs.chmodSync(path.join(app, "AGENTS.md"), 0o755)).current, BASE.current, "the mode bit rides on the value, unobserved or not");
 });
 
 test("the unobserved list is the STAMP'S OWN profile's: another profile, or no manifest, hashes every byte", () => {
@@ -204,13 +234,13 @@ test("the unobserved list is the STAMP'S OWN profile's: another profile, or no m
     setProfile("another-stack")(app);
     prose(app);
   });
-  assert.notEqual(otherWithProse.rule2, other.rule2, "a profile that declares nothing unobserved hashes AGENTS.md like any other byte");
+  assert.notEqual(otherWithProse.current, other.current, "a profile that declares nothing unobserved hashes AGENTS.md like any other byte");
   const bare = variant((app) => fs.rmSync(path.join(app, "qa/harness-manifest.json")));
   const bareWithProse = variant((app) => {
     fs.rmSync(path.join(app, "qa/harness-manifest.json"));
     prose(app);
   });
-  assert.notEqual(bareWithProse.rule2, bare.rule2, "no manifest is the core default: nothing unobserved");
+  assert.notEqual(bareWithProse.current, bare.current, "no manifest is the core default: nothing unobserved");
 });
 
 test("a version file NOT in the stamp's own JSON form keeps its raw bytes — the clock is still held, the version is not", () => {
@@ -220,14 +250,14 @@ test("a version file NOT in the stamp's own JSON form keeps its raw bytes — th
     fs.writeFileSync(p, `${JSON.stringify({ ...v, engineVersion, stampedAt }, null, 4)}\n`);
   };
   const a = variant(reindent("1.0.0", "2026-01-01T00:00:00.000Z"));
-  assert.equal(variant(reindent("1.0.0", "2026-02-02T00:00:00.000Z")).rule2, a.rule2, "stampedAt is still normalised in a form the JSON rule does not recognise");
-  assert.notEqual(variant(reindent("2.0.0", "2026-01-01T00:00:00.000Z")).rule2, a.rule2, "but the version is not: an unrecognised form moves the digest");
+  assert.equal(variant(reindent("1.0.0", "2026-02-02T00:00:00.000Z")).current, a.current, "stampedAt is still normalised in a form the JSON rule does not recognise");
+  assert.notEqual(variant(reindent("2.0.0", "2026-01-01T00:00:00.000Z")).current, a.current, "but the version is not: an unrecognised form moves the digest");
 });
 
-test("the real stamp: rule 2 of this tree is what stampedOutput() reports, and it is the default every reader compares", () => {
+test("the real stamp: the current rule of this tree is what stampedOutput() reports, and it is the default every reader compares", () => {
   const now = stampedOutput(ROOT, { timeoutMs: 60_000 });
   assert.equal(now.rule, STAMPED_OUTPUT_RULE);
-  assert.equal(now.hash, BASE.rule2, "two stamps of one tree hash the same under rule 2");
+  assert.equal(now.hash, BASE.current, "two stamps of one tree hash the same under the current rule");
 });
 
 // KD-207, closed: markdown under template/ ships, so it is ASKED about, and
