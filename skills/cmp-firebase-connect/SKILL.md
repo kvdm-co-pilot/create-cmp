@@ -90,7 +90,7 @@ Offer both paths and let the user pick:
 firebase projects:create <project-id> --display-name "<App Name>"
 ```
 
-Notes (verified against CLI 15.x help):
+Notes (from the CLI's `--help`; on a CLI that disagrees, its `--help` wins):
 - `<project-id>` is globally unique, lowercase, digits and hyphens (e.g. `acme-app-dev`). If the
   id is taken the command fails cleanly — pick another (suffix `-dev`, `-2026`, etc.); nothing
   was created.
@@ -154,14 +154,14 @@ exactly which switches still need a human in the [Firebase console](https://cons
 | Service | CLI? | What to do |
 |---|---|---|
 | **Auth sign-in providers** (email/password, phone, Google, …) | **No** — `auth:*` only exports/imports users | Console → Authentication → Sign-in method → enable each provider. Auth calls fail with `CONFIGURATION_NOT_FOUND` / `OPERATION_NOT_ALLOWED` until done. |
-| **Firestore database** | **Yes** (CLI ≥ v13-ish; verified on 15.18.0) | `firebase firestore:databases:create "(default)" --location <loc> --project <project-id>` — consent-gated. Run `firebase firestore:locations` first to pick `<loc>` (e.g. `nam5`, `eur3`, or the region matching `firebase.region` in the app's `create-cmp.json`). Console fallback: Firestore → Create database. |
+| **Firestore database** | **Yes** (current CLIs — confirm with `firebase firestore:databases:create --help`) | `firebase firestore:databases:create "(default)" --location <loc> --project <project-id>` — consent-gated. Run `firebase firestore:locations` first to pick `<loc>` (e.g. `nam5`, `eur3`, or the region matching `firebase.region` in the app's `create-cmp.json`). Console fallback: Firestore → Create database. |
 | **Storage default bucket** | **No** — no provisioning command in the CLI | Console → Storage → Get started. (Deploying `storage.rules` via `firebase deploy` also requires the bucket to exist first.) |
 | **FCM** | Auto | Enabled by app registration; nothing to toggle for basic push. |
 | **SHA-1/SHA-256 fingerprints** (needed for phone auth & Google Sign-In on Android) | **Yes** | `./gradlew :composeApp:signingReport` → copy the debug SHA-1 → consent-gated: `firebase apps:android:sha:create <appId> <shaHash>`. Then **re-download** the config (§3b) — adding a SHA changes `google-services.json` (`oauth_client` / `certificate_hash`). |
 
 If `create-cmp.json` records phone auth (`firebase.auth` is `phone` or `both`), flag the SHA row as
-**required, not optional**, and point at the **cmp-firebase-auth** knowledge if the plugin/user has it — iOS phone
-auth especially is a minefield.
+**required, not optional**, and say that iOS phone auth needs more than this skill covers (the
+`REVERSED_CLIENT_ID` URL scheme and APNs, §5) — it is a minefield.
 
 ## 5. Optional iOS branch (deferred by default)
 
@@ -179,7 +179,7 @@ firebase apps:sdkconfig IOS <iosAppId> --project <project-id> --out iosApp/iosAp
   The iOS half of the add step is unproven — say so when reporting.
 - Verify: `plutil -lint iosApp/iosApp/GoogleService-Info.plist` and check `BUNDLE_ID` matches.
 - Remind the user: iOS phone auth additionally needs the `REVERSED_CLIENT_ID` URL scheme and
-  APNs setup — out of scope here; that's **cmp-firebase-auth** territory.
+  APNs setup — out of scope for this skill, and no create-cmp skill covers it yet.
 
 ## 6. Prove it — the build IS the verification
 

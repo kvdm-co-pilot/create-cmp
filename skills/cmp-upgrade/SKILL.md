@@ -30,15 +30,15 @@ it — the engine diffs, guards the lockstep, writes surgically, and backs up.
 
 ```bash
 # 1. DIFF (safe, writes nothing) — show what the upgrade would change:
-node <repo>/bin/create-cmp.mjs upgrade --dry-run
+node "${CLAUDE_PLUGIN_ROOT}/bin/create-cmp.mjs" upgrade --dry-run
 #    (add --target-dir <dir> when not running from the project root,
 #     --set <id> to target a specific registry set instead of the latest)
 
 # 2. APPLY — after the user has seen and accepted the diff:
-node <repo>/bin/create-cmp.mjs upgrade --yes
+node "${CLAUDE_PLUGIN_ROOT}/bin/create-cmp.mjs" upgrade --yes
 
 # 3. VERIFY — prove the build is green (or chain it: upgrade --yes --verify):
-node <repo>/bin/create-cmp.mjs verify
+node "${CLAUDE_PLUGIN_ROOT}/bin/create-cmp.mjs" verify
 ```
 
 (If invoked from the published package: `npx create-cmp-cli@latest upgrade …`.)

@@ -37,8 +37,8 @@ npm whoami
 
 1. npmjs.com → avatar → **Access Tokens** → **Generate New Token** → **Granular Access Token**
 2. Permissions: **Read and write**. Packages: only ours — every name under `packages/*/package.json`
-   and `packages/aliases/*/package.json` (`node scripts/ground-truth.mjs` lists them; ten as of
-   2026-09-08, `prooflane-harness` and `prooflane-receipts` among them) — never "all packages".
+   and `packages/aliases/*/package.json` (`node scripts/ground-truth.mjs` lists them and counts them —
+   `prooflane-harness` and `prooflane-receipts` among them) — never "all packages".
 3. Enable **Bypass two-factor authentication** (this is what makes publish non-interactive).
 4. Pick an expiration; when it lapses, `npm whoami` starts failing and publish PUTs return E404 —
    that's the signal to regenerate.

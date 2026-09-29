@@ -82,8 +82,8 @@ data while it runs, hand off to **cmp-inspect**.
 - `compileKotlinDesktop` fails after adding a library → the new commonMain dependency may not
   publish a JVM artifact. Either pick a KMP library with JVM support or move the dependency to
   `androidMain`/`iosMain` and put a desktop fake behind an interface.
-- Version bumps: Compose Hot Reload 1.1.1 needs Kotlin ≥ 2.1.20 and CMP ≥ 1.8.2; the 1.2.x line
-  needs CMP ≥ 1.10. Never bump it in isolation from the pinned set — run `create-cmp upgrade`.
+- Version bumps: the pin is `compose-hot-reload` in `gradle/libs.versions.toml`. Each line has a
+  floor — 1.1.x needs Kotlin ≥ 2.1.20 and CMP ≥ 1.8.2; 1.2.x needs CMP ≥ 1.10. Never bump it in isolation from the pinned set — run `create-cmp upgrade`.
 
 ## Related
 

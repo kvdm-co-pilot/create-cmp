@@ -15,7 +15,9 @@ description: >-
 
 > Current scaffolds ship **Maestro** flows (`qa/e2e/*.yaml` — `# SPEC:`-cited, testTag `id:` selectors;
 > see `smoke.yaml` for the shape). Durable screen behavior belongs in Compose UI Tests (spec-cited);
-> E2E stays a thin smoke layer. Legacy pre-Maestro scaffolds (`qa/appium/`) are not covered here.
+> E2E stays a thin smoke layer. Only if the app carries `qa/appium/` or `tests/appium/` (a stamp from
+> before Maestro): read `${CLAUDE_PLUGIN_ROOT}/skills/cmp-test/references/legacy-appium.md` for that
+> harness's §3 and §5.
 
 ## Before anything: confirm the capability (fail loud)
 
@@ -57,7 +59,7 @@ tests in the app's shipped harness style. Nothing else in the CMP ecosystem can 
 3. `inspect_tree` (or `{ source: { kind: "live" } }`) — the CURRENT screen as JSON.
 
 **Fallback (file, tier 0):** a harness dump on disk — `inspect_tree { treePath }`. Use when no
-emulator is available; `inspector/harness/sample-tree.json` shows the shape.
+emulator is available; `${CLAUDE_PLUGIN_ROOT}/inspector/harness/sample-tree.json` shows the shape.
 
 From each tree, enumerate the raw material:
 
@@ -91,47 +93,71 @@ Rules that make the plan durable:
 - Prefer a screen's **tagged marker node** (e.g. `home_title`) as its "I am here" assertion;
   fall back to a distinctive text only when no tag exists (then see §4).
 
-## 3. Generate — match the shipped harness exactly
+## 3. Generate — Maestro flows in `qa/e2e/`
 
-Current scaffolds ship Maestro only (`qa/e2e/*.yaml`) — write flows there. The mechanics below
-(JS runner / pytest suite) apply only to **legacy pre-Maestro** projects that still carry
-`qa/appium/` or `tests/appium/`; write into whichever the app actually uses (legacy default: the
-JS runner — it's what `npm --prefix qa/appium run smoke` executes):
+Write each flow as a top-level `qa/e2e/<flow>.yaml` (a flow in a subfolder does not run and does
+not count as coverage). Copy `qa/e2e/smoke.yaml`'s shape: a header naming the `# SPEC:` clauses
+the flow proves, `appId` copied from `smoke.yaml`, then steps, each citing the tree node it came
+from. The verify lane's `e2eSmoke` step runs every top-level flow; `qa/e2e/README.md` has the rest.
 
-- **JS runner** — `qa/appium/run-android-smoke.mjs` + `qa/appium/lib/appium-client.mjs`: a plain
-  Node script (no test framework), `new AppiumClient({ serverUrl, capabilities })` with
-  UiAutomator2 capabilities against `http://127.0.0.1:4723` / `emulator-5554`, sequential awaits
-  inside `async function main()` with `try { … } finally { await client.stop(); }`, and
-  `main().catch(…exit 1)`. Helpers you may call (they exist — do not invent others):
-  `waitForText`, `waitForTextContaining`, `waitForTextGone`, `clickByText`,
-  `clickByTextContaining`, `clickByAccessibilityId`, `clickByXPath`, `waitForElement(using,
-  value)`, `elementExists(using, value)`, `back()`, `pause(ms)`, `swipeUp()`, `screenshot(path)`
-  (evidence to disk only — never into context).
-- **pytest suite** — `tests/appium/cmp/conftest.py` (the `driver` fixture: raw WebDriver REST via
-  `requests`, helpers `find_by_text` / `text_exists` / `click_text` / `screenshot`) +
-  `test_smoke.py`. Same capabilities, same assertion style (`assert driver.text_exists(...)`).
+**Worked example** — a flow for the template's Home → Detail drill-down, derived from two
+observed trees (Home, then Detail after tapping the first item). Every id below was read from a
+tree, not from source:
 
-New files: `qa/appium/<flow>.spec.mjs` (add a matching script to `qa/appium/package.json`) or
-`tests/appium/cmp/test_<flow>.py`. Copy the smoke file's header-comment style and prereq notes.
+```yaml
+# Generated regression flow — Home → Detail drill-down. SPEC: <the Home/Detail clauses it proves>
+# Derived from the rendered trees (connect_live → inspect_tree on Home, tap, inspect_tree again).
+# Selectors by testTag only (resource-ids on Android via TestTagAutomation) — never coordinates.
+appId: com.acme.app            # copy from qa/e2e/smoke.yaml
+---
+- launchApp:
+    clearState: true
+
+# Tree (Home): testTag="home_title" — the screen's "I am here" marker.
+- extendedWaitUntil:
+    visible:
+      id: "home_title"
+    timeout: 60000
+
+# Tree (Home): testTag="home_item_1", clickable — rows appear after the Loading arm, so wait.
+- extendedWaitUntil:
+    visible:
+      id: "home_item_1"
+    timeout: 30000
+- tapOn:
+    id: "home_item_1"
+
+# Tree delta (Detail): detail_title present, home_title gone — the navigation fact.
+- assertVisible:
+    id: "detail_title"
+- assertNotVisible:
+    id: "home_title"
+
+# Tree (Detail): testTag="detail_back", clickable — and back.
+- tapOn:
+    id: "detail_back"
+- assertVisible:
+    id: "home_title"
+```
+
+`extendedWaitUntil` follows any interaction that triggers an async state change (the settle rule
+in `smoke.yaml`'s header); a bare `assertVisible` is for static elements after navigation.
 
 **Selector preference order:**
 
-1. **resource-id == testTag** (`waitForElement('id', 'home_title')`) — the strongest selector,
-   BUT read the box below first.
-2. **accessibility id == contentDescription** (`clickByAccessibilityId('Add item')`) — works out
-   of the box; Compose maps `contentDescription` straight to the a11y bridge.
-3. **text xpath** (`waitForText`, `clickByText`) — works out of the box; last resort for untagged,
-   description-less nodes, and brittle against copy changes.
+1. **`id:` == testTag** — the strongest selector; works on a stock stamp (the box below).
+2. **`text:`** — a visible label; the last resort for an untagged node, and brittle against copy
+   changes. An untagged node you need is better tagged in source (§4).
 
 > **`testTagsAsResourceId` — stock apps HAVE it (via the shim).** The template's `AppShell` passes
 > `Modifier.exposeTestTagsForAutomation()` to `BaseScreen` — an expect/actual shim
 > (`presentation/components/TestTagAutomation.kt`) whose Android actual sets
 > `semantics { testTagsAsResourceId = true }` for the whole subtree (desktop/iOS actuals are
-> no-ops; the flag is Android-only at CMP 1.10.3, so do NOT set it in common code — it won't
-> compile for the other targets). Verified live: `uiautomator dump` resolves `home_title` /
+> no-ops; the flag is Android-only in the Compose Multiplatform version the template pins, so do NOT
+> set it in common code — it won't compile for the other targets). Verified live: `uiautomator dump` resolves `home_title` /
 > `app_bottom_nav` as `resource-id`s on a stock stamp, so `id`-based selectors work out of the box.
 > On an app stamped BEFORE the shim existed (no `TestTagAutomation.kt`), either port the shim in
-> or fall back to selectors 2–3 (raw UiAutomator equivalent:
+> or fall back to selector 2 (raw UiAutomator equivalent:
 > `new UiSelector().description("…")`), and say so in the generated file's header.
 
 ## 4. Missing-tag protocol
@@ -154,15 +180,13 @@ Naming: `<screen>_<element>` snake_case, matching the shipped `home_title` / `ho
 `app_bottom_nav` / `profile_title` convention. Rebuild, re-fetch the tree, confirm the tag
 appears, then reference it. One tag per marker node — don't carpet-tag every Text.
 
-## 5. Run + heal (legacy Appium path)
+## 5. Run + heal
 
-Run through the harness's own front door — Appium 3.x server on `:4723`, `emulator-5554`, debug
-APK installed (the `cmp-qa-prep` skill brings all of this up):
+Run through the lane or by hand, on the DEBUG build:
 
 ```bash
-npm --prefix qa/appium run smoke          # the shipped gate — keep it green
-node qa/appium/<flow>.spec.mjs            # your generated flows (add npm scripts to match)
-pytest tests/appium/cmp -v                # the pytest variant
+node qa/verify.mjs                    # e2eSmoke runs every top-level qa/e2e/*.yaml flow
+maestro test qa/e2e/<flow>.yaml       # one flow, against what is installed (installDebug first)
 ```
 
 A failing **generated** test is yours to heal, in-loop: re-fetch a fresh tree of the screen the
@@ -173,7 +197,7 @@ bug with the before/after trees as evidence, don't weaken the assertion to force
 
 ## 6. Golden-tree CI tie-in — regression without a device
 
-The Maestro suite (or, on legacy projects, the Appium suite) proves flows on a device. The
+The Maestro suite proves flows on a device. The
 **golden-tree layer** catches structural
 regressions in CI with no emulator at all — generate it alongside:
 
@@ -182,7 +206,7 @@ regressions in CI with no emulator at all — generate it alongside:
 2. In CI, and wherever your app's `CLAUDE.md` *Definition of done* runs the lane (a checkpoint
    over the finished work, not after each edit): `node qa/verify.mjs` diffs the current render against each
    golden. Empty diffs = pass. A diff entry like `clickable-changed` is a button silently
-   losing its handler — a class of regression the Appium suite only catches if it happens
+   losing its handler — a class of regression an E2E flow only catches if it happens
    to tap that button.
 3. For an in-session verified dev loop: `preview_diff { screen }` after an edit returns a
    `proven-clean | changed-with-regressions | no-change` verdict against the previous render;
@@ -192,10 +216,3 @@ regressions in CI with no emulator at all — generate it alongside:
 
 The two layers complement: golden trees are fast, device-free, and structural; the E2E suite
 proves the app really launches, navigates, and responds on device. Ship both.
-
-## Worked example
-
-`example-generated-home.spec.mjs` (bundled next to this file) is a complete generated suite for
-the template's Home screen, derived node-by-node from the real committed
-`inspector/harness/sample-tree.json` and written in the shipped `run-android-smoke.mjs` style —
-copy its structure for every flow you generate.

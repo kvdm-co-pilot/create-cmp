@@ -103,6 +103,10 @@ worth more than the finding it produced. Put it in `test/`, wired to the suite, 
    in one of them.
 6. **Scope the author took on quietly** — a refactor riding along, a dependency added, a
    convention changed in passing.
+7. **The brief asked for X and the diff does not do X.** Read the brief or spec your own brief
+   names before the diff, list what it asked for, and check each item against the tree. A diff
+   can be consistent with itself and still leave half the job undone. No brief named is a
+   question back, not a licence to review the diff against itself.
 
 **Do not re-run a green suite to see that it is green.** `node scripts/proof-plan.mjs` prints, under
 `suite`, whether `npm test` has already run over these exact bytes on this Node and what it found.
@@ -153,9 +157,6 @@ are re-recording — and not the whole diff again. Confirm or refute that round'
 those moved bytes, record it with `--kind rerecord` and `--round` set to the round you are
 re-recording, and take on nothing else. When a re-record is owed, and who carries it out, is the
 header of `docs/KNOWN-DEFECTS.md`; this paragraph only points at it.
-For the orchestrator: resume a stopped helper only while its context is small, it holds unsaved
-work and its cache is still warm (within about 5 minutes); otherwise brief a fresh one from its commits and hand-off file
-(https://code.claude.com/docs/en/sub-agents#resume-subagents).
 
 **Report to the orchestrator:** the test names you added and what each one refuses, the decisions
 you are handing up, what you attacked and could not break, and what you deliberately did not look
