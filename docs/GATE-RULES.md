@@ -125,6 +125,9 @@ A plant that lives in the instrument is run by everyone, forever, in
 milliseconds. A plant performed by hand is run once, by one person, and is gone
 the moment they close the terminal — you paid the full cost of a calibration and
 kept none of it. **If a gate is worth calibrating, its plant is worth keeping.**
+`node scripts/gate-assumptions.mjs` lists every gate, what it assumes the model cannot yet be trusted
+to do, and its kept plant (or `null`, a named gap), and `canary.yml` `ablate-gates`, dispatched with
+a model's name, re-runs the plants on each model release.
 
 The instrument reports its own cost for the same reason: `--budget-ms` (default
 5 s per cycle) turns "seconds each" from prose into a line in the output. Prose

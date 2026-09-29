@@ -179,12 +179,36 @@ export const DEVICE_TIER_LEVEL = "L2";
  */
 const CHEAP_TIER_DUE = "once, over the finished batch, before the PR — never per fix or per commit";
 
+// EACH TIER SAYS WHAT IT COMPENSATES FOR, AND WHAT KEPT DEFECT TURNS IT RED
+// (FIX-PLAN slice 18, GATE-RULES Rule 1 made permanent). `assumes` is one
+// sentence: what the model cannot yet be trusted to do, which this tier exists
+// to catch — the day a model can, the tier is a candidate for removal, and the
+// sentence is what gets re-tested. `plant` is the repo-relative path of the kept
+// plant that must turn this tier red, or null where none exists yet — a null is
+// a named gap, never a pass. `node scripts/gate-assumptions.mjs` lists them;
+// canary.yml `ablate-gates` re-runs the plants on each model release.
 const TIERS = Object.freeze({
-  suite: { when: "at-close", due: CHEAP_TIER_DUE, cost: "~50s", cmd: "npm test" },
-  frameworkCheck: { when: "at-close", due: CHEAP_TIER_DUE, cost: "~4s", cmd: "node scripts/framework-check.mjs" },
+  suite: {
+    when: "at-close",
+    due: CHEAP_TIER_DUE,
+    cost: "~50s",
+    cmd: "npm test",
+    assumes: "the model cannot be trusted to know a change broke nothing it did not read — a fix is judged by the lines it touched, not by the behaviour it moved.",
+    plant: null,
+  },
+  frameworkCheck: {
+    when: "at-close",
+    due: CHEAP_TIER_DUE,
+    cost: "~4s",
+    cmd: "node scripts/framework-check.mjs",
+    assumes: "the model cannot be trusted to tell a lane that returns a verdict from one that hangs or passes having checked nothing (GATE-RULES Rule 0; detekt's PASS that analysed nothing, Rule 1).",
+    plant: "scripts/framework-check.mjs",
+  },
   device: {
     when: "at-close",
     cost: "~3.5min + an emulator",
+    assumes: "the model cannot be trusted to know a stamped tree still runs from reading it — a build that compiles and a program that starts are different claims (l2Execution, ADR-0016).",
+    plant: "packages/harness/src/lib/profiles/cmp/plants.mjs",
     // What a record must REACH, and the command that produces one — the same
     // constant, so an agent is never told to run a check whose output this tier
     // would then refuse.
@@ -198,6 +222,11 @@ const TIERS = Object.freeze({
   review: {
     when: "at-close",
     cost: "~one read of the diff",
+    assumes: "the author cannot be trusted to grade its own work — a second reader of the diff finds what the one who wrote it cannot see (ADR-0014).",
+    // No kept plant: turning this tier red would need a planted defect a
+    // reviewer must find. The record-over-these-bytes check is unit-tested, but
+    // that proves the plumbing, not the reader.
+    plant: null,
     cmd: "node scripts/proof-plan.mjs --discharge-review",
     // A POINTER, AND NOT A SUMMARY OF WHAT IT POINTS AT. The four lines that
     // stood here paraphrased the rule beside the pointer to it, and were stale
@@ -224,6 +253,8 @@ const TIERS = Object.freeze({
     // Measured on its first PASS (KD-264, 2026-09-26, cold R8): ~11.6 min of steps
     // for one lane, ~22 min wall-clock for both lanes of the run.
     cost: "~12min of steps per lane, ~22min wall-clock + an emulator + the Firebase Emulator Suite",
+    assumes: "the model cannot be trusted to know the template's Firebase code executes, because the ordinary L2 run stamps it out and nothing else here runs it (KD-45).",
+    plant: "scripts/lib/fleet-firebase.mjs",
     requires: DEVICE_TIER_LEVEL,
     cmd: `CMP_AVD=Medium_Phone_API_35 node scripts/fleet-check.mjs --min-level ${DEVICE_TIER_LEVEL} --with-firebase`,
   },
