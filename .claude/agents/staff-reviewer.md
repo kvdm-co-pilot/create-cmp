@@ -108,6 +108,19 @@ worth more than the finding it produced. Put it in `test/`, wired to the suite, 
    can be consistent with itself and still leave half the job undone. No brief named is a
    question back, not a licence to review the diff against itself.
 
+**Brief fields.** Your brief names these six, each labelled at the start of its own line — in
+create-cmp, `scripts/hooks/brief-check.mjs` denies a spawn that lacks one. `Diff:` is what you
+read and `Brief:` is the X of point 7:
+
+```
+Objective: what this round reviews, and which round it is
+Output: the path the findings land in
+Diff: the base..head range or the branch to read
+Brief: the path of the brief or spec the diff was written against
+Out of scope: what this round must not touch
+Proof: the tests and commands the round runs, and the pass line to expect
+```
+
 **Do not re-run a green suite to see that it is green.** `node scripts/proof-plan.mjs` prints, under
 `suite`, whether `npm test` has already run over these exact bytes on this Node and what it found.
 If it says so, that is your baseline. Run the tests you write, by file. The whole suite is not

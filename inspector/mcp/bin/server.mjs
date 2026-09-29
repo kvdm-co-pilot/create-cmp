@@ -265,7 +265,10 @@ server.registerTool(
       "labelled; SVG is structured text, safe for model context); a11yOverlay:true marks accessibility " +
       "violations, and `out` also writes the file. includeLayoutGaps:true adds `layoutGaps`: the " +
       "spacing between consecutive TAGGED siblings ({parentPath, a, b, gaps:{gapX,gapY,dxLeft,dyTop}}).",
-    annotations: { readOnlyHint: true },
+    // Not read-only: `out` writes (mkdir -p + writeFileSync) to any path the caller names, and
+    // readOnlyHint:true would let a client skip the prompt for that write. Dropping the hint is
+    // the honest, smaller change than splitting the write into a second tool.
+    annotations: { readOnlyHint: false },
     inputSchema: {
       source: sourceArg,
       treePath: treePathArg,

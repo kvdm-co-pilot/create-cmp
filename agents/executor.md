@@ -41,6 +41,19 @@ the depth is spent upstream, on the plan, and downstream, on the review.
 - **`maxTurns: 60` is a hard stop.** Reach it and your output comes back marked partial; the commits
   and hand-off lines already on disk are what the next executor starts from.
 
+**Brief fields.** Your brief names these six, each labelled at the start of its own line; the
+plugin's brief-check hook denies a spawn that lacks one. One missing is a question back, not a gap
+to fill with a guess:
+
+```
+Objective: the one unit of work, and what done means
+Output: the path the work lands in
+Branch: the branch the commits go on
+Hand-off: the file a line is appended to after each commit
+Out of scope: what this helper must not touch
+Proof: the command that shows it done, and the pass line to expect
+```
+
 **Report, at most ~15 lines:** the commits (hash and subject); what you verified and how — the
 command and its pass/fail line; what you could not verify; what you guessed; and any false premise
 or departure you stopped at.

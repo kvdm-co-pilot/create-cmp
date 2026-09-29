@@ -123,7 +123,7 @@ export function respond(payload) {
     `brief-check: this ${agent} brief is missing ${missing.map((f) => `${f}:`).join(", ")}. ` +
     `Re-send the same spawn with every field below labelled at the start of its own line — the ${agent} schema:\n` +
     `${renderSchema(schema)}\n` +
-    "(scripts/hooks/brief-check.mjs — a form check on the brief, not a safety gate; the agent's own contract names these fields.)";
+    `(scripts/hooks/brief-check.mjs — a form check on the brief, not a safety gate; the same six labels are the "Brief fields" block of the ${agent} definition.)`;
   return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } };
 }
 
