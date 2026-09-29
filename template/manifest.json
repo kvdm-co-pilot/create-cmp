@@ -60,6 +60,7 @@
       "paths": [
         "specs",
         ".claude/skills",
+        ".claude/rules",
         ".githooks",
         "qa/approvals.json",
         "qa/comments.json",
@@ -67,7 +68,7 @@
         "qa/hooks",
         "qa/ruleset.json"
       ],
-      "notes": "The verification harness — the mode split (`--minimal` disables it; `create-cmp harden` installs it back). Three mechanisms share the subtraction, each already owned by the engine: (1) the paths above delete the app-owned governance surfaces (specs/, approvals+comments ledgers, evidence, generator skills, the pre-push receipt hook, the Stop hook's fail-closed launcher qa/hooks/ and the CI-required-check ruleset qa/ruleset.json — both presuppose the lane); (2) `cmp:feature harness`/`!harness` marker blocks give CLAUDE.md, AGENTS.md, README.md, CONTRIBUTING.md, docs/TESTING.md and .github/workflows/verify.yml their two honest renderings from one file; (3) the machine-owned lane region is subtracted by the ENGINE (src/lib/minimal.mjs), which keeps qa/preview-gallery.mjs plus its transitive qa/lib imports — derived from import statements, never listed here, so it cannot rot. .claude/settings.json is rewritten to the advisory-only hook set via the src/lib/hooks.mjs classifier (Stop hook and qa/-referencing nudges are full-mode only). qa/golden/ stays in BOTH modes — the desktopTest golden-tree tests read it and minimal keeps the full JVM test tier. qa/e2e is its own feature and stays orthogonal (Maestro flows run standalone)."
+      "notes": "The verification harness — the mode split (`--minimal` disables it; `create-cmp harden` installs it back). Three mechanisms share the subtraction, each already owned by the engine: (1) the paths above delete the app-owned governance surfaces (specs/, approvals+comments ledgers, evidence, the project skills and path-scoped rules (.claude/skills, .claude/rules — the walk, approvals and comments presuppose the lane), the pre-push receipt hook, the Stop hook's fail-closed launcher qa/hooks/ and the CI-required-check ruleset qa/ruleset.json — both presuppose the lane); (2) `cmp:feature harness`/`!harness` marker blocks give CLAUDE.md, AGENTS.md, README.md, CONTRIBUTING.md, docs/TESTING.md and .github/workflows/verify.yml their two honest renderings from one file; (3) the machine-owned lane region is subtracted by the ENGINE (src/lib/minimal.mjs), which keeps qa/preview-gallery.mjs plus its transitive qa/lib imports — derived from import statements, never listed here, so it cannot rot. .claude/settings.json is rewritten to the advisory-only hook set via the src/lib/hooks.mjs classifier (Stop hook and qa/-referencing nudges are full-mode only). qa/golden/ stays in BOTH modes — the desktopTest golden-tree tests read it and minimal keeps the full JVM test tier. qa/e2e is its own feature and stays orthogonal (Maestro flows run standalone)."
     },
     "ios": {
       "enabledByDefault": true,
@@ -101,7 +102,8 @@
         "composeApp/src/androidDebug/kotlin/com/example/app/inspector",
         "composeApp/src/androidRelease/kotlin/com/example/app/inspector",
         "composeApp/src/desktopMain/kotlin/com/example/app/inspector",
-        "qa/preview-gallery.mjs"
+        "qa/preview-gallery.mjs",
+        ".claude/skills/ui-loop"
       ],
       "notes": "Two loops in one feature. (1) Live on-device inspector: debug-only loopback HTTP server on 127.0.0.1:9500 (GET /inspect/health|tree|design-system) serving the semantics tree + design-token catalog to the cmp-inspector MCP via `adb forward tcp:9500 tcp:9500`. The androidRelease dir holds only the no-op startInspector() twin — release builds contain no inspector code structurally. (2) Headless preview harness (tier 0): the desktopMain inspector dir (PreviewRegistry/PreviewHarness/PreviewSemanticsJson) + the :composeApp:renderScreens task render every registered screen to PNG + contract tree JSON with no device; qa/preview-gallery.mjs builds a self-contained index.html from the output (vendored pure-logic render libs live in qa/lib and stay when the feature is off — they are inert without the harness). The harness starts its OWN Koin (independent of the dev-client feature's DesktopModule) and its PreviewRegistry tab entries are regenerated from the configured `tabs` by the scaffolder (pipeline step b.3). When off: delete all three inspector dirs + qa/preview-gallery.mjs, strip the `inspector` marker blocks in AppApplication.kt (import + startInspector() call), composeApp/src/androidDebug/AndroidManifest.xml (INTERNET permission), and composeApp/build.gradle.kts (desktopMain compose.uiTest dep + the renderScreens task). On-device server: zero dependencies (java.net.ServerSocket + kotlinx-serialization from commonMain)."
     },

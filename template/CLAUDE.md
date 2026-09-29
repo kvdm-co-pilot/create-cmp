@@ -64,7 +64,7 @@ sentence in it carries a tier tag: `[enforced: CLAUSE-ID]`, `[governed]`, or `[a
 Its `cmp:generated` sections (expect/actual table, layer inventory, ADR index, glossary) are
 derived from a tree walk, never hand-maintained — `node qa/arch-doc.mjs` regenerates them,
 and `node qa/arch-doc.mjs --check`, a verify-lane step, fails the lane when they drift from
-the tree. The governed `architecture` artifact (below) hashes the document alongside
+the tree. The governed `architecture` artifact (`.claude/rules/approvals.md`) hashes the document alongside
 `specs/app-base.spec.md`, so approving it is consent to this document. The summary:
 
 - **Layers:** `presentation` → `domain` ← `data`. `domain` imports nothing app-internal;
@@ -85,7 +85,7 @@ the tree. The governed `architecture` artifact (below) hashes the document along
   `presentation/theme/`. No hardcoded literals in screens.
 - **One feature is the exemplar** — the full pattern through every layer, tests included.
   It ships as `home`; `qa/approvals.json`'s `exemplarFeature` key retargets it to your own
-  first feature once shaped (see "Configurable exemplar"). New features mirror the exemplar
+  first feature once shaped (see `.claude/rules/approvals.md`). New features mirror the exemplar
   exactly: Screen → ViewModel (+ test) → UseCase (+ test) → Repository interface in `domain`
   + impl in `data` (+ test) → DI entry → navigation route.
 
@@ -172,203 +172,24 @@ artifact:
 npx create-cmp-cli upgrade --harness --yes   # without --yes it dry-runs and exits 0 — a silent no-op from a tool
 ```
 
-## Approvals — governed artifacts need a human's sign-off
+## Every change — the triage is visible, then the walk
 
-Some artifacts are **governed**: a human approves them, and the approval is bound to the
-artifact's content by hash (`qa/approvals.json`) — the evidence-receipt idea, applied to a
-human decision. The ordered walk is a **definition order**, not just an approval order:
-each artifact is the vocabulary the next is written in, so on a fresh app each step is a
-conversation that ends in an approval — the genesis walk:
-
-The genesis order — intent → first feature brief → architecture + structure → exemplar spec →
-exemplar feature → design system → components → per-feature specs — is driven by the `cmp-new`
-interview and is over before this file is your working contract; `node qa/approve.mjs --status`
-prints every artifact and its state. Two disciplines survive it: **behavior is spec-first** (clauses
-confirmed before the slice is built) and **visuals are UI-first** (the design system and component
-vocabulary are distilled from real screens, so they lock after the exemplar — a provisional palette
-carries the build until then; if the lock changes the exemplar's look, reopen → re-approve it — that
-loop is the design, not a failure). Once approved, the component registry is law: adding or changing
-a common component invalidates the approval until a human re-approves.
-
-### After genesis — every change is the same loop
-
-Genesis governs the app's birth. Everything after runs the SAME loop — decide →
-contract → build → prove → sign — over a subset (`docs/CHANGE-FLOW-DESIGN.md` in the
-create-cmp repo is the doc of record). Two lanes, one triage rule — and **the triage is
-always visible**: your FIRST reply to any change request (new feature, edit, bug fix, copy
-tweak, redesign — every entry point) states in one or two plain sentences what you
-understood the change to be, which lane it takes, and why, before any tool runs. The human
-can overrule the lane in a word; a silent route is a routing error even when the lane was
-right.
+Genesis (`cmp-new`; `node qa/approve.mjs --status`) is over before this file is your contract;
+every change after runs the SAME loop — decide → contract → build → prove → sign. Your FIRST
+reply to any change request states in one or two plain sentences what you understood, which
+lane it takes, and why, before any tool runs; the human can overrule it in a word, and a silent
+route is a routing error even when the lane was right.
 
 **Grill before the brief** (the `grill-me` plugin skill carries the procedure; the rule holds without the plugin):
-on the brief lane, after the triage restatement and before a word of the brief, settle
-the load-bearing questions — a signed brief or spec is a CLOSED decision: cite it, never re-ask it;
-ask the unsettled ones as a numbered list with a recommended answer each, and WAIT. Answers land in the brief's **Decisions** and
-**Open decisions**; the signature closes them. The direct lane is not grilled.
+settle the load-bearing questions as a numbered list with a recommended answer each, and WAIT — a signed brief
+or spec is a CLOSED decision: cite it, never re-ask it. The direct lane is not grilled.
 
-### Configurable exemplar — the DNA features are cloned from
-
-`qa/approvals.json` carries a top-level `"exemplarFeature"` key (absent means `"home"`, so
-older ledgers keep meaning what they meant). It names the feature whose 11-file set is the
-governed **exemplar-feature** artifact and the clone source `qa/scaffold-feature.mjs`
-stamps new features from. The genesis walk's endgame is pointing it at *your* first real
-feature: stamp it (`add-feature`), shape it, then set `exemplarFeature` — from then on the
-stamper clones your pattern in your domain language, and `home` demotes to an ordinary
-feature spec. If the configured exemplar has grown files beyond the canonical 11-file
-shape, the stamper clones the canonical set and warns, listing exactly what it skipped.
-
-
-## The walk — the user always knows where we are and whose turn it is
-
-Every governed change is a **walk** through six stages, spoken ONLY in this vocabulary
-wherever the human reads (chat, cards, commit prose): **Decide · Design · Contract ·
-Build · Prove · Sign-off**. The mapping is mechanical — Decide=the brief, Design=the
-rendered screens, Contract=the spec, Build=code+citing tests, Prove=the lane's receipt,
-Sign-off=acceptance — and spec clauses are spoken as **promises** ("Contract: 7
-promises agreed" · "Build: keeping promise 5 of 7" · "Prove: all promises kept,
-evidence attached"). `node qa/walk-status.mjs` derives the live position; a
-UserPromptSubmit hook injects it every prompt. **Render the injected state — never
-your memory of it.**
-
-**At kickoff** (with the triage restatement): print the itinerary — and DECLARE it as
-the live chain, so the studio's Drive strip and the statusline's readers see the same
-steps you just printed:
-
-    Navigation redesign — the journey (brief lane)
-    Decide → Design → Contract → Build → Prove → Sign-off
-    Stops for you: 3 (Decide — now · Contract · Sign-off). Build and Prove never stop for you.
-    First stop is now: 2 open decisions below.
-
-```bash
-node qa/plan.mjs --set "sign the brief | draft screens | agree the promises | build | full check | your sign-off" --title "navigation redesign"
-```
-
-**The chain is an offer, not an announcement** (drive-narration N6): show the declared
-steps in your first reply and invite the reshape in one breath — "say the word and I'll
-reorder" — then start work immediately; the chain gates nothing, so the offer never
-blocks. If the human redirects, re-declare (`--set` again) without ceremony: their
-reshape IS the new chain.
-
-**The chain stays current** — this is part of the contract, not a nicety: advance it
-with `node qa/plan.mjs --step N` as each step lands and `--done` when the request
-lands (closing writes the request's line into the local trail the studio's Recent
-requests fold shows). The current request itself is recorded mechanically (the
-per-prompt hook), the steps are yours to declare, and every surface shows the
-declaration's age — a stale chain reads as stale to the human watching the studio,
-which is worse than no chain. While the full check runs, the chain's observed line
-narrates the lane's own position (step, elapsed, usual cost) — quote THAT, never an
-estimate. The chain gates nothing; the walk stays the truth for doneness.
-
-**While a walk is open, the per-prompt inject carries the running protocol** — the `[studio: …]`
-line (restore it if DOWN: the cmp-inspector `preview { projectDir }` tool, or tell the human once),
-the `[chat header]` to open every reply with, verbatim, and the `▲ ARRIVED, UNPLANNED` line for work
-that belongs to no open walk (default: after the current walk lands; one walk at a time). Render the
-injected lines, never your memory of them; with no walk open it delivers nothing and you write none
-of it. After the header: one line per stage transition, nothing per-file.
-
-**At every human gate — loud:** a full stop card, never a bare question — and the
-easiest act leads:
-
-    ■ YOUR TURN — <feature> · stage 3 of 6: Contract — agreeing what it promises
-    <what it is, in plain words — two lines maximum>
-    → Easiest: the studio console at <url from the injected card> — the row carries the button.
-    → CLI fallback: <the command>   (or "reply approve" when no console is up)
-    After this: <the remaining stages, and which ones stop for the human>
-
-## Comments — review feedback flows back through the agent
-
-Approvals are binding (they gate the verify lane); **comments are advisory** — a human's
-running commentary, with a defined path back into your plan, spec, and code.
-`qa/comments.json` is the ledger; `qa/lib/comments.mjs` is the library, mirroring
-`qa/lib/approvals.mjs`'s shape: state, validation, transitions, nothing fabricated.
-
-**The loop of record:**
-
-1. A human adds a comment from the preview console — on a screen, a spec clause, a
-   design-system token or component, or an architecture tree node.
-2. You observe it — `review_comments { waitForComment: true }` (plugin) blocks until a new
-   one lands; without the plugin, `node qa/comment.mjs --list --open`.
-3. You act on it — update the plan, the spec clause, or the code it points at.
-4. You resolve it **after** acting, with a note saying what you did —
-   `resolve_comment { id, note }` (plugin) or `node qa/comment.mjs --resolve <id> --note
-   "..."` (CLI, records author `agent-cli`). The console then shows `resolved` plus your
-   note. The console never edits code: humans comment, agents resolve.
-
-| Command | What |
-|---|---|
-| `node qa/comment.mjs --list` | Every comment, open and resolved, with resolution notes |
-| `node qa/comment.mjs --list --open` | Only open comments |
-| `node qa/comment.mjs --resolve <id> --note "..."` | Resolve a comment, recording what changed |
-
-A comment targets one of: a **screen**, an **element** (screen + testTag), a **spec-line**
-(file + clause id), a **design-system** token, an **architecture** path, or **general**.
-`addComment` refuses empty text and a target missing the fields its type requires — the
-same refusal-over-fabrication stance as approvals. A ledger that exists but cannot be
-parsed is never treated as empty (that would hide real feedback); reads and writes surface
-the honest error instead.
-
-## UI feedback loop — see what you build, without a device
-
+- **The walk** (every kickoff, every human gate) — the `walk` skill, `.claude/skills/walk/SKILL.md`.
+- **Approvals** — `.claude/rules/approvals.md` (loads with `qa/approvals.json`, `specs/`, theme, components, screens).
+- **Comments** — `.claude/rules/comments.md` (loads with `qa/comments.json`).
 <!-- >>> cmp:feature inspector -->
-While building or changing any screen, use the preview loop instead of an emulator. It
-renders this app's real screens (real DI, real theme, seeded data) headlessly in seconds
-and tells you what your edit changed.
-
-**With the create-cmp plugin (cmp-inspector MCP tools):**
-
-1. `preview { projectDir }` — once per session. Returns a live gallery URL for the human
-   (it re-renders on every save) and per-screen structural summaries for you. Sources are
-   watched; you never run Gradle by hand.
-2. After each edit: `preview_status { waitForRender: true }` blocks until the outcome.
-   `changedLastRender` names the screens your edit touched (empty = the edit reached no
-   screen); `lastErrorSource: "compile"` means the edit did not build — the compiler's `e:`
-   lines are in `lastError`.
-3. `preview_diff { screen }` proves the change in one call: `proven-clean` /
-   `changed-with-regressions` / `no-change`. No snapshot bookkeeping.
-
-**If the tools are missing:** capability absence is a fault to diagnose and report — never
-a silent fallback. If ToolSearch finds no `cmp-inspector` tools, STOP and tell the human
-which it is: the plugin is disabled (`enabledPlugins` in `~/.claude/settings.json` or the
-project settings); the session predates the plugin's enablement (MCP servers attach at
-session start — restart the session; no in-session retry will surface them); or the plugin
-copy is stale/broken (run cmp-doctor's inspector-MCP check group). Report before degrading.
-
-**Degraded path** — for environments where the plugin is genuinely unavailable (CI, other
-agents), and only after the fault is reported: `./gradlew :composeApp:renderScreens` renders
-every screen to `composeApp/build/previews/<id>/{screen.png, tree.json}` (`-Pscreen=<id>`
-for one); `node qa/preview-gallery.mjs` builds a self-contained gallery page from the
-output. What this loses: on-save re-render, changed-screen attribution, compile errors
-in-band, and the `preview_diff` change proof — structured feedback replaced by pixels.
-
-**Live tier — the human's live device view (standing step).** Whenever `connect_live`
-succeeds, OFFER the `remoteUrl` it returns (`http://127.0.0.1:9500/inspect/remote`) to the
-human — every time, not as a maybe. It is a self-contained browser page that mirrors the
-running app (~700ms refresh) with click-to-tap driving the real device: they watch and drive
-the actual app while you assert on the tree (`navigate_and_inspect` — its before/after delta
-is the change proof live — and `inspect_tree`). It is also the right way for a human to
-*watch* an e2e run.
-
-Asserting persisted state: `db_query` reads bounded rows from the running app's database;
-use it when a flow's proof is a row existing (or not) after an action, instead of shelling
-into sqlite or trusting the UI.
-
-When the app crashes or misbehaves on device: `runtime_crashes` returns persisted crashes
-with cause attribution and `runtime_logs` bounded structured logcat for the app's pid; use
-these before hand-grepping `adb logcat`.
-
-Screens come from `inspector/PreviewRegistry.kt` (desktopMain). The `add-feature` and
-`add-screen` stampers auto-register stamped screens at the `// cmp:anchor preview-registry`
-marker; when you add a screen by hand, register it there — a forced-state variant is just
-another entry (`"home@empty"`). Every common component also carries a story entry
-(`"component.<kebab-name>"` in `inspector/ComponentStories.kt`); when you add a component,
-add its story — the lane's `componentStories` step fails naming the missing id otherwise.
-Assert on `tree.json` structure; never read PNG bytes. Pixels are for humans.
+- **UI feedback loop** (building any screen) — the `ui-loop` skill, `.claude/skills/ui-loop/SKILL.md`.
 <!-- <<< cmp:feature inspector -->
-<!-- >>> cmp:feature dev-client -->
-For one interactive window instead of stills of every screen:
-`./gradlew :composeApp:hotRunDesktop --auto` (Compose Hot Reload dev-client).
-<!-- <<< cmp:feature dev-client -->
 
 ## Docs
 
