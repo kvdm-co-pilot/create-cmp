@@ -26,6 +26,17 @@ on:
 jobs:
   android:
     runs-on: ubuntu-latest # ships with JDK + Android SDK preinstalled
+    # >>> cmp:feature harness
+    # The attestation step below signs the receipt keylessly: id-token lets the
+    # job ask GitHub's OIDC provider for its identity, attestations lets it store
+    # the result. Declaring any permission sets every other one to none, so
+    # contents: read (what checkout needs) is declared too. docs/adr/0017 in
+    # create-cmp explains why the attester must not be the receipt's producer.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    # <<< cmp:feature harness
     steps:
       - uses: actions/checkout@v4
 
@@ -78,6 +89,23 @@ jobs:
         env:
           CMP_DEVICE: none
         run: node qa/verify.mjs --profile ci
+
+      # CI attests the receipt CI itself just produced. The signature is keyless
+      # (Sigstore, bound to this workflow's OIDC identity), so no key exists that
+      # the receipt's author could reach, and anyone can then check it:
+      #   gh attestation verify qa/evidence/latest.json --repo <owner>/<repo>
+      # answers "a GitHub-hosted run of this workflow produced this receipt from
+      # this commit". What it covers is the rungs this run executed: L1 here,
+      # because CMP_DEVICE=none above — the L2 verdict stays the author's
+      # machine's word until CI runs that tier.
+      # UNVERIFIED: the input name `subject-path` and the major `v2` are taken
+      # from the plan, not yet checked against the action's README. A fork's
+      # pull request gets no id-token, so the step runs only where it can.
+      - name: Attest evidence receipt
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: qa/evidence/latest.json
 
       # The receipt this run produced, kept as a build artifact. The receipt
       # committed by the author (qa/evidence/latest.json) lives in the repo —

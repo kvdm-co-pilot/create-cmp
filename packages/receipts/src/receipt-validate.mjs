@@ -292,6 +292,45 @@ export function listSkippedSteps(receipt) {
     .map((s) => ({ name: s.name ?? "?", reason: s.reason ?? "no reason recorded" }));
 }
 
+/** The rung order every ladder shares (the schema's enum). */
+const RUNG_ORDER = ["L0", "L1", "L2", "L3"];
+
+/**
+ * Which of a receipt's rungs a party other than its producer vouches for, and
+ * which rest on the producer's word alone (docs/adr/0017). A REPORT, never a
+ * verdict: nothing here changes what `evaluateReceipt` or `checkDoneEvidence`
+ * decide.
+ *
+ * THE MARKER IS NOT IN THE RECEIPT, AND CANNOT BE. An attestation covers the
+ * receipt's bytes, so writing it into the receipt afterwards would change the
+ * bytes it covers; and any field the producer writes — `attestation`,
+ * `producedBy: "ci"` — is the producer's word again, which is the very gap
+ * this reports (a hand-edited receipt passes every check that reads it). So
+ * the only thing that moves a rung to "attested" is `attestedThrough`: the
+ * highest rung a CALLER has checked an attestation for, outside this file
+ * (e.g. `gh attestation verify` over the CI run's own receipt). A caller that
+ * has checked nothing passes nothing, and every rung is self-attested.
+ *
+ * @param {object} receipt the receipt as read
+ * @param {{attestedThrough?: string|null}} [opts] the highest rung an
+ *   independently verified attestation covers; rungs at or below it are
+ *   attested, rungs above it are self-attested
+ * @returns {{claimed: string[], attested: string[], selfAttested: string[], line: string}}
+ */
+export function attestationStanding(receipt, { attestedThrough = null } = {}) {
+  const rung = receipt?.evidenceLevel?.rung;
+  const top = RUNG_ORDER.indexOf(typeof rung === "string" ? rung : "");
+  const claimed = top < 0 ? [] : RUNG_ORDER.slice(0, top + 1);
+  const through = RUNG_ORDER.indexOf(typeof attestedThrough === "string" ? attestedThrough : "");
+  const attested = claimed.filter((r) => RUNG_ORDER.indexOf(r) <= through);
+  const selfAttested = claimed.filter((r) => RUNG_ORDER.indexOf(r) > through);
+  const list = (rs) => (rs.length ? rs.join(", ") : "none");
+  const line = claimed.length
+    ? `attestation — CI-attested: ${list(attested)} · self-attested: ${list(selfAttested)}`
+    : "attestation — no rung claimed, nothing to attest";
+  return { claimed, attested, selfAttested, line };
+}
+
 /** How a refusal names the lane when its caller does not spell it. */
 export const DEFAULT_LANE_COMMAND = "node qa/verify.mjs";
 

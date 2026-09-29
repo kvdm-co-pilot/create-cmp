@@ -20,7 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { computeInputsHash } from "./lib/inputs-hash.mjs";
-import { checkDoneEvidence, evaluateReceipt, readReceipt } from "./lib/receipt-validate.mjs";
+import { attestationStanding, checkDoneEvidence, evaluateReceipt, readReceipt } from "./lib/receipt-validate.mjs";
 import { readHold, assessHold, describeHold, holdExplains } from "./lib/agent-hold.mjs";
 import { LANE_MARKER_STALE_MS, laneMarkerPath } from "./lib/lane-markers.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
@@ -220,6 +220,12 @@ function evaluate() {
     const id = receipt.pack && typeof receipt.pack.id === "string" ? receipt.pack.id.trim() : "";
     result.packId = id || null;
   }
+  // WHO VOUCHES FOR EACH RUNG — a report line, never a verdict (docs/adr/0017).
+  // This file is the producer's own copy, and nothing this CLI can read on its
+  // own is an attestation by anyone else, so it passes no `attestedThrough`:
+  // every rung it reports is self-attested. CI's receipt is the attested one,
+  // and it is checked with `gh attestation verify`, not here.
+  result.attestation = attestationStanding(receipt);
   return result;
 }
 
@@ -280,6 +286,12 @@ if (asJson) {
   console.log(JSON.stringify(result, null, 2));
 } else if (result.valid) {
   console.log(`VALID — ${result.reason}${rungSuffix}`);
+  if (result.attestation) {
+    console.log(
+      `  ${result.attestation.line} (this committed file is its producer's word; ` +
+        "CI's own receipt is checked with `gh attestation verify`)",
+    );
+  }
 } else {
   console.error(`INVALID — ${result.reason}`);
 }
