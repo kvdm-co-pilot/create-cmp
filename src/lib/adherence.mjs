@@ -201,13 +201,29 @@ export function receiptRow({ receiptCheckExists, run, projectDir }) {
   return row(label, UNKNOWN, `qa/receipt-check.mjs ${run.status === null ? "did not finish" : `exited ${run.status}`}`, "node qa/receipt-check.mjs   # read the error");
 }
 
-export function credentialRow(userFile) {
+/**
+ * The credential denies at every scope Claude Code merges — a deny held at ANY scope denies the
+ * read, so the row reads the same scopes `--fix` does (planUserFix) and never names a remedy
+ * --fix would decline to act on (D4). A missing deny with a scope unread is a question: UNKNOWN.
+ * @param {Array<{scope:string} & ReturnType<typeof readSettingsFile>>} [scopes]
+ */
+export function credentialRow(userFile, scopes) {
   const label = "Credential reads denied";
   if (userFile.state === "unreadable") return row(label, UNKNOWN, `${userFile.path} cannot be read (${userFile.reason})`, `fix ${userFile.path}, then ${FIX_SELF}`);
-  const deny = list(userFile.settings?.permissions?.deny);
-  const missing = CREDENTIAL_DENY.filter((r) => !deny.some((d) => ruleCovers(d, r)));
-  if (!missing.length) return row(label, PASS, `user-scope permissions.deny covers ${CREDENTIAL_DENY.join(", ")}`);
-  return row(label, FAIL, `user-scope permissions.deny lacks ${missing.join(", ")}`, FIX_SELF);
+  const all = asScopes(userFile, scopes);
+  const unread = all.filter((sc) => sc.state === "unreadable");
+  const parsed = all.filter((sc) => sc.state === "parsed");
+  const heldAt = (rule) => parsed.filter((sc) => list(sc.settings.permissions?.deny).some((d) => ruleCovers(d, rule))).map((sc) => sc.scope);
+  const held = CREDENTIAL_DENY.map((rule) => ({ rule, at: heldAt(rule) }));
+  const missing = held.filter((h) => !h.at.length).map((h) => h.rule);
+  const covered = held.filter((h) => h.at.length).map((h) => `${h.rule} (${[...new Set(h.at)].join(", ")} scope)`);
+  if (!missing.length) return row(label, PASS, `permissions.deny covers ${covered.join(", ")}`);
+  const lacks = `permissions.deny at no scope read covers ${missing.join(", ")}`;
+  if (unread.length) {
+    const where = unread.map((sc) => `${sc.scope} (${sc.path}: ${sc.reason})`).join(", ");
+    return row(label, UNKNOWN, `${lacks}; could not read ${where}`, `fix ${unread.map((sc) => sc.path).join(" and ")}, then ${FIX_SELF}`);
+  }
+  return row(label, FAIL, lacks, FIX_SELF);
 }
 
 /**
@@ -446,7 +462,7 @@ export async function gatherAdherence({
     }),
     ciRow({ projectDir, workflow, gh }),
     receiptRow({ receiptCheckExists, run: plainRun, projectDir }),
-    credentialRow(userFile),
+    credentialRow(userFile, scopes),
     releaseActsRow(userFile, scopes),
     pluginRow(await gatherPlugin(claudeDir, loadCompare)),
     inspectorRow(inspectorServers({ projectDir, home, claudeDir })),
