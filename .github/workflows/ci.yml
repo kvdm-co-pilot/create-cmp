@@ -204,3 +204,80 @@ jobs:
             ${{ runner.temp }}/ios-link.log
             ${{ runner.temp }}/ios-build.log
           if-no-files-found: ignore
+
+  # ONE NAME FOR THE MATRIX (FIX-PLAN slice 7). `test` reports three contexts,
+  # `engine unit tests (20|22|24)`, and a ruleset can only require names it
+  # knows; a required `engine unit tests` would never be satisfied and would
+  # block every merge. This fan-in is the one context qa/ruleset-create-cmp.json
+  # requires, so the matrix can change without editing the ruleset. `always()`
+  # so a failed or cancelled leg reports red here rather than skipped — a
+  # skipped required check counts as passing.
+  tests:
+    name: tests
+    needs: [test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every engine unit test leg passed
+        env:
+          RESULT: ${{ needs.test.result }}
+        run: |
+          echo "engine unit tests (matrix): $RESULT"
+          test "$RESULT" = "success"
+
+  # THE HOOK'S QUESTION, ASKED WHERE THE SESSION CANNOT REACH (GATE-RULES Rule 4,
+  # FIX-PLAN slice 7, B-4): what does this PR's diff owe, and is each owed tier
+  # attested? `node scripts/proof-plan.mjs --ci` says what it can see — suite and
+  # framework-check are re-run by `tests`; review and the L2 runs count only as
+  # check runs named `review`, `L2 run`, `Firebase L2 run` on the head commit,
+  # never as files committed into the tree (a hashed record invalidates itself,
+  # an excluded one is forgeable).
+  #
+  # THE BASE BRANCH'S CODE JUDGES (Rule 2: the layer you changed cannot certify
+  # itself). The PR is checked out; the base branch is added as a second worktree
+  # and ITS scripts/proof-plan.mjs is run with `--tree` pointing at the PR. A PR
+  # that rewrites the plan is judged by the plan it replaces. The one exception is
+  # the bootstrap: a base that predates `--ci` cannot answer, so the PR's own copy
+  # runs and the log says so — true exactly once, for the PR that adds the mode.
+  #
+  # PULL REQUESTS ONLY — skipped on push to main, deliberately. After a
+  # rebase-merge the commits on main have new SHAs, so the check runs a reviewer
+  # posted on the PR head are not on them and every owed tier would read MISSING:
+  # a false red on every merge. And a check after the push refuses nothing — the
+  # refusal belongs before it, which is what the ruleset's required check is for.
+  #
+  # NOT --strict YET (Rule 1: calibrate a gate on a recorded run before wiring it).
+  # UNKNOWN (the API did not answer) passes with the tier lines printed; MISSING
+  # still fails. Nothing posts `review` / `L2 run` check runs yet, so a PR that
+  # owes one reads MISSING here until that poster exists — which is the record
+  # this job is gathering before the ruleset names it.
+  proof-owed:
+    name: proof owed
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: What this PR owes, judged by the base branch's plan code
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+          git worktree add --detach "$RUNNER_TEMP/base" "origin/$BASE_REF"
+          judge="$RUNNER_TEMP/base/scripts/proof-plan.mjs"
+          if ! grep -q -- '"--ci"' "$judge"; then
+            echo "::warning::origin/$BASE_REF's proof-plan.mjs predates --ci; the PR's own copy judges this once (bootstrap, Rule 2 not met for this run)"
+            judge="scripts/proof-plan.mjs"
+          fi
+          node "$judge" --ci --base "origin/$BASE_REF" --tree "$GITHUB_WORKSPACE" --sha "$HEAD_SHA" --repo "$GITHUB_REPOSITORY"

@@ -406,7 +406,10 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   `pnpm`/`bun`/`yarn publish` the publish refusal, however the command is spelled. The gate runs
   behind `scripts/hooks/fail-closed.sh`, which turns a gate that crashed or outran its 9 s
   deadline into a refusal for a command its prefilter matches; a hard kill by Claude Code itself
-  stays fail-open, which is what the opt-in `.githooks/pre-push` and CI are for. SessionStart puts
+  stays fail-open, which is what the opt-in `.githooks/pre-push` and CI are for. CI asks the same
+  question as the hook — `proof-plan.mjs --ci`, in the `proof owed` job — with the base branch's
+  code judging the PR's tree (Rule 2), and review and L2 runs attested by check runs, never by files
+  committed into the tree. SessionStart puts
   the schedule in front of the session. The audit the day after this rule landed found the program above existed
   and **nothing invoked it**: no settings file in this repo, no git hooks, every `--open` in prose.
   A rule made executable and left for the reader to remember to run is the same defect one layer

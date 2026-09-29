@@ -52,3 +52,25 @@ node bin/create-cmp.mjs --name "Demo App" --package com.example.demo \
 - Keep PRs focused; describe what you changed and paste build/test evidence.
 - By contributing you agree your work is licensed under the project's [MIT License](./LICENSE).
 - Be excellent to each other — see the [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+## What `main` requires — prepared, not applied
+
+Two CI checks are meant to gate every merge to `main`: `tests` (one context over the Node 20/22/24
+matrix of `engine unit tests`) and `proof owed` (`node scripts/proof-plan.mjs --ci`, run from the base
+branch's code: what the PR's diff owes, and whether a `review` / `L2 run` check run attests it). Today
+the ruleset requires neither. The payload that would make it so is `qa/ruleset-create-cmp.json`;
+applying it is a repository-settings act for the maintainer, not something a PR does:
+
+```bash
+gh api repos/kvdm-co-pilot/create-cmp/rulesets            # read first: require-pr-main was id 18921080 on 2026-09-29
+gh api -X PUT repos/kvdm-co-pilot/create-cmp/rulesets/18921080 --input qa/ruleset-create-cmp.json
+```
+
+What changes: the ruleset gains `required_status_checks` (`tests`, `proof owed`, strict — the branch
+must be up to date with `main`), and its one bypass actor today — `RepositoryRole` 5 (admin),
+`bypass_mode: always` — is removed, so an admin push meets the same checks. The pull-request rule
+(zero approvals, three merge methods) is carried over unchanged, because a PUT replaces the rule list
+whole. `guard-main-force-delete` (id 18921079) is untouched. UNVERIFIED: the payload's shape has not
+been sent to the API; read the PUT's response, then `gh api …/rulesets/18921080`, before trusting it.
+Apply it only after `proof owed` has run green on a recorded PR (GATE-RULES Rule 1) and something
+posts the `review` and `L2 run` check runs: until then a PR that owes one reads MISSING and cannot merge.

@@ -31,6 +31,8 @@
 //                                                   the current rule (a stamp of its commit, no L2 run)
 //   node scripts/proof-plan.mjs --close             refuse if anything is still owed
 //   node scripts/proof-plan.mjs --pre-push          git's pre-push hook: refuse a push onto main while owed
+//   node scripts/proof-plan.mjs --ci --base <ref> [--tree <path>] [--sha <sha>] [--repo <o/r>] [--strict]
+//                                                   CI: what the diff base...HEAD owes, attested by check runs
 //   node scripts/proof-plan.mjs --history [--json]  what settled slices cost, from the kept records
 //
 // NOTHING IS DELETED WITHOUT BEING KEPT. A settled plan, every review record and
@@ -338,14 +340,14 @@ function changedPaths(since = null, { root = REPO_ROOT } = {}) {
  * every path keeps obliging, which is the direction this may be wrong in.
  *
  * @param {string[]|null} paths changed relpaths
- * @param {{root?: string}} [opts]
+ * @param {{root?: string, base?: string}} [opts] `base` is the ref the merge-base is taken with — origin/main unless `--ci` names another
  * @returns {string[]}
  */
-function versionOnlyPaths(paths, { root = REPO_ROOT } = {}) {
+function versionOnlyPaths(paths, { root = REPO_ROOT, base: against = "origin/main" } = {}) {
   if (!Array.isArray(paths)) return [];
   const candidates = paths.filter(holdsVersionLines);
   if (!candidates.length) return [];
-  const base = sh("git", ["merge-base", "HEAD", "origin/main"], root);
+  const base = sh("git", ["merge-base", "HEAD", against], root);
   if (base.status !== 0) return [];
   const at = base.stdout.trim();
   const out = [];
@@ -436,33 +438,7 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
     // meets an undefined tier on trunk — the one place a release proof runs.
     return { state: "none", trunk: true, ...base, need: none, review: { state: "none", trunk: true, need: none }, firebase: { state: "none", trunk: true, need: none } };
   }
-  // `deviceTierNeed`, not `deriveTierNeed` over the list directly: markdown
-  // under `template/` ships into the stamped app, so it is asked about and the
-  // digest judges it (KD-207, scripts/observed-tree.mjs DEVICE_TIER_SHIPPED).
-  const need = deviceTierNeed(paths, { tierName: "the L2 run" });
-  // A review is owed on a broader set than a device run: `scripts/` and `test/`
-  // cannot reach a phone and are declared irrelevant to the device tier, but a
-  // rewritten gate or a test that quietly stops refusing something is exactly
-  // what wants a second reader (see REVIEW_TIER_IRRELEVANT for the whole
-  // reasoning). Derived by the same fail-open function, so an unclassified path
-  // costs a read of the diff rather than an unreviewed change.
-  //
-  // A path whose change is only a release number obliges no review (D-3): the
-  // review hash holds those lines, so it could never reopen one either.
-  // `opts.versionOnly` is handed in by a reader that has already asked;
-  // otherwise it is asked of git here, for the version files alone.
-  const bumped = new Set(opts.versionOnly ?? versionOnlyPaths(paths));
-  const reviewPaths = Array.isArray(paths) ? paths.filter((p) => !bumped.has(p)) : paths;
-  // Every path a bump: nothing is left to ask about, and an empty list would read
-  // to `deriveTierNeed` as "no change to reason about" — which owes.
-  const reviewNeed = Array.isArray(paths) && paths.length > 0 && reviewPaths.length === 0
-    ? { required: false, reason: `every changed path changed only a release number, which the review hash holds (scripts/observed-tree.mjs reviewBytes): ${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ", …" : ""}`, obliging: [] }
-    : deriveTierNeed(reviewPaths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
-
-  // The Firebase L2 run is owed on exactly the paths the L2 run is — the same
-  // function over the same list; only the sentence names the other run. What
-  // tells the two apart is the DIGEST each is keyed on, not the paths.
-  const firebaseNeed = deviceTierNeed(paths, { tierName: "the Firebase L2 run" });
+  const { device: need, review: reviewNeed, firebase: firebaseNeed } = tierNeeds(paths, { versionOnly: opts.versionOnly });
 
   // ONE STAMP FOR BOTH L2 TIERS. `stampedApps` stamps the scratch app once,
   // hashes it, runs `add firebase --no-verify` on the same directory under the
@@ -493,6 +469,174 @@ export function obligation(plan = read(), paths = changedPaths(), branch = curre
   });
   const rev = tierState(reviewNeed.required, plan, plan?.reviewDischarged, () => ({ hash: reviewTreeHash(REPO_ROOT) }));
   return { ...dev, need, ...base, review: { ...rev, need: reviewNeed }, firebase: { ...fb, need: firebaseNeed } };
+}
+
+/**
+ * WHICH at-close tiers a list of changed paths owes — the `required` half of
+ * `obligation()`, with no plan, no record and no stamp. It is its own function
+ * so `--ci` asks exactly the question the hook asks, by the same code, and a
+ * second spelling of the derivation never exists to drift (FIX-PLAN slice 7).
+ *
+ * @param {string[]|null} paths changed relpaths; null = git could not answer, which owes
+ * @param {{versionOnly?: string[], root?: string, base?: string}} [opts] `versionOnly` when the caller already asked git
+ */
+export function tierNeeds(paths, { versionOnly, root = REPO_ROOT, base = "origin/main" } = {}) {
+  // `deviceTierNeed`, not `deriveTierNeed` over the list directly: markdown
+  // under `template/` ships into the stamped app, so it is asked about and the
+  // digest judges it (KD-207, scripts/observed-tree.mjs DEVICE_TIER_SHIPPED).
+  const need = deviceTierNeed(paths, { tierName: "the L2 run" });
+  // A review is owed on a broader set than a device run: `scripts/` and `test/`
+  // cannot reach a phone and are declared irrelevant to the device tier, but a
+  // rewritten gate or a test that quietly stops refusing something is exactly
+  // what wants a second reader (see REVIEW_TIER_IRRELEVANT for the whole
+  // reasoning). Derived by the same fail-open function, so an unclassified path
+  // costs a read of the diff rather than an unreviewed change.
+  //
+  // A path whose change is only a release number obliges no review (D-3): the
+  // review hash holds those lines, so it could never reopen one either.
+  // `versionOnly` is handed in by a reader that has already asked;
+  // otherwise it is asked of git here, for the version files alone.
+  const bumped = new Set(versionOnly ?? versionOnlyPaths(paths, { root, base }));
+  const reviewPaths = Array.isArray(paths) ? paths.filter((p) => !bumped.has(p)) : paths;
+  // Every path a bump: nothing is left to ask about, and an empty list would read
+  // to `deriveTierNeed` as "no change to reason about" — which owes.
+  const reviewNeed = Array.isArray(paths) && paths.length > 0 && reviewPaths.length === 0
+    ? { required: false, reason: `every changed path changed only a release number, which the review hash holds (scripts/observed-tree.mjs reviewBytes): ${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ", …" : ""}`, obliging: [] }
+    : deriveTierNeed(reviewPaths, { irrelevantRoots: REVIEW_TIER_IRRELEVANT, tierName: "a review" });
+
+  // The Firebase L2 run is owed on exactly the paths the L2 run is — the same
+  // function over the same list; only the sentence names the other run. What
+  // tells the two apart is the DIGEST each is keyed on, not the paths.
+  const firebaseNeed = deviceTierNeed(paths, { tierName: "the Firebase L2 run" });
+  return { device: need, review: reviewNeed, firebase: firebaseNeed };
+}
+
+/**
+ * THE SAME QUESTION, ASKED WHERE THE SESSION CANNOT REACH (FIX-PLAN slice 7,
+ * B-4). The PreToolUse hook and `.githooks/pre-push` both run on the machine
+ * the agent runs on; a `git push` from anywhere else, the web UI or a hard kill
+ * of the hook walks past them. `--ci` asks the pull request's diff what it owes
+ * and says, tier by tier, whether anything outside this tree attests it.
+ *
+ * WHAT CI CAN SEE, AND WHAT IT CANNOT. Records live in `qa-artifacts/`, which
+ * is gitignored, and they must NOT be committed: hashed into the tree a record
+ * invalidates itself the moment it lands; excluded from the hash it is an
+ * agent-writable path owing no review, the forgeable record again
+ * (scripts/observed-tree.mjs, after the review-roots comment). So:
+ *   - suite and frameworkCheck are RE-RUN by CI itself (`npm test` in the
+ *     `tests` job; framework-check runs inside it) — reported, never re-judged;
+ *   - review and the L2 runs are asserted by a CHECK RUN on the head commit,
+ *     posted by whoever did the work: named by CI_CHECK_RUNS, successful to count.
+ *     No GH_TOKEN, or an API that did not answer, is UNKNOWN — not MISSING.
+ *
+ * WHOSE CODE JUDGES (GATE-RULES Rule 2). `tree` is the checkout being judged;
+ * the code judging it is wherever this file sits. The workflow runs the BASE
+ * branch's copy against the PR's tree, so a PR that rewrites this function is
+ * judged by the version it is trying to replace.
+ *
+ * Exit: 0 nothing owed is unattested; 1 an owed tier's check run is MISSING, or
+ * UNKNOWN under `strict`; 2 git could not say what the diff is.
+ *
+ * @param {{root?: string, base?: string, sha?: string|null, repo?: string|null, strict?: boolean, checkRuns?: Array<{name: string, status: string, conclusion: string|null}>|null|undefined, env?: object}} [opts]
+ *   `checkRuns` injected by a test; undefined → asked of `gh api` when GH_TOKEN is set; null → not asked (UNKNOWN)
+ * @returns {{exit: 0|1|2, lines: string[], tiers: Array<{tier: string, owed: boolean, state: string}>}}
+ */
+export function ciPlan({ root = REPO_ROOT, base = "origin/main", sha = null, repo = null, strict = false, checkRuns = undefined, env = process.env } = {}) {
+  const lines = [];
+  const judge = sh("git", ["rev-parse", "--short", "HEAD"], REPO_ROOT);
+  const judgedBy = `${judge.status === 0 ? judge.stdout.trim() : "unknown"} (${REPO_ROOT})`;
+  const mb = sh("git", ["merge-base", "HEAD", base], root);
+  if (mb.status !== 0) {
+    lines.push(`proof owed — could not answer: no merge-base between HEAD and ${base} in ${root} (${(mb.stderr || "").trim() || "git failed"}). Fetch the base with full history (fetch-depth: 0).`);
+    return { exit: 2, lines, tiers: [] };
+  }
+  const at = mb.stdout.trim();
+  const paths = changedPaths(at, { root });
+  if (paths === null) {
+    lines.push(`proof owed — could not answer: git could not list ${at.slice(0, 7)}..HEAD in ${root}`);
+    return { exit: 2, lines, tiers: [] };
+  }
+  const head = sha ?? (sh("git", ["rev-parse", "HEAD"], root).stdout || "").trim();
+  lines.push(`proof owed — what this diff owes (GATE-RULES Rule 4), judged by the code at ${judgedBy}`);
+  lines.push(`  tree ${root}  base ${base} (merge-base ${at.slice(0, 7)})  head ${head.slice(0, 7) || "unknown"}  ${paths.length} changed path(s)`);
+
+  const needs = paths.length === 0
+    ? Object.fromEntries(["device", "review", "firebase"].map((k) => [k, { required: false, reason: "nothing changed since the merge-base", obliging: [] }]))
+    : tierNeeds(paths, { root, base: at });
+
+  // Asked once, and only when some tier needs it.
+  let runs = checkRuns;
+  let why = null;
+  const owedExternal = Object.keys(CI_CHECK_RUNS).some((k) => needs[k].required);
+  if (owedExternal && runs === undefined) {
+    const r = lookupCheckRuns({ repo: repo ?? env.GITHUB_REPOSITORY ?? null, sha: head, env });
+    runs = r.runs;
+    why = r.why;
+  }
+  if (runs === null && !why) why = "no check runs were read";
+
+  const tiers = [];
+  const row = (label, text) => lines.push(`  ${label.padEnd(16)} ${text}`);
+  row("suite", "re-run by CI — the `tests` job (npm test); not re-judged here");
+  row("frameworkCheck", "re-run by CI — inside npm test (test/framework-check.test.mjs); not re-judged here");
+  for (const [tier, name] of Object.entries(CI_CHECK_RUNS)) {
+    const need = needs[tier];
+    if (!need.required) {
+      tiers.push({ tier, owed: false, state: "not-owed" });
+      row(name, `not owed — ${need.reason}`);
+      continue;
+    }
+    if (!Array.isArray(runs)) {
+      tiers.push({ tier, owed: true, state: "unknown" });
+      row(name, `OWED, UNKNOWN — ${why}; ${need.reason}`);
+      continue;
+    }
+    const mine = runs.filter((r) => r.name === name);
+    const ok = mine.find((r) => r.status === "completed" && r.conclusion === "success");
+    if (ok) {
+      tiers.push({ tier, owed: true, state: "present" });
+      row(name, `OWED, PRESENT — check run "${name}" succeeded on ${head.slice(0, 7)}`);
+    } else {
+      tiers.push({ tier, owed: true, state: "missing" });
+      const seen = mine.length ? `; seen: ${mine.map((r) => `${r.status}/${r.conclusion ?? "none"}`).join(", ")}` : "";
+      row(name, `OWED, MISSING — no successful check run "${name}" on ${head.slice(0, 7)}${seen}; ${need.reason}`);
+    }
+  }
+  const missing = tiers.filter((t) => t.state === "missing");
+  const unknown = tiers.filter((t) => t.state === "unknown");
+  const exit = missing.length || (strict && unknown.length) ? 1 : 0;
+  if (exit) lines.push(`\nproof owed: REFUSED — ${[...missing, ...(strict ? unknown : [])].map((t) => `${CI_CHECK_RUNS[t.tier]} (${t.state.toUpperCase()})`).join(", ")}`);
+  else if (unknown.length) lines.push(`\nproof owed: passing, not strict — ${unknown.map((t) => CI_CHECK_RUNS[t.tier]).join(", ")} UNKNOWN; --strict would refuse`);
+  else lines.push("\nproof owed: nothing owed is unattested");
+  return { exit, lines, tiers };
+}
+
+/** The check-run name that attests each externally-proven tier on a head commit. */
+export const CI_CHECK_RUNS = Object.freeze({ review: "review", device: "L2 run", firebase: "Firebase L2 run" });
+
+/**
+ * The check runs on one commit, read with `gh api` — or WHY they were not.
+ * Needs GH_TOKEN in `env`: without it the answer is "not asked", never a
+ * machine's own `gh auth` session, so the same command means the same thing in
+ * CI and on a laptop.
+ *
+ * @returns {{runs: Array<{name: string, status: string, conclusion: string|null}>|null, why: string|null}}
+ */
+export function lookupCheckRuns({ repo, sha, env = process.env }) {
+  if (!env.GH_TOKEN) return { runs: null, why: "GH_TOKEN is not set, so no check run was read" };
+  if (!repo || !sha) return { runs: null, why: `cannot name the commit to ask about (repo ${repo || "unknown"}, sha ${sha || "unknown"})` };
+  const r = spawnSync("gh", ["api", "--paginate", `repos/${repo}/commits/${sha}/check-runs?per_page=100`, "--jq", ".check_runs[] | {name, status, conclusion}"], {
+    encoding: "utf8",
+    env,
+    timeout: 60_000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  if (r.status !== 0) return { runs: null, why: `gh api did not answer (${(r.stderr || r.error?.message || "exit " + r.status).trim().split("\n")[0]})` };
+  try {
+    return { runs: r.stdout.split("\n").filter(Boolean).map((l) => JSON.parse(l)), why: null };
+  } catch (e) {
+    return { runs: null, why: `gh api answered unreadably (${e.message})` };
+  }
 }
 
 /**
@@ -1430,6 +1574,22 @@ export function reviewDischarge(record, now) {
 function main() {
   const argv = process.argv.slice(2);
   const flag = (n) => argv.indexOf(n);
+
+  if (flag("--ci") !== -1) {
+    // CI's question (ciPlan says what it can and cannot see). `--tree` is the
+    // checkout judged; this file's own location is the code judging it.
+    const opt = (n) => (flag(n) !== -1 && argv[flag(n) + 1] && !argv[flag(n) + 1].startsWith("--") ? argv[flag(n) + 1] : null);
+    const tree = opt("--tree");
+    const r = ciPlan({
+      root: tree ? path.resolve(tree) : REPO_ROOT,
+      base: opt("--base") ?? "origin/main",
+      sha: opt("--sha"),
+      repo: opt("--repo"),
+      strict: flag("--strict") !== -1,
+    });
+    process.stdout.write(`${r.lines.join("\n")}\n`);
+    process.exit(r.exit);
+  }
 
   if (flag("--pre-push") !== -1) {
     // Git's pre-push hook (.githooks/pre-push): stdin is one line per ref,
