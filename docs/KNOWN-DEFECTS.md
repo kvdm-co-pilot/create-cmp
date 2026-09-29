@@ -825,3 +825,18 @@ the answer to what argv cannot see.
 **Fires when:** an agent reaches `npm publish` through `npx` or `npm exec` with a value-taking option in
 front, on a tree that owes.
 *Logged 2026-09-29, round 2 of slice `harness/hooks-never-grant` (the last round; remaining findings land here).*
+
+### KD-277 — `--rekey` cannot reproduce the recorded rule-2 digest, so a digest-rule change forces the L2 run it was built to avoid
+
+`scripts/proof-plan.mjs` (`--rekey`), `scripts/stamped-output.mjs`
+
+Run on this slice: "re-stamping commit e8993d7 does NOT reproduce the recorded digest under rule 2 (9475c56, the
+record says c73493a) — the stamped app moved: 7 file(s) differ, first: .gradle/8.11.1/checksums/checksums.lock".
+A fresh stamp has no `.gradle/`; the recorded file list names one, so the run that recorded the digest walked a
+tree that had already been built, or the stamp directory was reused. Either way the rule-2 record binds build
+byproducts, a re-stamp can never match it, and the rekey path — "seconds, and no L2 run" — refuses on every
+record made this way. This slice ran the L2 run instead; the cost was ~22 minutes, not an adopter wrongly served.
+
+**Fires when:** the digest rule changes (as rule 3 did here) and a record exists whose file list includes build
+output; `--rekey` then refuses and the tier is owed a run instead of a re-derivation.
+*Logged 2026-09-29, at the close of slice `harness/hooks-never-grant` (after the last review round).*
