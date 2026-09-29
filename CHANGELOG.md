@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- A `claude plugin eval` suite in `evals/`: one natural-phrasing trigger case for each of the 11 plugin skills, and near-miss negatives for cmp-new, grill-me and cmp-doctor. Each case has a `tool_used` grader on the Skill tool and a `regex` result grader, runs 3 times, and is run locally at release (`evals/README.md`, npm-publish step 2). Results go to `evals/results/`, which is gitignored. `test/plugin-evals-are-well-formed.test.mjs` checks the shape.
+
 ## [0.28.6] - 2026-09-29
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the

@@ -101,6 +101,12 @@ not proceed to the version bump until the fleet check passes.
 slice (GATE-RULES Rule 4) — and **refuses `npm publish`** unless the record this run writes is
 PASS at L2 on this exact tree. Steps 1 and 2 are checked by the program; this text explains them.
 
+- **Plugin evals — a record, not a gate.** Run the suite as `evals/README.md` describes
+  (`claude plugin eval . --trust-plugin --no-publish --ablation none --model … --judge-model …
+  --max-cost-usd …`). Put the path of the run's `evals/results/<timestamp>/aggregate-result.json`
+  and its `aggregates.overallScore` in the release PR. A trigger case that goes red means a skill
+  description needs fixing before publish. Never drop the case to make the run pass.
+
 ### 3. Auth check
 
 ```bash
