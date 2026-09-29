@@ -79,23 +79,11 @@ const WRAPS = [
 const PREFIXES = [["bare", ""], ["behind an assignment", "CMP_AVD=Medium_Phone_API_35 "], ["behind a cd", "cd /tmp && "]];
 const SUFFIXES = [["no flags", ""], ["with the lane's flags", " --min-level L2"]];
 
-/**
- * THE SPELLINGS THIS GATE IS ALREADY KNOWN NOT TO SEE, pinned exactly.
- *
- * KD-190 logs two — a command substitution in the path, and a flag before the
- * operand — with reasons that do not reach this one: quoting the FILE NAME
- * itself (`node /t/scripts/"fleet-check.mjs"`) is a wholly literal path with no
- * substitution and no flag, and `FLEET_CHECK_WORD` misses it because every one
- * of its quoted alternatives has to end at a `/`. The shell runs the real file;
- * `classify()` returns null; the hook says nothing.
- *
- * Pinned as the exact set of REASONS rather than as a count. A new silent
- * spelling of any other shape lands in `silent` and fails; closing this one
- * empties the set and fails too, which is what tells whoever closes it to
- * delete this declaration instead of leaving it to rot.
- */
-const KNOWN_SILENT_REASON = "the file name itself quoted — a quoted span that does not end at a `/` (KD-190's class, a third spelling)";
-const knownSilent = (how) => how === "the FILE NAME double-quoted" || how === "the FILE NAME single-quoted";
+// No spelling is KNOWN to be silent any more. KD-190's third spelling — the
+// file name itself quoted (`node /t/scripts/"fleet-check.mjs"`) — was pinned
+// here as a declared exception until the argv reader in proof-gate.mjs (slice 5)
+// read it; the declaration was deleted with its fix, as it asked to be. A
+// silent spelling of ANY shape now fails below.
 
 /** The word /bin/sh hands node, or null when the shape does not parse as one clean word. */
 function shellWord(operand) {
@@ -107,7 +95,6 @@ function shellWord(operand) {
 
 test("every spelling the shell really runs is classified, and judged against the tree it runs from", () => {
   const silent = [];
-  const known = [];
   const wrong = [];
   let executed = 0;
   let resolved = 0;
@@ -131,8 +118,7 @@ test("every spelling the shell really runs is classified, and judged against the
           const command = `${pre}node ${operand}${suf}`;
           executed += 1;
           if (classify(command) !== "device") {
-            if (knownSilent(how)) known.push(KNOWN_SILENT_REASON);
-            else silent.push(`${how}, ${prefixed}, ${suffixed}\n    command: ${JSON.stringify(command)}\n    the shell runs: ${JSON.stringify(word)}`);
+            silent.push(`${how}, ${prefixed}, ${suffixed}\n    command: ${JSON.stringify(command)}\n    the shell runs: ${JSON.stringify(word)}`);
             continue;
           }
           const got = commandCwd("device", command, HERE);
@@ -152,12 +138,6 @@ test("every spelling the shell really runs is classified, and judged against the
       }
     }
   }
-
-  assert.deepEqual(
-    [...new Set(known)],
-    [KNOWN_SILENT_REASON],
-    "the known-silent set changed shape: it is declared as one reason and pinned so it can neither grow silently nor outlive its fix",
-  );
 
   assert.deepEqual(
     silent,
