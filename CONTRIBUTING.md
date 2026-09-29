@@ -73,4 +73,5 @@ must be up to date with `main`), and its one bypass actor today — `RepositoryR
 whole. `guard-main-force-delete` (id 18921079) is untouched. UNVERIFIED: the payload's shape has not
 been sent to the API; read the PUT's response, then `gh api …/rulesets/18921080`, before trusting it.
 Apply it only after `proof owed` has run green on a recorded PR (GATE-RULES Rule 1) and something
-posts the `review` and `L2 run` check runs: until then a PR that owes one reads MISSING and cannot merge.
+posts the `review` and `L2 run` check runs: until then a PR that owes one reads MISSING. The job only
+reports until its step passes `--strict`; requiring it refuses nothing before that flag is added.

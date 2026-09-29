@@ -534,8 +534,12 @@ export function tierNeeds(paths, { versionOnly, root = REPO_ROOT, base = "origin
  * branch's copy against the PR's tree, so a PR that rewrites this function is
  * judged by the version it is trying to replace.
  *
- * Exit: 0 nothing owed is unattested; 1 an owed tier's check run is MISSING, or
- * UNKNOWN under `strict`; 2 git could not say what the diff is.
+ * Exit: 0 unless `strict`; under `strict`, 1 when an owed tier's check run is
+ * MISSING or UNKNOWN; 2 git could not say what the diff is, strict or not.
+ * NOT STRICT IS REPORT-ONLY (GATE-RULES Rule 1: calibrate a gate before it
+ * refuses). Nothing posts the `review` / `L2 run` check runs yet, so MISSING is
+ * what every owing PR reads today — a refusal on it would be a gate that has
+ * only ever said no. The tier lines print either way; the job is the record.
  *
  * @param {{root?: string, base?: string, sha?: string|null, repo?: string|null, strict?: boolean, checkRuns?: Array<{name: string, status: string, conclusion: string|null}>|null|undefined, env?: object}} [opts]
  *   `checkRuns` injected by a test; undefined → asked of `gh api` when GH_TOKEN is set; null → not asked (UNKNOWN)
@@ -604,9 +608,11 @@ export function ciPlan({ root = REPO_ROOT, base = "origin/main", sha = null, rep
   }
   const missing = tiers.filter((t) => t.state === "missing");
   const unknown = tiers.filter((t) => t.state === "unknown");
-  const exit = missing.length || (strict && unknown.length) ? 1 : 0;
-  if (exit) lines.push(`\nproof owed: REFUSED — ${[...missing, ...(strict ? unknown : [])].map((t) => `${CI_CHECK_RUNS[t.tier]} (${t.state.toUpperCase()})`).join(", ")}`);
-  else if (unknown.length) lines.push(`\nproof owed: passing, not strict — ${unknown.map((t) => CI_CHECK_RUNS[t.tier]).join(", ")} UNKNOWN; --strict would refuse`);
+  const unattested = [...missing, ...unknown];
+  const exit = strict && unattested.length ? 1 : 0;
+  const named = unattested.map((t) => `${CI_CHECK_RUNS[t.tier]} (${t.state.toUpperCase()})`).join(", ");
+  if (exit) lines.push(`\nproof owed: REFUSED — ${named}`);
+  else if (unattested.length) lines.push(`\nproof owed: reporting, not strict — ${named}; --strict would refuse`);
   else lines.push("\nproof owed: nothing owed is unattested");
   return { exit, lines, tiers };
 }

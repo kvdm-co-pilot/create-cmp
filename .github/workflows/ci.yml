@@ -247,10 +247,11 @@ jobs:
   # refusal belongs before it, which is what the ruleset's required check is for.
   #
   # NOT --strict YET (Rule 1: calibrate a gate on a recorded run before wiring it).
-  # UNKNOWN (the API did not answer) passes with the tier lines printed; MISSING
-  # still fails. Nothing posts `review` / `L2 run` check runs yet, so a PR that
-  # owes one reads MISSING here until that poster exists — which is the record
-  # this job is gathering before the ruleset names it.
+  # Without --strict the job REPORTS and exits 0: MISSING and UNKNOWN (the API
+  # did not answer) both print their tier lines and refuse nothing. Nothing posts
+  # `review` / `L2 run` check runs yet, so a PR that owes one reads MISSING here
+  # until that poster exists — the record this job is gathering before --strict
+  # and the ruleset make it refuse.
   proof-owed:
     name: proof owed
     if: github.event_name == 'pull_request'
