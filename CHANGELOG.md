@@ -6,11 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.28.7] - 2026-09-30
+## [0.28.8] - 2026-09-30
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the
 CI-attested receipt reader, and `@create-cmp/inspector` 0.9.3 carries the server instructions that
-now reach the agent, in a rebuilt bundle. 0.28.5 and 0.28.6 were set mid-batch and never published; the number moved on with the bytes. Nothing is published.
+now reach the agent, in a rebuilt bundle. 0.28.5, 0.28.6 and 0.28.7 were set mid-batch and never published; the number moved on with the bytes. Nothing is published.
 
 ### Added
 
