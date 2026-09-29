@@ -66,8 +66,10 @@ agents degrade to screenshots and raw adb without anyone noticing (this happened
 entire production build). These four checks are yours to run directly — the engine cannot see
 your session. Report each as GREEN/FAIL with the next command.
 
-1. **Tools resolvable in THIS session** — ToolSearch for "cmp-inspector". Any
-   `mcp__cmp-inspector__*` match = GREEN. FAIL means the server is not attached to this
+1. **Tools resolvable in THIS session** — ToolSearch for "cmp-inspector". Any tool whose
+   name contains `cmp-inspector` = GREEN, whatever its prefix: a plugin install names them
+   `mcp__plugin_create-cmp_cmp-inspector__*`, a project-scope `.mcp.json` names them
+   `mcp__cmp-inspector__*`. Never FAIL on the prefix alone. FAIL means the server is not attached to this
    session: continue with checks 2–4 to say WHY. MCP servers attach at session START — if
    the plugin was enabled (or fixed) after this session began, **no in-session retry will
    ever surface the tools; the next command is: restart the session.**
