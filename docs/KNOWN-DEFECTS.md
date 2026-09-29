@@ -120,6 +120,10 @@ you the same list without opening anything.
 | **KD-265** | nothing now refuses a stamp + `add firebase` that outgrows the hook's `STAMP_CAP_MS` (3000 ms): the one measured assertion (`ms < STAMP_CAP_MS` in `two-stamps-of-one-tree-are-not-the-same-app`) became `ms < CEILING_MS` (60 s) with the suite's own cap, and `ANSWER_RESERVE_MS`'s "0.25–0.34s measured" is now prose no test holds | cannot fire today (279 ms measured on this tree, 2026-09-26) and fails safe when it does: the Firebase half reads unanswerable and the tier OWED, naming the cap, never DISCHARGED. Whether a wall-clock guard belongs in a suite that runs under `prepublishOnly` load is Karel's call |
 | **KD-268** | the demo's plant test stamps from its own config, not the demo's `--no-ios --yes` | not today — the injectors plant on the demo's own stamp |
 | **KD-269** | injector #4 adds its import only when the file starts with `package` | every template screen does |
+| **KD-279** | the Firebase consent hook is silent on `yarn firebase …`, `pnpm firebase …`, `eval '…'`, `bun x firebase-tools …`, `pnpm --filter <v> exec firebase …`, `node node_modules/.bin/firebase …`, `doas`/`watch` — each runs a listed mutation | a consent check that fails open by its own header; the spellings an agent types first (`firebase`, `npx firebase-tools`, `npm exec`, `sh -c`) all ask; a KMP app rarely carries firebase-tools as a package dependency |
+| **KD-280** | `qa/hooks/firebase-consent.mjs` runs `main()` on import — anything that imports it for `decide`/`mutationsIn` blocks on stdin, then exits the process | nothing imports it today (the test spawns it); brief-check carries the entry-module guard this file lacks |
+| **KD-281** | the classifier note costs ~600 ms on every git/gh/npm/pnpm/yarn/npx call (measured 596–605 ms vs 44 ms for `ls`, 2026-09-30) and repeats the same line on each | steering only, inside the 10 s hook budget; the cost is latency per call, not a wrong answer |
+| **KD-282** | the harden/upgrade JSON merge identifies a hook by matcher + command, so an app's own field on a lane hook (a raised `timeout`) is dropped silently when the engine re-spells that hook's command | cannot fire until the engine re-spells a hook an app customised; the result keeps the engine's hook, never loses one |
 
 ---
 
@@ -852,3 +856,40 @@ wrongly served — the skill's pointer says where consent lives and the CLI stil
 
 **Fires when:** an adopter with a pre-0.28 Firebase app upgrades the harness and expects the consent hook.
 *Logged 2026-09-30, at the close of slice `harness/hooks-never-grant` batch 2 (found by the harden fix, not fixed).*
+
+### KD-279 — the Firebase consent hook misses launchers that run their operand
+
+`overlays/firebase/files/qa/hooks/firebase-consent.mjs` (`WRAPPERS`, `firebaseCall`, `LAUNCHER_VALUE_FLAGS`)
+
+Measured 2026-09-30 by calling `mutationsIn` on each spelling: `yarn firebase apps:create`, `pnpm firebase apps:create`,
+`eval 'firebase projects:create p'`, `bun x firebase-tools apps:create`, `pnpm --filter app exec firebase apps:create`
+(`--filter`'s value read as the subcommand), `node node_modules/.bin/firebase apps:create`, `doas firebase …` and
+`watch firebase …` are silent. A heredoc body (`cat <<EOF\nfirebase apps:create\nEOF`) asks, which is the safe
+direction. `firebase deploy` and `emulators:*` stay silent, as D6 asks. Placed on row 2: the hook states it fails open
+and reads top-level words, and every spelling its header names asks. The class is "a launcher that runs its operand",
+and the repair is the table, not another instance. *Logged 2026-09-30, batch 2 review round 1.*
+
+### KD-280 — the consent hook runs on import
+
+`overlays/firebase/files/qa/hooks/firebase-consent.mjs` (last lines)
+
+`main()` is called unconditionally, so `import { decide } from ".../firebase-consent.mjs"` reads stdin to its end and
+then `process.exit(0)`s the importer. `scripts/hooks/brief-check.mjs` guards the same shape with an entry-module
+check. Nothing imports it today. *Logged 2026-09-30, batch 2 review round 1.*
+
+### KD-281 — the classifier note is paid on every git/gh/npm call
+
+`scripts/hooks/proof-gate.mjs` (`steers`, PostToolUse branch)
+
+`plan.obligation()` runs after every steered command, including `git status`: 596–605 ms measured on this tree against
+44 ms for an unsteered `ls`, and the identical note is emitted on each call. Slice 17 asked for steering "when a tier is
+owed"; nothing wrong is said, it is said often and slowly. *Logged 2026-09-30, batch 2 review round 1.*
+
+### KD-282 — a JSON-merged hook loses the app's own fields when the engine re-spells it
+
+`src/lib/harness-upgrade.mjs` (`mergeHookGroups`)
+
+A hook's identity is `[matcher, command.trim()]`. When the engine changes a lane hook's command (a re-anchoring) and
+the app had raised that hook's `timeout`, the app's entry matches base and is dropped as "removed", and the engine's new
+spelling lands with the engine's timeout. No hook is lost and no deny is dropped. *Logged 2026-09-30, batch 2 review
+round 1.*
