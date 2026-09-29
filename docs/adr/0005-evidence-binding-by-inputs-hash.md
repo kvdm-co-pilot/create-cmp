@@ -49,6 +49,13 @@ tree for the receipt-matches-HEAD gate.
 - **Tamper-evident.** Editing the receipt's verdict without re-running, or committing a receipt
   from an earlier tree, changes neither the recorded `inputs.hash` nor the code — recompute
   mismatches and CI fails. You cannot hand-forge a green receipt.
+  - *Correction, 2026-09-29 (KD-271).* The last two sentences over-claim. A receipt committed from
+    an earlier tree is refused — that is **stale-evident**, and it holds for every reader. A verdict
+    edited in place is not: `qa/evidence` is outside the hashed surface, so the recorded hash and the
+    code both still match and the recompute passes. Nothing signs the receipt. A forgery is caught
+    only where the lane is re-run — CI re-runs the L1 rungs, and once CI attests that run the
+    attestation is checkable; an L2 rung is self-attested by the machine that ran it. The binding
+    decided above stands; only this consequence is narrowed.
 - **Cheap enough to run on every stop.** The predicate is file hashing only; the Stop hook nags
   exactly when the verified surface changed without a fresh PASS receipt, and stays silent for
   conversational turns and doc-only edits.

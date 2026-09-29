@@ -758,3 +758,21 @@ missed defect — and the slice that met it renamed its paths space-free instead
 
 **Fires when:** a tracked path with whitespace is added or edited and `proof-plan` runs before it is committed.
 *Logged 2026-09-27, slice `docs/anthropic-agentic-engineering-base` (doc-only, no review round).*
+
+### KD-271 — a hand-edited receipt passes every reader: `qa/evidence` is outside the inputs hash and nothing signs it
+
+`packages/receipts/src/inputs-hash.mjs` (the surface excludes `qa/evidence`) · `packages/receipts/src/receipt-validate.mjs` (`evaluateReceipt`) · `packages/harness/src/receipt-check.mjs` · `template/.github/workflows/verify.yml` (Receipt attests HEAD)
+
+The inputs hash binds a receipt to the tree it verified, so a receipt from an earlier tree is refused
+everywhere. It does not bind the receipt to the run that wrote it: `qa/evidence` is outside the hashed
+surface and nothing signs the file. A FAIL receipt whose `verdict` and failing rows are flipped to PASS,
+with plausible durations, passes `evaluateReceipt`, `checkDoneEvidence`, `checkExecutionPlausibility`
+and the Stop hook alike. CI's lane re-run catches a forged L1 result; nothing catches a forged L2 rung,
+which is self-attested by the machine that ran it. Four documents said a receipt could not be
+hand-forged; they now say what binds — stale-evident everywhere, forge-evident only where re-run — and
+ADR-0005 carries a dated correction. The planned close is a CI attestation of the lane run that any
+reader can check.
+
+**Fires when:** anyone edits `qa/evidence/latest.json` by hand and commits it — an agent claiming done
+included — and no CI re-run stands between that commit and a merge.
+*Logged 2026-09-29, slice `harness/hooks-never-grant`.*
