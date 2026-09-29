@@ -317,6 +317,36 @@ export const WATCHED = Object.freeze({
   publish: invocation("npm\\s+publish"),
 });
 
+/**
+ * WHAT EACH WATCHED ACT'S GATE COMPENSATES FOR, AND WHAT KEPT DEFECT TURNS IT
+ * RED (FIX-PLAN slice 18) — keyed exactly as WATCHED, and a sibling of it rather
+ * than fields on it, because WATCHED's values are the patterns `FIND` and
+ * `commandCwd` compile and read. `assumes` is one sentence: what the model cannot
+ * yet be trusted to do. `plant` is the repo-relative path of the kept plant that
+ * must turn this gate red, or null where none exists — a named gap. Listed by
+ * `node scripts/gate-assumptions.mjs`; test/gate-assumptions.test.mjs holds the
+ * keys to WATCHED's.
+ */
+export const WATCHED_GATES = Object.freeze({
+  device: {
+    assumes: "the model will buy the L2 run again over bytes already proven, or on a branch the merge will not keep, unless refused (the 2026-09-08 second run over the same stamped bytes).",
+    plant: "test/a-device-run-proves-a-tree-the-merge-will-not-keep.test.mjs",
+  },
+  merge: {
+    assumes: "the model will declare done and merge before the schedule is collected — an owed L2 run or review is forgotten at the close, where it is due.",
+    plant: "test/every-at-close-tier-holds-the-merge-in-the-same-states.test.mjs",
+  },
+  create: {
+    assumes: "the model will open a PR without knowing which at-close tiers the merge will refuse on, and finish the slice around the wrong finish line.",
+    // A reminder, never a refusal: there is no red for a plant to turn.
+    plant: null,
+  },
+  publish: {
+    assumes: "the model will publish from a tree that is not merged trunk, or without a passing L2 release proof of these bytes, reading the npm-publish skill's steps as advice.",
+    plant: "test/proof-gate-hook.test.mjs",
+  },
+});
+
 /** Each watched pattern, global and with match indices, so a match that is only a quoted MENTION can be stepped over and the program's own position read. */
 const FIND = Object.entries(WATCHED).map(([kind, re]) => [kind, new RegExp(re.source, "dg")]);
 

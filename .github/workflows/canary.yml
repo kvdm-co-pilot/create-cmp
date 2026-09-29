@@ -13,6 +13,12 @@ name: Canary
 #                      attempt assembleDebug. Failure is EXPECTED and never
 #                      reds the workflow (continue-on-error) — the outcome is
 #                      recorded in an artifact.
+#   4. ablate-gates  — dispatch-only, and only when the `model` input names a
+#                      model. Every gate states what the model cannot yet be
+#                      trusted to do (`node scripts/gate-assumptions.mjs`); on
+#                      a model release this re-runs the kept plants, and the
+#                      job summary is the record of which model they were
+#                      re-run for (FIX-PLAN slice 18). Never scheduled.
 #
 # Reporting choice (v1): artifacts + a single alarm issue. No `canary-results`
 # branch — pushing from CI needs write auth + history churn and adds a failure
@@ -23,6 +29,12 @@ on:
   schedule:
     - cron: "17 2 * * *" # nightly, off the :00 rush
   workflow_dispatch:
+    inputs:
+      model:
+        description: "Model just released (id or name) — set it to run ablate-gates; leave empty for the version canary only"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -163,3 +175,39 @@ jobs:
             canary-latest-probe.json
             ${{ runner.temp }}/latest-build.log
           if-no-files-found: ignore
+
+  ablate-gates:
+    name: ablate gates on a model release
+    if: github.event_name == 'workflow_dispatch' && inputs.model != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Every gate states what it assumes; every named plant is in the tree
+        run: node scripts/gate-assumptions.mjs --check
+      - name: Re-run the plants (framework-check runs them both ways)
+        run: node scripts/framework-check.mjs
+      - name: Record the ablation
+        if: always()
+        env:
+          MODEL: ${{ inputs.model }}
+          OUTCOME: ${{ job.status }}
+        run: |
+          {
+            echo "## Gates ablated on \`$MODEL\`"
+            echo
+            echo "- commit: \`$GITHUB_SHA\`"
+            echo "- outcome: **$OUTCOME** — a red run means a plant rotted or a gate's assumption no longer holds"
+            echo "- after a green run, record it locally: \`node scripts/gate-assumptions.mjs --record-ablated \"$MODEL\"\`"
+            echo
+            echo '```'
+            node scripts/gate-assumptions.mjs || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

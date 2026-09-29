@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- Every gate says what it compensates for. Each tier in `scripts/proof-plan.mjs` `TIERS` and each act
+  the proof gate watches (`WATCHED_GATES`, keyed as `WATCHED`) carries `assumes` — one sentence on what
+  the model cannot yet be trusted to do — and `plant`, the kept plant that must turn it red, or `null`
+  where none exists (suite, review, PR creation). `node scripts/gate-assumptions.mjs` lists them;
+  `--check` exits 1 when a gate states no assumption or names a plant that is not in the tree. The
+  Canary workflow gains a `model` dispatch input and an `ablate-gates` job, never scheduled, that runs
+  that check and `node scripts/framework-check.mjs` and writes the model into the job summary as the
+  ablation record; `--record-ablated <model>` keeps the last one locally (FIX-PLAN slice 18, D-4).
+
 - CI asks the proof gate's question too. `node scripts/proof-plan.mjs --ci --base <ref>` reports what a
   PR's diff owes, tier by tier: suite and framework-check are re-run by CI; review and the L2 runs count
   only as successful check runs named `review`, `L2 run` or `Firebase L2 run` on the head commit, read
