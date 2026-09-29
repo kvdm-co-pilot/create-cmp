@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- CI asks the proof gate's question too. `node scripts/proof-plan.mjs --ci --base <ref>` reports what a
+  PR's diff owes, tier by tier: suite and framework-check are re-run by CI; review and the L2 runs count
+  only as successful check runs named `review`, `L2 run` or `Firebase L2 run` on the head commit, read
+  with `gh api` when `GH_TOKEN` is set and UNKNOWN otherwise. A missing one exits 1; UNKNOWN exits 1
+  only under `--strict`. The new `proof owed` job runs the BASE branch's copy of the script against the
+  PR (`--tree`), not strict yet, and pull requests only. A fan-in job `tests` gives the Node matrix one
+  context a ruleset can require. `qa/ruleset-create-cmp.json` and CONTRIBUTING.md hold the prepared,
+  unapplied ruleset that would require both and drop the admin bypass (FIX-PLAN slice 7).
 - `scripts/hooks/fail-closed.sh` runs this repository's PreToolUse proof gate. A gate that crashes
   (`node` missing from PATH, a segfault) or outruns the launcher's 9 s deadline now refuses a
   command matching `gh|npm|npx|pnpm|bun|yarn|git push|fleet-check`, and stays silent for any other.
