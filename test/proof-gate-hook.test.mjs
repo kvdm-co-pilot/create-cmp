@@ -18,7 +18,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { classify, decide, releaseContext } from "../scripts/hooks/proof-gate.mjs";
+import { CLASSIFIER_CONTEXT_CAP, classifierNote, classify, decide, releaseContext, steers } from "../scripts/hooks/proof-gate.mjs";
 import { reviewTreeHash } from "../scripts/observed-tree.mjs";
 import { stampedApps, stampedOutput, STAMPED_OUTPUT_RULE } from "../scripts/stamped-output.mjs";
 import { TIERS, currentBranch, obligation, recordMeetsTier } from "../scripts/proof-plan.mjs";
@@ -392,7 +392,12 @@ test("protocol: PostToolUse after a merge closes the slice's plan, and is otherw
     assert.equal(merged.status, 0, merged.stderr);
     assert.equal(merged.stdout, "", "the close is silent — a merge is not the place for a lecture");
 
-    assert.equal(post("npm test").stdout, "", "an unmatched command closes nothing");
+    // `npm test` is no longer unmatched: it is one of the commands the classifier
+    // note follows (FIX-PLAN slice 17), so after the close it may carry a note —
+    // and only a note. That it closes nothing is the history assertion below.
+    const after = post("npm test").stdout;
+    if (after) assert.deepEqual(Object.keys(JSON.parse(after).hookSpecificOutput).sort(), ["classifierContext", "hookEventName"], after);
+    assert.equal(post("ls -la").stdout, "", "a command outside the steered set is silent");
     const kept = fs.existsSync(path.join(scratchHistory, "proof-plan-history.jsonl"))
       ? fs.readFileSync(path.join(scratchHistory, "proof-plan-history.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l))
       : [];
@@ -686,4 +691,85 @@ test("fail-closed: a gate that cannot answer refuses a command it gates, and nev
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE CLASSIFIER NOTE (FIX-PLAN slice 17, H7). After a git/gh/npm/pnpm/yarn/npx
+// command, a tree that owes a tier tells the auto-mode classifier so through
+// PostToolUse `classifierContext`. Steering, never a refusal.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("the classifier note follows the argv reader's programs, not a text match", () => {
+  for (const cmd of ["git status", "FOO=1 git push origin HEAD:main", "/usr/bin/git log", "gh pr view 1", "npm test", "pnpm i", "yarn build", "npx -y tsc", "ls && git diff", 'sh -c "gh pr merge 1"']) {
+    assert.equal(steers(cmd), true, JSON.stringify(cmd));
+  }
+  for (const cmd of ["ls -la", "echo git push origin HEAD:main", "cat 'gh pr merge 1'", `node ${FC}`, "gitk", ""]) {
+    assert.equal(steers(cmd), false, JSON.stringify(cmd));
+  }
+});
+
+test("the classifier note names every unsettled tier and the branch, and is null when nothing is owed", () => {
+  assert.equal(
+    classifierNote({ state: "owed", branch: "slice", review: { state: "reopened" }, firebase: { state: "discharged" } }),
+    "proof-plan: L2 run, review (reopened) OWED on slice; merging or pushing to main now is premature",
+  );
+  assert.equal(classifierNote({ state: "none", trunk: true, branch: "main", review: { state: "none" }, firebase: { state: "none" } }), null);
+  assert.equal(classifierNote({ state: "discharged", branch: "slice", review: { state: "discharged" }, firebase: { state: "none" } }), null);
+  assert.ok(classifierNote({ state: "owed", branch: "b".repeat(20000) }).length <= CLASSIFIER_CONTEXT_CAP);
+});
+
+/** A worktree of its own on a clean trunk: origin/main is HEAD, nothing changed — it owes nothing. */
+function trunkTree() {
+  const live = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "classifier-note-trunk-")));
+  const T = path.join(tmp, "tree");
+  const git = (args) => {
+    const r = spawnSync("git", args, { cwd: T, encoding: "utf8" });
+    assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+  };
+  fs.mkdirSync(path.join(T, "packages", "harness", "src", "lib"), { recursive: true });
+  fs.cpSync(path.join(live, "scripts"), path.join(T, "scripts"), { recursive: true });
+  fs.copyFileSync(path.join(live, "packages", "harness", "src", "lib", "affected-tests.mjs"), path.join(T, "packages", "harness", "src", "lib", "affected-tests.mjs"));
+  fs.mkdirSync(path.join(T, ".claude"), { recursive: true });
+  fs.copyFileSync(path.join(live, ".claude", "settings.json"), path.join(T, ".claude", "settings.json"));
+  fs.writeFileSync(path.join(T, ".gitignore"), ".claude/worktrees/\nqa-artifacts/\n");
+  git(["init", "-q", "-b", "main"]);
+  git(["add", "-A"]);
+  git(["-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "-c", "commit.gpgsign=false", "commit", "-qm", "base"]);
+  git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: T, PROOFLANE_HISTORY_DIR: path.join(tmp, "history"), PROOFLANE_SUITE_ROOT: path.join(tmp, "suite") };
+  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  return { T, env };
+}
+
+/** PostToolUse through the tree's own PostToolUse wiring, the hook loaded from the tree's own scripts/. */
+function postIn({ T, env }, command) {
+  const wiring = JSON.parse(fs.readFileSync(path.join(T, ".claude", "settings.json"), "utf8")).hooks.PostToolUse.flatMap((e) => e.hooks).find((h) => h.command.includes("scripts/hooks/proof-gate.mjs")).command;
+  const r = spawnSync("sh", ["-c", wiring], {
+    input: JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command }, tool_response: { stdout: "" }, cwd: T }),
+    cwd: T,
+    env,
+    encoding: "utf8",
+    timeout: 20000,
+  });
+  assert.equal(r.status, 0, `the hook failed on ${JSON.stringify(command)}: ${r.stderr}`);
+  return r.stdout ? JSON.parse(r.stdout).hookSpecificOutput : null;
+}
+
+test("PostToolUse on a tree that owes: a steered command carries a classifierContext naming the owed tier; an unmatched one carries nothing", { skip: process.platform === "win32" ? "POSIX shell" : false }, () => {
+  const tree = owingTree();
+  for (const command of ["git push origin HEAD:main", "git status"]) {
+    const out = postIn(tree, command);
+    assert.equal(out?.hookEventName, "PostToolUse", JSON.stringify(out));
+    assert.deepEqual(Object.keys(out).sort(), ["classifierContext", "hookEventName"], "a note, never a decision");
+    assert.match(out.classifierContext, /^proof-plan: .*L2 run.* OWED on slice; merging or pushing to main now is premature$/, out.classifierContext);
+  }
+  assert.equal(postIn(tree, "ls -la"), null, "an unmatched command carries nothing");
+  assert.equal(postIn(tree, "echo git push origin HEAD:main"), null, "a mention is not a command");
+});
+
+test("PostToolUse on a clean trunk: a steered command carries nothing — nothing is owed", { skip: process.platform === "win32" ? "POSIX shell" : false }, () => {
+  const tree = trunkTree();
+  assert.equal(postIn(tree, "git push origin HEAD:main"), null);
+  assert.equal(postIn(tree, "npm test"), null);
 });

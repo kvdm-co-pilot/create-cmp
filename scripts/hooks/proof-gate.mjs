@@ -35,7 +35,10 @@
 //     anything else     silent, and cheap: nothing is imported before a match, so an
 //                       ordinary Bash call pays node's startup and no more.
 //   PostToolUse (Bash)  after `gh pr merge`, the finished slice's plan is closed, so it is
-//                       never found lying around by the next one.
+//                       never found lying around by the next one. After any git, gh, npm,
+//                       pnpm, yarn or npx command on a tree that owes a tier, a one-line
+//                       `classifierContext` for the auto-mode classifier — steering, never
+//                       a refusal (FIX-PLAN slice 17).
 //
 // ONE EXCEPTION, and why it is not a hole: a device run on a clean TRUNK is allowed.
 // Trunk owes nothing per slice, so by the rule above the run would be refused as
@@ -1762,6 +1765,47 @@ export function judgedTree(kind, command, cwd, { budgetMs = TREE_PROBE_TOTAL_MS,
 /** The judged tree's OWN scheduler — its plan file, its change set, its branch rule, its trigger lists. A worktree answers for itself. */
 const planOf = (root) => (root === REPO_ROOT ? import("../proof-plan.mjs") : import(pathToFileURL(path.join(root, "scripts", "proof-plan.mjs")).href));
 
+/**
+ * THE CLASSIFIER NOTE (FIX-PLAN slice 17, H7): after a git, gh, npm, pnpm, yarn
+ * or npx command, a tree that owes a tier says so to the auto-mode classifier
+ * through PostToolUse `classifierContext` (Claude Code v2.1.236+), so a push or
+ * merge the classifier judges next is judged on the schedule, not on the agent's
+ * account of it. STEERING, NOT A GATE: the classifier misses 17% of overeager
+ * actions by Anthropic's own count, and the refusal stays the PreToolUse gate's.
+ *
+ * Which commands: the argv reader's own reading — each top-level simple
+ * command's program, past assignments and wrappers (`argvOf`) — plus whatever
+ * the patterns classify as a merge, PR or publish (a merge inside `sh -c`,
+ * which the argv reader does not open). No second text match.
+ */
+const STEERED = new Set(["git", "gh", "npm", "pnpm", "yarn", "npx"]);
+
+export function steers(command) {
+  const cmd = String(command ?? "");
+  const kind = classify(cmd);
+  if (kind && kind !== "device") return true;
+  return lex(cmd).commands.some((c) => STEERED.has(argvOf(c.words)?.prog));
+}
+
+/** Claude Code caps a hook's context string at 10,000 characters; the note is one line and never nears it. */
+export const CLASSIFIER_CONTEXT_CAP = 10000;
+
+/**
+ * The note, pure: `obligation()` in, one line or null out. A tier is named when
+ * it is neither `none` nor `discharged` — the rule `close()` settles a slice
+ * by — with its state beside it when that state is not plain OWED.
+ */
+export function classifierNote(o) {
+  const open = [
+    ["L2 run", o?.state],
+    ["review", o?.review?.state],
+    ["Firebase L2 run", o?.firebase?.state],
+  ].filter(([, state]) => state && state !== "none" && state !== "discharged");
+  if (!open.length) return null;
+  const tiers = open.map(([tier, state]) => (state === "owed" ? tier : `${tier} (${state})`)).join(", ");
+  return `proof-plan: ${tiers} OWED on ${o.branch || "a detached HEAD"}; merging or pushing to main now is premature`.slice(0, CLASSIFIER_CONTEXT_CAP);
+}
+
 const HONOURED = "Three forms are read: the cwd this hook was given, a literal `cd /absolute/path && …` in front of the command (a subdirectory is fine — it resolves to the worktree that holds it), and `node /absolute/path/scripts/fleet-check.mjs`. A path with a space in it is read when the WHOLE path is quoted — `cd \"/My Trees/slice\"`, `node '/My Trees/slice/scripts/fleet-check.mjs'` — because quotes delimit; escaping the space instead does not, and neither does quoting part of the path. Anything else is refused rather than guessed at (docs/GATE-RULES.md, Rule 4).";
 
 const cannotTell = (why) =>
@@ -2156,19 +2200,26 @@ async function main() {
   if (event === "PostToolUse") {
     if (input.tool_name !== "Bash") return;
     const command = String(input.tool_input?.command ?? "");
-    if (classify(command) !== "merge") return;
-    // Best effort and read-only in effect: close() removes the plan only when
-    // nothing is owed, which after a merge the gate allowed is always true. It
-    // closes the plan of the tree that was MERGED — closing the session's
-    // instead would delete a slice that is still open, which is the same
-    // mistaken reader as KD-79 doing damage rather than refusing.
+    const kind = classify(command);
+    if (kind !== "merge" && !steers(command)) return;
+    // ONE obligation read serves both halves. After a merge, close(): best
+    // effort and read-only in effect — it removes the plan only when nothing is
+    // owed, which after a merge the gate allowed is always true. It closes the
+    // plan of the tree that was MERGED — closing the session's instead would
+    // delete a slice that is still open, which is the same mistaken reader as
+    // KD-79 doing damage rather than refusing. Then the classifier note, for
+    // the same tree, from the same read.
     try {
-      const where = judgedTree("merge", command, input.cwd);
-      if (!where.root) return; // another repository's merge, or a tree that could not be named: close nothing
-      const { close } = await planOf(where.root);
-      close(undefined, { via: "merge" });
+      const where = judgedTree(kind, command, input.cwd);
+      if (!where.root) return; // another repository's tree, or one that could not be named: close nothing, say nothing
+      const plan = await planOf(where.root);
+      plan.setGitDeadline?.(declaredBudgetMs() - (Date.now() - STARTED_MS) - ANSWER_RESERVE_MS);
+      const o = plan.obligation();
+      if (kind === "merge") plan.close(o, { via: "merge" });
+      const note = classifierNote(o);
+      if (note) emit({ hookSpecificOutput: { hookEventName: "PostToolUse", classifierContext: note } });
     } catch {
-      /* a failed close leaves the plan, which the next session names as stale */
+      /* a failed close leaves the plan, which the next session names as stale; a failed read steers nothing */
     }
     return;
   }

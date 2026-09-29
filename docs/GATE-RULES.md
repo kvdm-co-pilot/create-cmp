@@ -415,7 +415,10 @@ the sentence the program prints. That line now reads `OWED — at slice close, N
   question as the hook — `proof-plan.mjs --ci`, in the `proof owed` job — with the base branch's
   code judging the PR's tree (Rule 2), and review and L2 runs attested by check runs, never by files
   committed into the tree. SessionStart puts
-  the schedule in front of the session. The audit the day after this rule landed found the program above existed
+  the schedule in front of the session. After a `git`, `gh`, `npm`, `pnpm`, `yarn` or `npx` call on a tree
+  that owes a tier, PostToolUse hands the auto-mode classifier a one-line `classifierContext` naming
+  the tier and the branch — steering, not a gate: Anthropic's own count has the classifier missing
+  17% of overeager actions, so the merge refusal above stays the enforcement. The audit the day after this rule landed found the program above existed
   and **nothing invoked it**: no settings file in this repo, no git hooks, every `--open` in prose.
   A rule made executable and left for the reader to remember to run is the same defect one layer
   up — while the template this repo stamps had carried the equivalent PreToolUse hooks for
