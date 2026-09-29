@@ -809,3 +809,19 @@ cover every file-editing tool, as the permissions docs say; inconsistent either 
 
 **Fires when:** a reader compares the two files, or the docs' claim about `Edit` rules turns out narrower than read.
 *Logged 2026-09-29, round 1 of slice `harness/hooks-never-grant`.*
+
+### KD-276 — the launcher readers (npx, npm exec) still skip options from a fixed list, and `npm exe` is not a prefix the gate knows
+
+`scripts/hooks/proof-gate.mjs` (`NPX_VALUE`, `actAt`)
+
+Round 2 made `npm`, `pnpm`, `yarn` and `gh` find their subcommand by name, so an option the gate never
+heard of cannot hide `publish`. The unwrapping of `npx … npm publish` and `npm exec -- npm publish` still
+walks a fixed list of npx options that take a value, so `npx --registry r npm publish` is not caught; and
+`npm exe` (a unique prefix of `exec`) is not recognised, so `npm exe -- npm publish` is not unwrapped. In
+`commandCwd`, an unlisted option's value after `publish` is read as a folder operand and the tree is marked
+unknown — the safe direction. Same class as KD-272: the effect-level gates (CI required checks, pre-push) are
+the answer to what argv cannot see.
+
+**Fires when:** an agent reaches `npm publish` through `npx` or `npm exec` with a value-taking option in
+front, on a tree that owes.
+*Logged 2026-09-29, round 2 of slice `harness/hooks-never-grant` (the last round; remaining findings land here).*
