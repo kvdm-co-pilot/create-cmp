@@ -840,3 +840,15 @@ record made this way. This slice ran the L2 run instead; the cost was ~22 minute
 **Fires when:** the digest rule changes (as rule 3 did here) and a record exists whose file list includes build
 output; `--rekey` then refuses and the tier is owed a run instead of a re-derivation.
 *Logged 2026-09-29, at the close of slice `harness/hooks-never-grant` (after the last review round).*
+
+### KD-278 — an app that got Firebase from a 0.27-or-earlier stamp never receives the consent hook
+
+`overlays/firebase/edits.json` (the `settings` merge), `src/lib/harness-upgrade.mjs` (`upgrade --harness`)
+
+Slice 16 ships `qa/hooks/firebase-consent.mjs` and its ask rule through `create-cmp add firebase`. An app that
+already carries Firebase from an older stamp is refused by `add firebase` (it is already added) and
+`upgrade --harness` does not add the hook, so those apps keep prose-only consent for cloud mutations. Nobody is
+wrongly served — the skill's pointer says where consent lives and the CLI still asks — but the gap is real.
+
+**Fires when:** an adopter with a pre-0.28 Firebase app upgrades the harness and expects the consent hook.
+*Logged 2026-09-30, at the close of slice `harness/hooks-never-grant` batch 2 (found by the harden fix, not fixed).*
