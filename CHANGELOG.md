@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/hooks/fail-closed.sh` runs this repository's PreToolUse proof gate. A gate that crashes
+  (`node` missing from PATH, a segfault) or outruns the launcher's 9 s deadline now refuses a
+  command matching `gh|npm|npx|pnpm|bun|yarn|git push|fleet-check`, and stays silent for any other.
+  A hard kill by Claude Code at the registered timeout is still fail-open.
+- `.githooks/pre-push` and `node scripts/proof-plan.mjs --pre-push` refuse a push onto `main`
+  while the checkout's slice still owes an at-close tier. Opt in with
+  `git config core.hooksPath .githooks`.
+
 ### Security
 
 - A hook never grants. The three PreToolUse reminders a stamped app carries answered
@@ -25,6 +35,15 @@ All notable changes to this project are documented here. The format is based on
 - An edit to a stamped app's `.claude/settings.json`, `CHANGELOG.md`, `CONTRIBUTING.md`,
   `docs/TESTING.md` or `docs/dev-client.md` no longer owes an L2 run: the L2 run never opens them, and
   stamped-digest rule 3 holds their content. A rule-2 record is re-derived by `proof-plan --rekey`.
+- The proof gate now reads the command that will run, not only its usual spelling. Fourteen
+  spellings used to get past it with no gate at all: `gh -R … pr merge`, `npm -w … publish`,
+  `/opt/homebrew/bin/gh`, a quoted or escaped `gh`, `stdbuf`/`noglob`, `npx -y npm publish`,
+  `npm exec -- npm publish`, `pnpm`/`bun publish`, `gh api …/pulls/N/merge`,
+  `git push origin HEAD:main`, and `node <flags> scripts/fleet-check.mjs`. Each is now judged as the
+  act it performs. A heredoc or quoted string that only names a gated command is no longer refused.
+- The proof gate's git calls draw on what is left of the hook's budget and set
+  `GIT_OPTIONAL_LOCKS=0`, so a slow git answers as "could not tell" (owed) instead of running out
+  the clock.
 
 ## [0.28.4] - 2026-09-27
 

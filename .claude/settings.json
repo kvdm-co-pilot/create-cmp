@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs\" \"gh|npm|npx|pnpm|bun|yarn|git push|fleet-check\"",
             "timeout": 10
           }
         ]
