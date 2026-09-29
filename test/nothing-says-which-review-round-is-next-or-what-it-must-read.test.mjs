@@ -261,12 +261,14 @@ test("THE DEFAULT FLOOR OF `changedPaths` IS WHERE IT ALWAYS WAS — the general
   // always run, executed here.
   const git = (...args) => execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8" });
   const base = git("merge-base", "HEAD", "origin/main").trim();
-  const expected = new Set(
-    git("diff", "--name-only", `${base}...HEAD`).split("\n").map((l) => l.trim()).filter(Boolean),
-  );
-  for (const l of git("status", "--porcelain").split("\n")) {
-    if (!l.trim()) continue;
-    for (const p of l.slice(3).trim().split(" -> ")) expected.add(p);
+  // NUL-separated on both sides (KD-270): the quoted porcelain spelling of a
+  // spaced path is not the path.
+  const expected = new Set(git("diff", "--name-only", "-z", `${base}...HEAD`).split("\0").filter(Boolean));
+  const fields = git("status", "--porcelain", "-z").split("\0");
+  for (let i = 0; i < fields.length; i++) {
+    if (fields[i].length < 4) continue;
+    expected.add(fields[i].slice(3));
+    if (/[RC]/.test(fields[i].slice(0, 2)) && fields[i + 1]) expected.add(fields[++i]);
   }
   assert.deepEqual([...changedPaths()].sort(), [...expected].sort(), "the no-argument call no longer reads the merge-base with origin/main union the working tree");
 

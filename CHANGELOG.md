@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format is based on
   Apps stamped before this keep the granting forms until their `.claude/settings.json` is edited;
   `doctor --fix` does not rewrite reminder text.
 
+### Fixed
+
+- `proof-plan` no longer owes a review for a release bump, and a bump after a discharged review no
+  longer reopens it; an uncommitted path with a space in its name is classified by its own name
+  (KD-270).
+
 ## [0.28.4] - 2026-09-27
 
 The notary and the refusal demo tell the truth. Ships with `prooflane-harness` 0.23.5 and

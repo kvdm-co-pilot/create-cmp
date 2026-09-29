@@ -221,12 +221,14 @@ export function filesFor(root, roots, { skip = () => false } = {}) {
  *
  * @param {string} root repo root
  * @param {string[]} roots relative directories or files whose content feeds the tier
- * @param {{skip?: (relPath: string) => boolean}} [opts] see filesFor
+ * @param {{skip?: (relPath: string) => boolean, normalise?: (relPath: string, buf: Buffer) => Buffer}} [opts]
+ *   `skip`: see filesFor; `normalise`: the bytes a file is hashed AS (default: its own)
  * @returns {string} hex digest
  */
 export function observedTreeHash(root, roots, opts) {
+  const normalise = opts?.normalise ?? ((_rel, buf) => buf);
   const rows = filesFor(root, roots, opts).map(
-    (relPath) => `${relPath}\n${createHash("sha256").update(fs.readFileSync(path.join(root, relPath))).digest("hex")}`,
+    (relPath) => `${relPath}\n${createHash("sha256").update(normalise(relPath, fs.readFileSync(path.join(root, relPath)))).digest("hex")}`,
   );
   return createHash("sha256").update(rows.join("\n")).digest("hex");
 }
@@ -342,6 +344,89 @@ export const REVIEW_TIER_TRIGGERS = Object.freeze([
  * Anything else in REVIEW_TIER_IRRELEVANT is simply not a root.
  */
 export const REVIEW_SKIP = (relPath) => relPath.endsWith(".md");
+
+/**
+ * A release number never wants a reader — and a bump never reopens a review.
+ *
+ * The stamped digest already holds the release numbers the stamp writes at a
+ * placeholder (scripts/stamped-output.mjs VERSION_NORMALISERS); this is the
+ * review tier's half of the same rule. A release bump (e8993d7: eight files,
+ * every changed line a `"version"`) asked a reader to check numbers
+ * `scripts/ground-truth.mjs` already checks by program, and a bump landed after
+ * a discharged review moved this hash and reopened it (D-3).
+ *
+ * WHOLE LINES ONLY, and only this repo's OWN numbers: a line that is nothing
+ * but `"version": "<string>"` (a trailing comma allowed) in
+ *  - any `package.json`, at the top level (two-space indent);
+ *  - `.claude-plugin/plugin.json`, at the top level;
+ *  - `.claude-plugin/marketplace.json`, every such line (the catalogue's and
+ *    each listed plugin's release number);
+ *  - any `package-lock.json`: the top-level line, and the line inside each
+ *    `packages` entry that is THIS repo's — the root (`""`) and a workspace
+ *    (any key not under `node_modules/`). A dependency's version is someone
+ *    else's code and still moves the hash.
+ * The line keeps its key, indent and comma, so a version ADDED or REMOVED is
+ * still a change; only the number is held. A file whose bytes are not UTF-8 is
+ * hashed raw. `versionOnly` below is the diff-side twin: it compares two
+ * versions of a file through this same function, so a change the hash cannot
+ * see is exactly a change that obliges nothing.
+ */
+const VERSION_LINE = /^(\s*"version"\s*:\s*")[^"\\]*(",?\s*)$/;
+const HELD_VERSION = "0.0.0-held-by-observed-tree";
+const TOP_LEVEL_VERSION = /^ {2}"version"/;
+
+/** Which version lines a file's number may be held on, or null when the file carries none this rule holds. */
+function versionLineRule(relPath) {
+  const base = relPath.split("/").pop();
+  if (base === "package-lock.json") return "lock";
+  if (base === "package.json" || relPath === ".claude-plugin/plugin.json") return "top";
+  if (relPath === ".claude-plugin/marketplace.json") return "every";
+  return null;
+}
+
+export function reviewBytes(relPath, buf) {
+  const rule = versionLineRule(relPath);
+  if (!rule) return buf;
+  const text = buf.toString("utf8");
+  if (!Buffer.from(text, "utf8").equals(buf)) return buf;
+  let section = null;
+  let entry = null;
+  const held = text.split("\n").map((line) => {
+    if (rule === "lock") {
+      const top = /^ {2}"([^"]*)"\s*:/.exec(line);
+      if (top) {
+        section = top[1];
+        entry = null;
+      }
+      const key = /^ {4}"([^"]*)"\s*:\s*\{\s*$/.exec(line);
+      if (key && section === "packages") entry = key[1];
+      const own = TOP_LEVEL_VERSION.test(line) || (/^ {6}"version"/.test(line) && entry !== null && !entry.startsWith("node_modules/"));
+      return own ? line.replace(VERSION_LINE, `$1${HELD_VERSION}$2`) : line;
+    }
+    if (rule === "top" && !TOP_LEVEL_VERSION.test(line)) return line;
+    return line.replace(VERSION_LINE, `$1${HELD_VERSION}$2`);
+  });
+  return Buffer.from(held.join("\n"), "utf8");
+}
+
+/** Whether `reviewBytes` holds any line of this path at all — the only files `versionOnly` can say yes for. */
+export const holdsVersionLines = (relPath) => versionLineRule(relPath) !== null;
+
+/** True when two versions of a file differ in nothing but the version lines `reviewBytes` holds. */
+export function versionOnly(relPath, before, after) {
+  return versionLineRule(relPath) !== null && reviewBytes(relPath, before).equals(reviewBytes(relPath, after));
+}
+
+/**
+ * THE review hash — one spelling, for every reader that records or compares
+ * it (proof-plan's obligation, `--record-review`, `--discharge-review`).
+ *
+ * @param {string} root repo root
+ * @returns {string} hex digest
+ */
+export function reviewTreeHash(root) {
+  return observedTreeHash(root, REVIEW_TIER_TRIGGERS, { skip: REVIEW_SKIP, normalise: reviewBytes });
+}
 
 // THE DEVICE HASH USED TO LIVE HERE, in three spellings that had to agree and
 // once did not: `fleet-check` recorded `observedTreeHash(root,
