@@ -3,7 +3,9 @@
 // loop into project skills. A rule loads only when the agent works with a file its
 // `paths:` globs match, so a glob that matches nothing in a stamped app is a section
 // that never fires. This stamps a real app and proves every glob of every shipped rule
-// matches at least one stamped file, and that minimal mode ships none of them.
+// matches at least one stamped file, that the stamped CLAUDE.md stays under the
+// 200-line budget the move was for (Anthropic memory guidance, doc-base note 04:151)
+// in both modes, and that minimal mode ships none of the moved files.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -57,7 +59,7 @@ function rulePaths(text) {
 test("every glob of every shipped rule matches a file in a stamped app", () => {
   const rulesDir = path.join(full, ".claude/rules");
   const rules = fs.readdirSync(rulesDir).filter((f) => f.endsWith(".md")).sort();
-  assert.deepEqual(rules, ["approvals.md", "comments.md"], "the rules D5 moved out of CLAUDE.md ship");
+  assert.deepEqual(rules, ["approvals.md", "comments.md", "lane.md"], "the rules moved out of CLAUDE.md ship");
   const stamped = listFiles(full).map((f) => path.relative(full, f).split(path.sep).join("/"));
   for (const rule of rules) {
     const globs = rulePaths(fs.readFileSync(path.join(rulesDir, rule), "utf8"));
@@ -70,7 +72,7 @@ test("every glob of every shipped rule matches a file in a stamped app", () => {
 
 test("CLAUDE.md names every moved rule and skill, and each exists in the stamp", () => {
   const claude = fs.readFileSync(path.join(full, "CLAUDE.md"), "utf8");
-  for (const rel of [".claude/rules/approvals.md", ".claude/rules/comments.md", ".claude/skills/walk/SKILL.md", ".claude/skills/ui-loop/SKILL.md"]) {
+  for (const rel of [".claude/rules/approvals.md", ".claude/rules/comments.md", ".claude/rules/lane.md", ".claude/skills/walk/SKILL.md", ".claude/skills/ui-loop/SKILL.md"]) {
     assert.ok(claude.includes(rel), `CLAUDE.md points at ${rel}`);
     assert.ok(fs.existsSync(path.join(full, rel)), `the stamp ships ${rel}`);
   }
@@ -82,4 +84,11 @@ test("minimal mode ships neither the rules nor the skills, and its CLAUDE.md nam
   }
   const claude = fs.readFileSync(path.join(minimal, "CLAUDE.md"), "utf8");
   assert.ok(!/\.claude\/(rules|skills)\//.test(claude), "minimal CLAUDE.md points at a file the stamp deletes");
+});
+
+test("the stamped CLAUDE.md is at most 200 lines, in full mode and in minimal mode", () => {
+  for (const [mode, dir] of [["full (all features)", full], ["minimal", minimal]]) {
+    const lines = fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8").replace(/\n$/, "").split("\n").length;
+    assert.ok(lines <= 200, `${mode} CLAUDE.md is ${lines} lines — over the 200-line budget; move on-demand content to .claude/rules or a skill`);
+  }
 });

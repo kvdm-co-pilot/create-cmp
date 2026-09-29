@@ -65,3 +65,5 @@ another entry (`"home@empty"`). Every common component also carries a story entr
 (`"component.<kebab-name>"` in `inspector/ComponentStories.kt`); when you add a component,
 add its story — the lane's `componentStories` step fails naming the missing id otherwise.
 Assert on `tree.json` structure; never read PNG bytes. Pixels are for humans.
+
+A human comment left from the preview console follows `.claude/rules/comments.md` — read it before acting on or resolving one.

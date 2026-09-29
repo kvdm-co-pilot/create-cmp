@@ -98,7 +98,7 @@ docs/                        architecture, testing, ADRs
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Workflow, definition of done, commit style |
 <!-- >>> cmp:feature harness -->
 | [`CLAUDE.md`](./CLAUDE.md) | The AI delivery contract |
-| [`.claude/rules/`](./.claude/rules/), [`.claude/skills/`](./.claude/skills/) | What the contract loads only when it applies: the approvals and comments rules (by the files they govern) and the walk, UI-loop and generator skills |
+| [`.claude/rules/`](./.claude/rules/), [`.claude/skills/`](./.claude/skills/) | What the contract loads only when it applies: the approvals, comments and lane rules (by the files they govern) and the walk, UI-loop and generator skills |
 <!-- <<< cmp:feature harness -->
 <!-- >>> cmp:feature !harness -->
 | [`CLAUDE.md`](./CLAUDE.md) | The AI working guide |
