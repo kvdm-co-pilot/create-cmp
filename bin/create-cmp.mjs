@@ -301,6 +301,8 @@ function printHelp() {
       `  (Firebase is not a stamp option: --firebase, --region, --auth and the service flags are\n` +
       `   refused here and name \`create-cmp add firebase\`; their --no- forms are accepted, and moot)\n\n` +
       `doctor flags:  --yes  --dry-run  --no-ios  --no-install  --target-dir <dir>  --fix\n` +
+      `  --adherence   the report card: hooks, pre-push, CI Verify, receipt, credential denies, release acts,\n` +
+      `                plugin bytes, cmp-inspector (with --fix: asks per user-scope entry; never shadows an allow)\n` +
       `upgrade flags: --target-dir <dir>  --set <id>  --dry-run  --yes  --verify\n` +
       `  --harness mode flags: --target-dir <dir>  --base-dir <extracted-template>  --dry-run  --yes\n` +
       `  (--harness dry-runs by default; conflicts never clobber — they land as *.cmp-new sidecars)\n` +

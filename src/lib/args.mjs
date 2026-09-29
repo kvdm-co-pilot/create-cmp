@@ -25,7 +25,7 @@ export const BOOLEAN_FLAGS = new Set([
   // was still true on this branch after KD-7 was "fixed", through this door only
   // — declaring a flag boolean protects the user's positional whether or not
   // anything reads the flag.
-  "yes", "y", "force", "fix", "harness",
+  "yes", "y", "force", "fix", "harness", "adherence",
   // every name `flagBool`/`flagBoolWithAlias` reads
   "minimal", "verify", "ios", "firebase", "firestore", "storage", "functions",
   "fcm", "room", "e2e", "appium", "inspector", "dev-client",
@@ -54,6 +54,8 @@ export const KNOWN_FLAGS = new Set([
   "name", "package", "bundle-id", "base-dir", "target-dir", "theme-prefix",
   "set", "specs", "receipt", "citation-roots", "region", "auth", "tabs",
   "minimal", "yes", "y", "force", "fix", "verify", "no-install",
+  // `doctor --adherence` — the report card (src/lib/adherence.mjs)
+  "adherence",
   // the app shape — a VALUE (`lean` or `full`), never a boolean: it names a set of
   // toggle defaults (src/commands/create.mjs, PRESETS), and `--minimal` is the harness mode
   "preset",
