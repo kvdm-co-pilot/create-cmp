@@ -2,7 +2,8 @@
 //
 // package.json says `engines: ">=20.19.0"` and the CI matrix tests 20, 22, 24. But
 // nothing checked that the code we ship actually RUNS on the floor — so
-// `import.meta.dirname` (Node 20.11+) reached scripts/check-plugin-sync.mjs
+// `import.meta.dirname` (Node 20.11+) reached scripts/check-plugin-sync.mjs (retired
+// in FIX-PLAN slice 13; plugin-refresh.mjs --check does its job)
 // while the floor was 18, which meant the plugin-drift detector was dead on
 // load for every Node 18 user, and its test file took the whole Node 18 lane red. That red sat on
 // main across two releases, read as background noise rather than as the
@@ -83,7 +84,9 @@ test("no shipped .mjs uses an API newer than the declared Node floor", () => {
 test("the scan actually reaches the files it claims to cover", () => {
   const files = shippedFiles();
   assert.ok(files.length > 100, `scan found only ${files.length} files — the walk is broken, not the code clean`);
-  assert.ok(files.includes("scripts/check-plugin-sync.mjs"), "the file that motivated this gate is not scanned");
+  // The file that motivated this gate (scripts/check-plugin-sync.mjs) was retired in FIX-PLAN slice 13;
+  // its successor, which carries the same job, must be scanned in its place.
+  assert.ok(files.includes("scripts/plugin-refresh.mjs"), "scripts/ is not scanned — the plugin-drift check lives there");
   assert.ok(files.some((f) => f.startsWith("src/")), "src/ not scanned");
   assert.ok(files.some((f) => f.startsWith("packages/")), "packages/ not scanned");
 });

@@ -35,6 +35,27 @@
 // in this repo has picked up the new one yet. It was misread twice as a marker
 // FILE (`[ -f ]` says a directory is absent), which produced two confident wrong
 // conclusions in one day. Hence a program.
+//
+// TWO FALSE GREENS THIS USED TO GIVE (FIX-PLAN slice 13, C-3, C-9):
+//
+//   - "current" was decided by version number and sha existence alone, so the
+//     documented update refusing an unchanged version left older bytes under the
+//     right number — and SessionStart said "current". Now `--check` and the
+//     SessionStart line read each scope's `installPath` and call it current ONLY
+//     when those bytes match the marketplace clone at HEAD, both directions.
+//   - the rebuild removed `cache/<version>/` even when running sessions held it,
+//     taking their `.in_use` leases with it — after which the lease table was
+//     empty and the closing line said every session had loaded the new bytes. A
+//     directory with a live lease is now never removed: the refresh refuses and
+//     names the holders.
+//
+// The documented path runs first — `claude plugin marketplace update`, then
+// `claude plugin update` per scope — and the result is read back from
+// `installed_plugins.json` (`version`, `installPath`) and the bytes. The manual
+// rebuild is the fallback for the one case the documented path refuses: a
+// version number that did not move. `/reload-plugins` is typed by a human in
+// each session; this program says which sessions still need it. The last line
+// prints what was observed on disk, nothing it was merely told.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -68,9 +89,26 @@ function tryFetch(dir, timeoutMs) {
  * Paths that exist in a working tree but are not part of the plugin: git's own
  * directory, installed modules, the runtime's marker, and anything the repo
  * gitignores (local ledgers, build output, scratch apps). The content proof
- * compares everything else.
+ * compares everything else. `.orphaned_at` is Claude Code's marker on a version
+ * directory it will clean up in 14 days — the runtime's, not the plugin's.
  */
-const NOT_PLUGIN_CONTENT = Object.freeze([".git", "node_modules", ".in_use", ".DS_Store"]);
+const NOT_PLUGIN_CONTENT = Object.freeze([".git", "node_modules", ".in_use", ".orphaned_at", ".DS_Store"]);
+
+/**
+ * Every path the clone's git ignores, relative and slash-joined — matched as a
+ * whole path, never collapsed to its top-level directory (an ignored
+ * `inspector/mcp/node_modules/` must not take all of `inspector/` out of the proof).
+ */
+export function ignoredPaths(dir) {
+  try {
+    return new Set(
+      execFileSync("git", ["-C", dir, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory"], { encoding: "utf8" })
+        .split("\n").filter(Boolean).map((p) => p.replace(/\/$/, "")),
+    );
+  } catch {
+    return new Set();
+  }
+}
 
 /** The plugin id this repo publishes, derived — never spelled out here. */
 export function selfPluginId(repoRoot) {
@@ -95,27 +133,59 @@ export function installEntries(installed, pluginId) {
  * old lease is simply not released until exit). A session appearing ONLY under
  * an old generation has not reloaded yet.
  */
-export function leases(cacheRoot, sessionsDir = path.join(HOME, ".claude", "sessions")) {
-  if (!fs.existsSync(cacheRoot)) return [];
-  const session = (pid) => {
+const SESSIONS = path.join(HOME, ".claude", "sessions");
+
+/** The holders named in one version directory's `.in_use/` lease directory. */
+function holdersOf(versionDir, sessionsDir) {
+  const lease = path.join(versionDir, ".in_use");
+  if (!fs.existsSync(lease) || !fs.statSync(lease).isDirectory()) return [];
+  return fs.readdirSync(lease).filter((n) => /^\d+$/.test(n)).map((pid) => {
     try {
       const s = json(path.join(sessionsDir, `${pid}.json`));
       return { pid: Number(pid), name: s.name ?? null, cwd: s.cwd ?? null };
     } catch {
       return { pid: Number(pid), name: null, cwd: null };
     }
-  };
+  });
+}
+
+export function leases(cacheRoot, sessionsDir = SESSIONS) {
+  if (!fs.existsSync(cacheRoot)) return [];
   return fs
     .readdirSync(cacheRoot, { withFileTypes: true })
     .filter((e) => e.isDirectory())
-    .map((e) => {
-      const lease = path.join(cacheRoot, e.name, ".in_use");
-      const holders = fs.existsSync(lease) && fs.statSync(lease).isDirectory()
-        ? fs.readdirSync(lease).filter((n) => /^\d+$/.test(n)).map(session)
-        : [];
-      return { version: e.name, holders };
-    })
+    .map((e) => ({ version: e.name, holders: holdersOf(path.join(cacheRoot, e.name), sessionsDir) }))
     .sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true }));
+}
+
+/** A lease is live while its pid is. EPERM means the process exists under another user. */
+export function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code === "EPERM";
+  }
+}
+
+/** The running processes that hold `versionDir` — a dead pid's leftover lease holds nothing. */
+export function liveLeaseHolders(versionDir, { sessionsDir = SESSIONS, isAlive = pidAlive } = {}) {
+  return holdersOf(versionDir, sessionsDir).filter((h) => isAlive(h.pid));
+}
+
+/**
+ * The ONLY place this program removes a directory. A version directory a running
+ * session holds is never removed: its hooks and MCP server run from those bytes,
+ * and removing it also removes the leases, which then read as "nobody is on the
+ * old version". Refuse, and return who holds it. `fill` writes the new contents.
+ */
+export function replaceVersionDir(dest, fill, opts = {}) {
+  const holders = liveLeaseHolders(dest, opts);
+  if (holders.length) return { replaced: false, holders };
+  fs.rmSync(dest, { recursive: true, force: true });
+  fs.mkdirSync(dest, { recursive: true });
+  fill(dest);
+  return { replaced: true, holders: [] };
 }
 
 /** The sessions working in THIS repo that have not yet loaded `version`. */
@@ -137,7 +207,7 @@ export function compareTrees(a, b, ignore = new Set()) {
     for (const e of fs.readdirSync(pa, { withFileTypes: true })) {
       if (NOT_PLUGIN_CONTENT.includes(e.name)) continue;
       const childRel = rel ? path.join(rel, e.name) : e.name;
-      if (ignore.has(childRel.split(path.sep)[0])) continue;
+      if (ignore.has(childRel.split(path.sep).join("/"))) continue;
       const childB = path.join(pb, e.name);
       if (e.isDirectory()) {
         if (!fs.existsSync(childB)) { missing.push(childRel); continue; }
@@ -152,19 +222,47 @@ export function compareTrees(a, b, ignore = new Set()) {
   return { differing, missing, identical: differing.length === 0 && missing.length === 0 };
 }
 
+/**
+ * Are the installed bytes the clone's bytes? BOTH directions: a file the clone
+ * gained (a new skill) is missing from the install, and a file the clone lost is
+ * extra in it. An absent installPath is not current, whatever its number says.
+ */
+export function sameBytes(installPath, source, ignore = new Set()) {
+  if (!installPath || !fs.existsSync(installPath)) {
+    return { identical: false, absent: true, differing: [], missing: [], extra: [] };
+  }
+  const fromSource = compareTrees(source, installPath, ignore);
+  const fromInstall = compareTrees(installPath, source, ignore);
+  return {
+    identical: fromSource.identical && fromInstall.identical,
+    absent: false,
+    differing: fromSource.differing,
+    missing: fromSource.missing,
+    extra: fromInstall.missing,
+  };
+}
+
 /** What `--check` answers, and what the refresh re-answers when it is done. */
-export function inspect({ repoRoot, marketplaceDir, cacheRoot, installed, pluginId }) {
+export function inspect({ repoRoot, marketplaceDir, cacheRoot, installed, pluginId, sessionsDir = SESSIONS }) {
   const { entries } = installEntries(installed, pluginId);
   const clone = fs.existsSync(marketplaceDir)
     ? { head: git(marketplaceDir, "rev-parse", "HEAD"), declares: json(path.join(marketplaceDir, ".claude-plugin", "plugin.json")).version }
     : null;
+  // One comparison per distinct installPath — three scopes usually share one.
+  const ignore = clone ? ignoredPaths(marketplaceDir) : new Set();
+  const compared = new Map();
+  const bytesOf = (p) => {
+    if (!clone) return null;
+    if (!compared.has(p)) compared.set(p, sameBytes(p, marketplaceDir, ignore));
+    return compared.get(p);
+  };
   // `behind` is only meaningful against a remote ref that was just fetched; an
   // unfetched origin/main is as stale as the clone and would report a confident 0.
   let behind = null;
   if (clone) {
     try { behind = Number(git(marketplaceDir, "rev-list", "--count", "HEAD..origin/main") || 0); } catch { behind = null; }
   }
-  const leaseTable = leases(cacheRoot);
+  const leaseTable = leases(cacheRoot, sessionsDir);
   return {
     clone,
     behind,
@@ -182,8 +280,36 @@ export function inspect({ repoRoot, marketplaceDir, cacheRoot, installed, plugin
       shaExists: (() => {
         try { git(marketplaceDir, "cat-file", "-e", `${e.gitCommitSha}^{commit}`); return true; } catch { return false; }
       })(),
+      // The recorded commit against the clone's HEAD — reported, but the bytes decide.
+      atHead: clone ? e.gitCommitSha === clone.head : null,
+      bytes: bytesOf(e.installPath),
     })),
   };
+}
+
+/**
+ * Every reason the install is NOT current. Empty means current, and only then:
+ * the bytes at every scope's installPath match the clone at HEAD. A version
+ * number, a sha that exists, a plugin count — none of them can make this empty.
+ */
+export function staleReasons(s) {
+  const reasons = [];
+  if ((s.behind ?? 0) > 0) reasons.push(`the marketplace clone is ${s.behind} commit(s) behind origin/main`);
+  if (!s.clone) reasons.push("no marketplace clone on disk, so the installed bytes cannot be compared to anything");
+  for (const x of s.scopes) {
+    if (x.version !== s.repoDeclares) reasons.push(`${x.scope} scope on ${x.version}, repo declares ${s.repoDeclares}`);
+    if (!x.shaExists) reasons.push(`${x.scope} scope pinned to a sha that no longer exists`);
+    if (!x.bytes) continue;
+    if (x.bytes.absent) reasons.push(`${x.scope} scope's installPath does not exist (${x.installPath})`);
+    else if (!x.bytes.identical) {
+      reasons.push(
+        `${x.scope} scope's installed bytes differ from the clone at ${s.clone.head.slice(0, 7)} ` +
+          `(${x.bytes.differing.length} differing, ${x.bytes.missing.length} missing, ${x.bytes.extra.length} extra` +
+          `${x.atHead ? "" : `; recorded sha ${String(x.sha).slice(0, 7)}`})`,
+      );
+    }
+  }
+  return reasons;
 }
 
 /**
@@ -204,22 +330,13 @@ export function summary({ repoRoot, doFetch = true, timeoutMs = 3000 } = {}) {
 
     const fetched = doFetch && fs.existsSync(marketplaceDir) ? tryFetch(marketplaceDir, timeoutMs) : false;
     const s = inspect({ repoRoot, marketplaceDir, cacheRoot, installed, pluginId });
-    const behind = fetched ? s.behind : null;
-    const wrongVersion = s.scopes.filter((x) => x.version !== s.repoDeclares);
-    const goneSha = s.scopes.filter((x) => !x.shaExists);
+    // An unfetched origin/main is as stale as the clone: its "0 behind" says nothing.
+    const why = staleReasons({ ...s, behind: fetched ? s.behind : null });
+    if (why.length) return `installed plugin is STALE — ${why.join("; ")}. Refresh: node scripts/plugin-refresh.mjs`;
 
-    if (behind > 0 || wrongVersion.length || goneSha.length) {
-      const why = [
-        behind > 0 ? `the marketplace clone is ${behind} commit(s) behind` : null,
-        wrongVersion.length ? `${wrongVersion.map((x) => x.scope).join("/")} scope on ${wrongVersion[0].version}, repo declares ${s.repoDeclares}` : null,
-        goneSha.length ? `${goneSha.map((x) => x.scope).join("/")} pinned to a sha that no longer exists` : null,
-      ].filter(Boolean);
-      return `installed plugin is STALE — ${why.join("; ")}. Refresh: node scripts/plugin-refresh.mjs`;
-    }
-    if (s.needReload.length) {
-      return `installed plugin is current (${s.repoDeclares}), but this session has not loaded it — /reload-plugins`;
-    }
-    return `installed plugin current — ${s.repoDeclares}${fetched ? "" : " (offline: compared disk only)"}`;
+    const at = `${s.repoDeclares}, bytes identical to the marketplace clone at ${s.clone.head.slice(0, 7)}`;
+    if (s.needReload.length) return `installed plugin current (${at}), but this session has not loaded it — /reload-plugins`;
+    return `installed plugin current — ${at}${fetched ? "" : " (offline: compared disk only)"}`;
   } catch {
     return null;
   }
@@ -255,93 +372,159 @@ export async function refresh({ repoRoot, argv = [] }) {
   log(`\nplugin refresh — ${pluginId.plugin}@${pluginId.marketplace}\n`);
   log(`  repo declares      ${before.repoDeclares}  (HEAD ${before.repoHead.slice(0, 7)})`);
   if (before.clone) log(`  marketplace clone  ${before.clone.declares}  (HEAD ${before.clone.head.slice(0, 7)}${before.behind ? `, ${before.behind} behind origin/main` : ""})`);
-  for (const s of before.scopes) {
-    const where = s.projectPath ? ` ${s.projectPath}` : "";
-    log(`  scope ${s.scope.padEnd(6)}     ${s.version} @ ${s.sha.slice(0, 7)}${s.shaExists ? "" : "  ⚠ that sha no longer exists (rebased away)"}${where}`);
-  }
+  printScopes(before);
   log(`\n  loaded by running sessions (.in_use leases — the bytes a session HAS, not what disk says):`);
-  const describe = (h) => `${h.name ?? `pid ${h.pid}`}${h.cwd === repoRoot ? " (this repo)" : ""}`;
   for (const l of before.leases) {
-    log(`    ${l.version.padEnd(8)} ${l.holders.length ? l.holders.map(describe).join(", ") : "— no session"}`);
+    log(`    ${l.version.padEnd(8)} ${l.holders.length ? l.holders.map((h) => describe(h, repoRoot)).join(", ") : "— no session"}`);
   }
 
-  const stale =
-    (before.behind ?? 0) > 0 ||
-    before.scopes.some((s) => s.version !== before.repoDeclares || !s.shaExists);
+  const beforeStale = staleReasons(before);
 
   if (check) {
-    if (stale) log("\n  STALE — run without --check to refresh.\n");
-    else if (before.needReload.length) log(`\n  disk is current, but ${before.needReload.map(describe).join(", ")} has not reloaded — /reload-plugins there.\n`);
-    else log("\n  current — every scope matches what the repo declares, and every session in this repo has loaded it.\n");
-    return stale ? 1 : 0;
+    if (beforeStale.length) log(`\n  STALE — ${beforeStale.join("; ")}.\n  Run without --check to refresh.\n`);
+    else if (before.needReload.length) log(`\n  disk is current (bytes match the clone), but ${before.needReload.map((h) => describe(h, repoRoot)).join(", ")} has not reloaded — /reload-plugins there.\n`);
+    else log(`\n  current — every scope's installPath holds the clone's bytes at ${before.clone.head.slice(0, 7)}, and no session in this repo holds only an older generation.\n`);
+    return beforeStale.length ? 1 : 0;
   }
 
-  const targetVersion = before.repoDeclares;
-  const dest = path.join(cacheRoot, targetVersion);
+  const cli = claudeVersion();
+  const scopeArgs = uniqueScopes(entries);
   const plan = [
-    `pull ${path.relative(HOME, marketplaceDir)} (the only step that reaches GitHub)`,
-    `rebuild ${path.relative(HOME, dest)} from the clone, version-keyed dir removed first`,
-    `npm ci --omit=dev in the rebuilt directory`,
-    `repoint ${entries.length} scope(s) in installed_plugins.json`,
-    `prove the result byte-identical to the clone, or fail`,
+    cli
+      ? `claude plugin marketplace update ${pluginId.marketplace}, then claude plugin update ${key} for ${scopeArgs.map((s) => s.scope).join(", ")} (the documented path; claude ${cli})`
+      : `no claude CLI on PATH — the documented path is skipped`,
+    `read installed_plugins.json back (version, installPath) and compare each installPath's bytes to the clone`,
+    `only if still stale: pull the clone and rebuild cache/<version>/ — REFUSED if a running session holds that directory`,
+    `print what was observed on disk; /reload-plugins is yours to type in each session named`,
   ];
   log(`\n  plan:\n${plan.map((p, i) => `    ${i + 1}. ${p}`).join("\n")}\n`);
   if (dryRun) { log("  --dry-run: nothing written.\n"); return 0; }
 
-  // 1. The only step that reaches GitHub.
+  // 1. The documented path. Its own output is logged, never trusted: the refusal
+  //    "already at the latest version" exits 0 over older bytes.
+  if (cli) {
+    const steps = [
+      { args: ["plugin", "marketplace", "update", pluginId.marketplace], cwd: repoRoot },
+      ...scopeArgs.map((s) => ({ args: ["plugin", "update", key, "--scope", s.scope], cwd: s.projectPath ?? repoRoot })),
+    ];
+    for (const step of steps) {
+      const out = runClaude(step.args, step.cwd);
+      log(`  ${out.ok ? "·" : "✗"} claude ${step.args.join(" ")} — ${out.lastLine || `exit ${out.status}`}`);
+    }
+    const afterCli = reinspect({ repoRoot, marketplaceDir, cacheRoot, pluginId });
+    const still = staleReasons(afterCli);
+    if (still.length === 0) return report(afterCli, repoRoot);
+    log(`\n  the documented path left it stale — ${still.join("; ")}.\n  Falling back to the rebuild.\n`);
+  }
+
+  // 2. The fallback reaches GitHub through the clone.
   git(marketplaceDir, "fetch", "origin");
   git(marketplaceDir, "pull", "--ff-only", "origin", "main");
   const head = git(marketplaceDir, "rev-parse", "HEAD");
   const declares = json(path.join(marketplaceDir, ".claude-plugin", "plugin.json")).version;
-  log(`  ✓ clone at ${head.slice(0, 7)}, declares ${declares}`);
+  log(`  · clone at ${head.slice(0, 7)}, declares ${declares}`);
 
-  // 2. Version-keyed directory removed FIRST, so nothing can reuse old bytes.
+  // 3. Rebuild the version-keyed directory from scratch, so nothing reuses old
+  //    bytes — unless a running session holds it. Then nothing is removed.
   const finalDest = path.join(cacheRoot, declares);
-  fs.rmSync(finalDest, { recursive: true, force: true });
-  fs.mkdirSync(finalDest, { recursive: true });
-  execFileSync("rsync", ["-a", "--exclude", ".git", "--exclude", "node_modules", `${marketplaceDir}/`, `${finalDest}/`]);
-  log(`  ✓ rebuilt ${path.relative(HOME, finalDest)}`);
-
-  // 3. The cache carries production node_modules; a fresh clone installs this way.
-  execFileSync("npm", ["ci", "--omit=dev", "--no-audit", "--no-fund"], { cwd: finalDest, stdio: "pipe" });
-  log(`  ✓ npm ci --omit=dev`);
+  const rebuilt = replaceVersionDir(finalDest, (dir) => {
+    execFileSync("rsync", ["-a", "--exclude", ".git", "--exclude", "node_modules", `${marketplaceDir}/`, `${dir}/`]);
+    // The cache carries production node_modules; a fresh clone installs this way.
+    execFileSync("npm", ["ci", "--omit=dev", "--no-audit", "--no-fund"], { cwd: dir, stdio: "pipe" });
+  });
+  if (!rebuilt.replaced) {
+    log(`\n  ✗ REFUSED — ${path.relative(HOME, finalDest)} is held by ${rebuilt.holders.length} running session(s):`);
+    for (const h of rebuilt.holders) log(`      pid ${h.pid}  ${h.name ?? "(unnamed)"}  ${h.cwd ?? ""}`);
+    log(
+      `\n  Their hooks and MCP servers run from those bytes, and removing the directory removes their leases too.\n` +
+        `  Bump .claude-plugin/plugin.json's version so the update lands in a new directory, or end those\n` +
+        `  sessions and re-run. Nothing was removed and installed_plugins.json was not touched.\n`,
+    );
+    return 1;
+  }
+  log(`  · rebuilt ${path.relative(HOME, finalDest)} (rsync + npm ci --omit=dev)`);
 
   // 4. EVERY scope, together — a half-updated manifest is the trap this exists for.
+  //    Re-read first: the documented path may have rewritten the file.
   const now = new Date().toISOString();
-  for (const e of installed.plugins[key]) {
+  const current = json(INSTALLED);
+  for (const e of current.plugins[key] ?? []) {
     e.installPath = finalDest;
     e.version = declares;
     e.gitCommitSha = head;
     e.lastUpdated = now;
   }
-  writeJson(INSTALLED, installed);
+  writeJson(INSTALLED, current);
   if (fs.existsSync(KNOWN)) {
     const known = json(KNOWN);
     if (known[pluginId.marketplace]) { known[pluginId.marketplace].lastUpdated = now; writeJson(KNOWN, known); }
   }
-  log(`  ✓ ${installed.plugins[key].length} scope(s) repointed at ${declares} @ ${head.slice(0, 7)}`);
+  log(`  · ${(current.plugins[key] ?? []).length} scope(s) written to installed_plugins.json`);
 
-  // 5. The proof. Anything the repo ignores is not plugin content.
-  const ignore = new Set(
-    execFileSync("git", ["-C", marketplaceDir, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory"], { encoding: "utf8" })
-      .split("\n").filter(Boolean).map((p) => p.replace(/\/$/, "").split("/")[0]),
-  );
-  const cmp = compareTrees(finalDest, marketplaceDir, ignore);
-  if (!cmp.identical) {
-    log(`\n  ✗ FAILED the content proof — ${cmp.differing.length} differing, ${cmp.missing.length} missing`);
-    for (const f of [...cmp.differing, ...cmp.missing].slice(0, 10)) log(`      ${f}`);
+  // 5. The proof is the same question --check asks, re-asked from disk.
+  return report(reinspect({ repoRoot, marketplaceDir, cacheRoot, pluginId }), repoRoot);
+}
+
+/** `claude --version`, or null when there is no CLI on PATH. */
+function claudeVersion() {
+  try {
+    return execFileSync("claude", ["--version"], { encoding: "utf8", timeout: 15000, stdio: ["ignore", "pipe", "ignore"] }).trim().split(/\s/)[0];
+  } catch {
+    return null;
+  }
+}
+
+function runClaude(args, cwd) {
+  try {
+    const out = execFileSync("claude", args, { cwd, encoding: "utf8", timeout: 180000, stdio: ["ignore", "pipe", "pipe"] });
+    return { ok: true, status: 0, lastLine: out.trim().split("\n").pop() ?? "" };
+  } catch (err) {
+    const text = `${err.stdout ?? ""}${err.stderr ?? ""}`.trim();
+    return { ok: false, status: err.status ?? null, lastLine: text.split("\n").pop() ?? "" };
+  }
+}
+
+/** One `claude plugin update --scope` per distinct scope + project. */
+function uniqueScopes(entries) {
+  const seen = new Map();
+  for (const e of entries) seen.set(`${e.scope}|${e.projectPath ?? ""}`, { scope: e.scope, projectPath: e.projectPath ?? null });
+  return [...seen.values()];
+}
+
+function reinspect({ repoRoot, marketplaceDir, cacheRoot, pluginId }) {
+  return inspect({ repoRoot, marketplaceDir, cacheRoot, installed: json(INSTALLED), pluginId });
+}
+
+const describe = (h, repoRoot) => `${h.name ?? `pid ${h.pid}`}${h.cwd === repoRoot ? " (this repo)" : ""}`;
+
+function printScopes(s) {
+  for (const x of s.scopes) {
+    const where = x.projectPath ? ` ${x.projectPath}` : "";
+    const bytes = !x.bytes ? "" : x.bytes.absent ? "  ✗ installPath missing" : x.bytes.identical ? "  bytes = clone" : "  ✗ bytes ≠ clone";
+    log(`  scope ${x.scope.padEnd(6)}     ${x.version} @ ${String(x.sha).slice(0, 7)}${x.shaExists ? "" : "  ⚠ that sha no longer exists (rebased away)"}${bytes}${where}`);
+    log(`    installPath       ${x.installPath}`);
+  }
+}
+
+/**
+ * The closing lines — only what was read back from disk: each scope's recorded
+ * version and installPath, whether those bytes match the clone, and which
+ * sessions the leases say have not reloaded. Exit 1 unless every scope is current.
+ */
+function report(after, repoRoot) {
+  log("\n  observed after the refresh:");
+  printScopes(after);
+  const still = staleReasons(after);
+  if (still.length) {
+    log(`\n  ✗ NOT current — ${still.join("; ")}.\n`);
     return 1;
   }
-  log(`  ✓ byte-identical to the clone — 0 differing, 0 missing\n`);
-
-  // What is on disk is settled. What each session HAS is not, and it is knowable.
-  const after = leases(cacheRoot);
-  const pending = sessionsNeedingReload(after, repoRoot, declares);
-  if (pending.length) {
-    log(`  Installed. ${pending.map(describe).join(", ")} is still on an older generation — run there:\n    /reload-plugins\n`);
-    log(`  Then re-run with --check: the session should appear under ${declares}.\n`);
+  const paths = [...new Set(after.scopes.map((x) => x.installPath))];
+  log(`\n  ✓ ${after.scopes.length} scope(s) record ${[...new Set(after.scopes.map((x) => x.version))].join(", ")} at ${paths.join(", ")}; bytes identical to the clone at ${after.clone.head.slice(0, 7)}.`);
+  if (after.needReload.length) {
+    log(`  ${after.needReload.map((h) => describe(h, repoRoot)).join(", ")} hold(s) only an older generation — type /reload-plugins there, then re-run --check.\n`);
   } else {
-    log(`  Installed, and every session in this repo has loaded ${declares}.\n`);
+    log(`  No session in this repo holds only an older generation (per .in_use leases).\n`);
   }
   return 0;
 }

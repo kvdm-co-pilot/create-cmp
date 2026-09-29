@@ -201,6 +201,11 @@ release body instead.
 - `npx create-cmp-cli@latest` works from a clean machine (or at least `--help` succeeds).
 - The git tag is pushed and a GitHub release exists.
 - `CHANGELOG.md` has no stale `[Unreleased]` entries left over from this release.
+- The installed plugin loads: after `node scripts/plugin-refresh.mjs` reports it current, an
+  authenticated `claude -p "ok" --output-format stream-json --verbose` shows this plugin under
+  `plugins` in the `system/init` event and nothing for it under `plugin_errors`. CI cannot ask
+  this (it needs auth and a secret fork PRs cannot see); its `plugin loads` job runs only
+  `claude plugin validate --strict --json .`.
 
 ## Do not
 
