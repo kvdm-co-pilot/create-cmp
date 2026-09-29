@@ -625,14 +625,62 @@ function skipFlags(args, j, takesValue) {
   return j;
 }
 
-// The global flags each program takes a SEPARATE value for, so the value is not read as the subcommand.
-const GH_VALUE = new Set(["-R", "--repo", "--hostname"]);
 /**
- * npm flags whose NEXT token is a value — so the value is read neither as the
- * subcommand (`npm --tag next publish` publishes) nor as the folder operand
- * (`npm publish --access public` is not publishing "public"). ONE list, read by
- * both `act` and `commandCwd`: two lists answered differently (review round 1),
- * and test/every-spelling-npm-or-git-resolves-to-a-gated-act-is-that-act.test.mjs
+ * The gated act a command's subcommand performs, the subcommand found by NAME
+ * rather than by knowing every flag (review round 2: a hand-kept list of npm's
+ * value-taking flags knew 13 of npm's 104, so `npm --scope foo publish` walked
+ * past as no gated act). A word no option stands in front of is the subcommand,
+ * as the program reads it. A word right after an option (no `=`) may be that
+ * option's value or the subcommand — the gate cannot know which without the
+ * program's own option table — so when `named(word)` says it names a watched
+ * command it is ONE reading, and the scan goes on past it as a value too. A `--`
+ * ends the options: the next word is the subcommand. `readAt` is asked for each
+ * reading, the definitive one first, and the first gated act it returns is the
+ * command's — a value that is itself a command name (`npm --tag x publish`, where
+ * `x` is npm's exec) cannot hide the act the other reading performs.
+ * The residual errs toward judging, never away: `npm --message publish` is read
+ * as publish though npm reads "publish" as the message, and a boolean flag
+ * before a command the gate does not watch (`npm --json run publish`) reads that
+ * command as a value and the next word as the subcommand.
+ */
+function actAt(args, j, named, readAt) {
+  const at = [];
+  let afterOption = false;
+  for (; j < args.length; j += 1) {
+    const w = args[j];
+    if (w === "--") {
+      at.push(j + 1);
+      break;
+    }
+    if (/^-./.test(w)) {
+      afterOption = !w.includes("=");
+      continue;
+    }
+    if (!afterOption) {
+      at.push(j);
+      break;
+    }
+    if (named(w)) at.push(j);
+    afterOption = false;
+  }
+  for (const k of at.reverse()) {
+    const kind = k < args.length ? readAt(k) : null;
+    if (kind) return kind;
+  }
+  return null;
+}
+
+// The watched subcommands, by name: what actAt reads a word after an option as.
+const GH_COMMAND = (w) => w === "pr" || w === "api";
+const GH_PR_COMMAND = (w) => w === "merge" || w === "create";
+/**
+ * npm flags whose NEXT token is a value, read by `commandCwd` only — so a value
+ * after `publish` is not taken for the folder operand (`npm publish --access
+ * public` is not publishing "public"). `act` no longer reads it: it finds the
+ * subcommand by name (actAt), because this list knew 13 of the 104
+ * options npm reads a value for (review round 2). A flag it lacks after publish
+ * reads its value as an operand, and an operand makes the tree unknown — the
+ * judging direction. test/every-spelling-npm-or-git-resolves-to-a-gated-act-is-that-act.test.mjs
  * reads this one out of the source.
  */
 const NPM_TAKES_VALUE = new Set(["-w", "--workspace", "-C", "--prefix", "--cache", "--loglevel", "--registry", "--userconfig", "--access", "--tag", "--otp", "--auth-type", "--provenance-file"]);
@@ -643,7 +691,8 @@ const NPM_TAKES_VALUE = new Set(["-w", "--workspace", "-C", "--prefix", "--cache
  * is the shortest spelling of publish.
  */
 const isNpmPublish = (w) => typeof w === "string" && w.length >= 2 && "publish".startsWith(w);
-const PM_VALUE = new Set(["-C", "--dir", "--cwd", "-F", "--filter", "--registry"]);
+const NPM_COMMAND = (w) => isNpmPublish(w) || w === "exec" || w === "x";
+const PM_COMMAND = (prog) => (w) => w === "publish" || (prog === "yarn" && (w === "workspace" || w === "npm"));
 const NPX_VALUE = new Set(["-p", "--package", "-c", "--call"]);
 const GIT_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace"]);
 const PUSH_VALUE = new Set(["-o", "--push-option", "--repo", "--receive-pack", "--exec"]);
@@ -672,27 +721,31 @@ function act(words, depth = 0) {
   let j;
   switch (prog) {
     case "gh":
-      j = skipFlags(args, 0, GH_VALUE);
-      if (args[j] === "pr") {
-        j = skipFlags(args, j + 1, GH_VALUE);
-        return args[j] === "merge" ? "merge" : args[j] === "create" ? "create" : null;
-      }
-      if (args[j] === "api") return args.slice(j + 1).some((a) => PULL_MERGE.test(a)) ? "merge" : null;
-      return null;
+      return actAt(args, 0, GH_COMMAND, (k) => {
+        if (args[k] === "pr") return actAt(args, k + 1, GH_PR_COMMAND, (m) => (GH_PR_COMMAND(args[m]) ? args[m] : null));
+        if (args[k] === "api") return args.slice(k + 1).some((a) => PULL_MERGE.test(a)) ? "merge" : null;
+        return null;
+      });
     case "npm":
-      j = skipFlags(args, 0, NPM_TAKES_VALUE);
-      if (isNpmPublish(args[j])) return "publish";
-      if (args[j] === "exec" || args[j] === "x") return act(unversioned(args.slice(skipFlags(args, j + 1, NPX_VALUE))), depth + 1);
-      return null;
+      return actAt(args, 0, NPM_COMMAND, (k) => {
+        if (isNpmPublish(args[k])) return "publish";
+        if (args[k] === "exec" || args[k] === "x") return act(unversioned(args.slice(skipFlags(args, k + 1, NPX_VALUE))), depth + 1);
+        return null;
+      });
     case "npx":
       return act(unversioned(args.slice(skipFlags(args, 0, NPX_VALUE))), depth + 1);
     case "pnpm":
     case "bun":
-    case "yarn":
-      j = skipFlags(args, 0, PM_VALUE);
-      if (prog === "yarn" && args[j] === "workspace") j = skipFlags(args, j + 2, PM_VALUE);
-      if (prog === "yarn" && args[j] === "npm") j += 1;
-      return args[j] === "publish" ? "publish" : null;
+    case "yarn": {
+      const named = PM_COMMAND(prog);
+      const readAt = (k) => {
+        if (args[k] === "publish") return "publish";
+        if (prog === "yarn" && args[k] === "workspace") return actAt(args, k + 2, named, readAt);
+        if (prog === "yarn" && args[k] === "npm") return actAt(args, k + 1, named, readAt);
+        return null;
+      };
+      return actAt(args, 0, named, readAt);
+    }
     case "git": {
       j = skipFlags(args, 0, GIT_VALUE);
       if (args[j] !== "push") return null;
