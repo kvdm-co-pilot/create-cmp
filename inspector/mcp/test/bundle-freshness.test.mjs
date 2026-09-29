@@ -108,6 +108,15 @@ test("dist/server.mjs boots and serves every tool with NO node_modules in scope"
     assert.ok(init && init.result, `the bundle never completed initialize. stderr: ${stderr.slice(0, 400)}`);
     assert.equal(init.result.serverInfo.name, "cmp-inspector");
     assert.ok(init.result.serverInfo.version, "the bundle reports a version without reading a sibling manifest");
+    // The discovery surface arrives where clients read it: a TOP-LEVEL
+    // initialize result field. Declared 2026-07-13 but passed inside serverInfo,
+    // which no client reads, it reached no agent until this assertion held.
+    assert.equal(typeof init.result.instructions, "string", "initialize carries top-level instructions");
+    assert.ok(
+      init.result.instructions.includes("cmp-inspector"),
+      "the instructions are the inspector's own workflow text",
+    );
+    assert.equal(init.result.serverInfo.instructions, undefined, "instructions no longer ride inside serverInfo");
 
     const list = messages.find((m) => m.id === 2);
     assert.ok(list && list.result, `tools/list produced no result. stderr: ${stderr.slice(0, 400)}`);

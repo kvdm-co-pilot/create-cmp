@@ -169,8 +169,13 @@ const SERVER_VERSION =
 const server = new McpServer({
   name: "cmp-inspector",
   version: SERVER_VERSION,
+}, {
   // Injected into the connected agent's context — the discovery surface for the
   // default workflow. Front-loaded: the edit loop first, everything else after.
+  // ServerOptions (the SECOND argument), never the Implementation object: inside
+  // the first it rode along in serverInfo, which no client reads, so from
+  // 2026-07-13 it never reached an agent. bundle-freshness asserts the top-level
+  // initialize result's instructions on the wire.
   instructions:
     "cmp-inspector: the AI-native window into a Compose Multiplatform app's UI — " +
     "structured JSON trees, never screenshots (pixels flow to the human, structure " +

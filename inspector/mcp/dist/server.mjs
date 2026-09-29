@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs d34ca7b1f9d71d8ae0db81960ee88c66a55d29635b5bfba5d2d0e9b87a64c5a4
+// cmp:bundle-inputs 7a498f11b2dd8d04497fd465aef5fff026c9a562a2991808f86f8a352c9d58b3
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -41848,9 +41848,14 @@ async function gitChangedFiles(cwd) {
 var SERVER_VERSION = true ? "0.9.1" : JSON.parse(readFileSync4(new URL("../package.json", import.meta.url), "utf8")).version;
 var server = new McpServer({
   name: "cmp-inspector",
-  version: SERVER_VERSION,
+  version: SERVER_VERSION
+}, {
   // Injected into the connected agent's context — the discovery surface for the
   // default workflow. Front-loaded: the edit loop first, everything else after.
+  // ServerOptions (the SECOND argument), never the Implementation object: inside
+  // the first it rode along in serverInfo, which no client reads, so from
+  // 2026-07-13 it never reached an agent. bundle-freshness asserts the top-level
+  // initialize result's instructions on the wire.
   instructions: "cmp-inspector: the AI-native window into a Compose Multiplatform app's UI \u2014 structured JSON trees, never screenshots (pixels flow to the human, structure flows to you).\n\nDEFAULT UI LOOP \u2014 use while building or editing ANY screen of a create-cmp app; no device, no emulator, no manual Gradle:\n1. preview { projectDir }  \u2192 live self-updating gallery URL for the human; keep it running for the whole session.\n2. Edit code, then preview_status { waitForRender: true }  \u2192 blocks until the outcome: changedLastRender names the screens your edit touched (empty = it reached no screen); lastErrorSource \"compile\" = the edit didn't build (the compiler's e: lines are in lastError).\n3. preview_diff { screen }  \u2192 verdict: proven-clean | changed-with-regressions | no-change. Zero snapshot bookkeeping.\n4. preview_stop {} when the session ends.\n\nOne-off render: render_screen { projectDir, screen } (~1s warm via the resident daemon). Inspect the RUNNING app (tier 1): connect_live (SELF-HEALING \u2014 creates the adb forward, launches the debug app when its health endpoint is dead, resets a stale adb transport, and can force a verified relaunch with {relaunch:true}), then inspect_tree (one node via testTag, an SVG wireframe via format:'wireframe', spacing via includeLayoutGaps) and navigate_and_inspect. Runtime eyes beyond the tree: runtime_crashes (persisted crashes + cause attribution), runtime_logs (adb logcat, structured + bounded), db_query (read-only SQLite state). Human approval gates: the preview gallery's Screens/Design System/Architecture/Approvals/Specs/Comments tabs (same URL as `preview`) are where the human reviews and signs governed artifacts, sees the app's layer map + governed contract + feature shape, and leaves review feedback; approval_status { waitForDecision: true } blocks on an approval decision the same way preview_status blocks on a render, and review_comments { waitForComment: true } blocks on new review feedback the same way \u2014 act on it, then resolve_comment. Genesis mode (a fresh app's unreviewed/reopened artifacts): snapshot_variant stashes the current render as a named design-language candidate for the Design System tab's candidates strip; the human's Pick lands as a `pick:<name>` comment, observed the normal review_comments way. Always assert on tree JSON; never read PNG bytes into context."
 });
 var treePathArg = external_exports.string().optional().describe(
