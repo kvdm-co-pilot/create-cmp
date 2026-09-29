@@ -16,6 +16,14 @@ All notable changes to this project are documented here. The format is based on
   while the checkout's slice still owes an at-close tier. Opt in with
   `git config core.hooksPath .githooks`.
 
+||||||| parent of dbc945a (feat(receipts): CI attests the receipt it produced, and the reader names each rung's attester — a stamped app's verify.yml signs its own receipt keylessly, receipt-check reports CI-attested vs self-attested per rung, and qa/ruleset.json makes the check required (ADR-0017, proposed; FIX-PLAN slice 8A))
+### Added
+
+- A stamped app's CI attests the receipt it produced (keyless GitHub artifact attestation, checked
+  with `gh attestation verify`); `qa/receipt-check.mjs` reports which rungs are CI-attested and which
+  self-attested; `qa/ruleset.json` and one `gh api` line in the README make the check required on the
+  default branch (ADR-0017, proposed).
+
 ### Security
 
 - A hook never grants. The three PreToolUse reminders a stamped app carries answered

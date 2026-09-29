@@ -12,6 +12,7 @@ export {
   checkFreshness,
   checkExecutionPlausibility,
   listSkippedSteps,
+  attestationStanding,
   validateReceiptForTree,
   checkLaneVouching,
   checkDoneEvidence,

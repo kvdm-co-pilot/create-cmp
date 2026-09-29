@@ -122,6 +122,20 @@ Every change must pass the verify lane (`node qa/verify.mjs`) and commit its upd
 (`qa/evidence/latest.json`). CI re-runs the same lane on every push — see
 [`.github/workflows/verify.yml`](./.github/workflows/verify.yml).
 
+The committed receipt is written on your machine, so it is your machine's word. CI's own receipt
+is signed by GitHub for the run that produced it (an artifact attestation, keyless), and
+`gh attestation verify <file> --repo <owner>/<repo>` checks it, where `<file>` is the `latest.json`
+inside a run's downloaded `verify-evidence` artifact — not the committed file, whose timestamps
+differ from CI's. The L1 check is
+CI-attested; the L2 verdict is the machine's word until CI runs that tier.
+`node qa/receipt-check.mjs` prints which rungs are which.
+
+To make the check binding, require it on your default branch with no bypass:
+`gh api -X POST repos/{owner}/{repo}/rulesets --input qa/ruleset.json`. The ruleset requires the
+status check `android`, the job name in `verify.yml`; rename one and you must rename the other.
+The JSON's shape has not been checked against GitHub's rulesets API yet, so read the response:
+a 422 names the field it refused.
+
 ## Verification enforcement
 
 For AI sessions using Claude Code, a **Stop hook** (`.claude/settings.json`) makes
