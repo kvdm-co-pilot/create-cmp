@@ -68,7 +68,7 @@ export const SHIPPED_COMMANDS = Object.freeze(
       id: "stop-receipt-relative",
       surface: "Stop",
       status: "superseded",
-      successor: "stop-receipt-fail-closed",
+      successor: "stop-receipt-fail-closed-guarded",
       shipped: "fc4dd3e … ff6c304 (through 0.26.2)",
       why: "names qa/receipt-check.mjs relative to the SESSION's directory, so a session started anywhere but the project root loses the Stop gate",
       command: "node qa/receipt-check.mjs --hook",
@@ -77,7 +77,7 @@ export const SHIPPED_COMMANDS = Object.freeze(
       id: "stop-receipt-anchored",
       surface: "Stop",
       status: "superseded",
-      successor: "stop-receipt-fail-closed",
+      successor: "stop-receipt-fail-closed-guarded",
       shipped: "e326c24 (0.26.3) … 8945566",
       why: "runs the gate directly, and Claude Code blocks on exit 2 alone — a gate that crashes, finds no node on the PATH or hangs lets the session stop ungated; the successor runs it through qa/hooks/fail-closed.sh, which turns those into a named refusal (a file only a newer lane carries, so doctor --fix does not write it)",
       command: "node \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook",
@@ -85,10 +85,23 @@ export const SHIPPED_COMMANDS = Object.freeze(
     {
       id: "stop-receipt-fail-closed",
       surface: "Stop",
+      status: "superseded",
+      successor: "stop-receipt-fail-closed-guarded",
+      shipped: "after 8945566 (0.28.0) … 7441f2e (0.28.8)",
+      why: "hands the launcher's path straight to sh, and where /bin/sh is dash (Ubuntu, Debian) `sh <missing file>` exits 2, which Claude Code reads as a refusal — with CLAUDE_PROJECT_DIR unset and a session opened below the project root, every stop is blocked; the successor exits 0 when the launcher is absent and otherwise passes its exit code through unchanged",
+      command: "sh \"${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook",
+    },
+    {
+      // The launcher's path is an ARGUMENT to a fixed `sh -c` guard, not code inside
+      // it: the quoted script names no path, so the anchoring detector still sees every
+      // path the form runs, and proof-gate's deadline parser still finds the launcher's
+      // arguments at the same offsets after it.
+      id: "stop-receipt-fail-closed-guarded",
+      surface: "Stop",
       status: "current",
       anchored: true,
-      shipped: "after 8945566 (fail-closed Stop launcher) …",
-      command: "sh \"${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook",
+      shipped: "after 7441f2e (dash-safe launcher guard) …",
+      command: "sh -c 'f=\"$1\"; shift; [ -f \"$f\" ] || exit 0; exec sh \"$f\" \"$@\"' _ \"${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook",
     },
     {
       id: "prompt-walk-relative",

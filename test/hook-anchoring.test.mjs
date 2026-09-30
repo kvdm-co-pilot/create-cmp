@@ -201,13 +201,13 @@ function appDir() {
  * with CLAUDE_PROJECT_DIR naming the project root. Bounded: a hook that hangs is
  * a failure, not something to wait out.
  */
-function runHook(command, { cwd, projectDir }) {
+function runHook(command, { cwd, projectDir, shell = "sh" }) {
   const env = { ...process.env };
   // This suite runs inside a session that sets CLAUDE_PROJECT_DIR itself, so the
   // unset case has to be made, not assumed.
   if (projectDir === undefined) delete env.CLAUDE_PROJECT_DIR;
   else env.CLAUDE_PROJECT_DIR = projectDir;
-  const res = spawnSync("sh", ["-c", command], {
+  const res = spawnSync(shell, ["-c", command], {
     cwd,
     env,
     encoding: "utf8",
@@ -303,21 +303,36 @@ test("behavioural: with CLAUDE_PROJECT_DIR unset the anchor degrades to the rela
     assert.equal(atRoot.status, 0, `anchored Stop hook broke at the root with no CLAUDE_PROJECT_DIR: ${atRoot.stderr}`);
     assert.match(atRoot.stdout, /RECEIPT-CHECK-RAN/);
 
-    // And it degrades to exactly the old failure, not to a worse one: `/qa/...`
-    // at the filesystem root is what a bare ${CLAUDE_PROJECT_DIR} would give.
-    // The shipped form is two-argument since slice 8B (`sh <launcher> <gate>`),
-    // so the first word to go unresolved is the LAUNCHER, and it must go
-    // unresolved against the cwd. Not worse also means not BLOCKING: the old
-    // form's miss was a non-blocking error, and so is this one (exit 2 would
-    // refuse every stop of a session opened one directory down).
+    // And it degrades to no worse than the old failure. The shipped form is
+    // two-argument since slice 8B (a launcher, then the gate), so the first file to
+    // go unresolved is the LAUNCHER. `sh <missing file>` is not a portable miss:
+    // macOS sh exits 127 there, but dash — /bin/sh on Ubuntu and Debian — exits 2,
+    // and exit 2 from a Stop hook BLOCKS every stop of a session opened one
+    // directory down (CI run 36644123577). So the form guards the launcher's
+    // existence itself and a miss is a clean exit 0 — under every shell it meets,
+    // dash included wherever this machine has one.
     const subDir = path.join(dir, "services", "app");
-    const sub = runHook(shippedCommand.stop, { cwd: subDir, projectDir: undefined });
-    assert.notEqual(sub.status, 0);
-    assert.notEqual(sub.status, 2, `the degraded Stop hook BLOCKS — worse than the relative form it replaced: ${sub.stderr.slice(0, 200)}`);
-    assert.ok(
-      sub.stderr.includes("./qa/hooks/fail-closed.sh") && !sub.stderr.includes(": /qa/"),
-      `unset CLAUDE_PROJECT_DIR resolved somewhere other than the cwd — the ':-.' default is not doing its job: ${sub.stderr.slice(0, 200)}`
-    );
+    const shells = ["sh", ...(spawnSync("sh", ["-c", "command -v dash"], { encoding: "utf8" }).status === 0 ? ["dash"] : [])];
+    for (const shell of shells) {
+      const sub = runHook(shippedCommand.stop, { cwd: subDir, projectDir: undefined, shell });
+      assert.equal(sub.status, 0, `[${shell}] the degraded Stop hook did not exit cleanly — a missing launcher must not refuse: ${sub.stderr.slice(0, 200)}`);
+      assert.equal(sub.stderr, "", `[${shell}] the degraded Stop hook complained: ${sub.stderr.slice(0, 200)}`);
+    }
+    // Where it resolved, and that a launcher that IS there keeps its exit code:
+    // plant one at the CWD's qa/hooks/ (not /qa/, which a bare ${CLAUDE_PROJECT_DIR}
+    // would give) that refuses with 2. Exit 2 must come back unchanged, or the
+    // guard has swallowed the launcher's refusal along with the miss.
+    fs.mkdirSync(path.join(subDir, "qa", "hooks"), { recursive: true });
+    fs.writeFileSync(path.join(subDir, "qa", "hooks", "fail-closed.sh"), 'printf "LAUNCHER-FROM-CWD %s" "$*"; exit 2\n');
+    for (const shell of shells) {
+      const planted = runHook(shippedCommand.stop, { cwd: subDir, projectDir: undefined, shell });
+      assert.match(
+        planted.stdout,
+        /LAUNCHER-FROM-CWD \.\/qa\/receipt-check\.mjs --hook/,
+        `[${shell}] unset CLAUDE_PROJECT_DIR resolved somewhere other than the cwd — the ':-.' default is not doing its job: ${planted.stderr.slice(0, 200)}`
+      );
+      assert.equal(planted.status, 2, `[${shell}] the guard changed the launcher's exit code 2 to ${planted.status}`);
+    }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
