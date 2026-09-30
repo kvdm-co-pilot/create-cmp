@@ -6,11 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.28.8] - 2026-09-30
+## [0.28.9] - 2026-09-30
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the
 CI-attested receipt reader, and `@create-cmp/inspector` 0.9.3 carries the server instructions that
-now reach the agent, in a rebuilt bundle. 0.28.5, 0.28.6 and 0.28.7 were set mid-batch and never published; the number moved on with the bytes. Nothing is published.
+now reach the agent, in a rebuilt bundle. 0.28.5, 0.28.6, 0.28.7 and 0.28.8 were set mid-batch and never published; the number moved on with the bytes. Nothing is published.
 
 ### Added
 
@@ -112,6 +112,15 @@ now reach the agent, in a rebuilt bundle. 0.28.5, 0.28.6 and 0.28.7 were set mid
 - The plugin skills reach plugin files as `${CLAUDE_PLUGIN_ROOT}/…`; cmp-test leads with Maestro (Appium moved to `references/legacy-appium.md`) and cmp-new's guided walk moved to `references/guided-walk.md`; every skill description fits the spec's 1,024 characters (`test/skill-description-budget.test.mjs`); the staff reviewer blocks on a diff that does not do what its brief asked; cmp-orchestrator drops `Task` and `TodoWrite` from its tools.
 
 ### Fixed
+
+- The fail-closed launcher no longer blocks every stop on Linux. The Stop hook stamped since 0.28.0
+  handed `sh` the launcher's path directly, and where `/bin/sh` is dash (Ubuntu, Debian)
+  `sh <missing file>` exits 2 — which Claude Code reads as a refusal — so a session opened below the
+  project root with `CLAUDE_PROJECT_DIR` unset could never stop; macOS `sh` exits 127 there, which is
+  why only CI saw it. The Stop hook and this repository's PreToolUse proof-gate entry now run the
+  launcher through a fixed guard, `sh -c '…[ -f "$f" ] || exit 0; exec sh "$f" "$@"' _ <launcher> …`:
+  a launcher that is not there exits 0, one that is keeps its exit code unchanged. The old Stop form
+  is recorded as superseded in `src/lib/shipped-hooks.mjs`; `doctor --fix` does not rewrite it.
 
 - `proof-plan` no longer owes a review for a release bump, and a bump after a discharged review no
   longer reopens it; an uncommitted path with a space in its name is classified by its own name

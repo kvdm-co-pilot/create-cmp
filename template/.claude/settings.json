@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook"
+            "command": "sh -c 'f=\"$1\"; shift; [ -f \"$f\" ] || exit 0; exec sh \"$f\" \"$@\"' _ \"${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs\" --hook"
           }
         ]
       }

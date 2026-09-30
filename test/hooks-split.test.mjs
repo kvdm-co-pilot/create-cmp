@@ -109,7 +109,7 @@ test("the full SessionStart carries the narration and the derived gates line; mi
 test("the Stop hook runs the gate through the fail-closed launcher; minimal drops the gate's ask rules", () => {
   const stop = settings.hooks.Stop.flatMap((g) => g.hooks).map((h) => h.command);
   assert.deepEqual(stop, [
-    'sh "${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh" "${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook',
+    `sh -c 'f="$1"; shift; [ -f "$f" ] || exit 0; exec sh "$f" "$@"' _ "\${CLAUDE_PROJECT_DIR:-.}/qa/hooks/fail-closed.sh" "\${CLAUDE_PROJECT_DIR:-.}/qa/receipt-check.mjs" --hook`,
   ]);
   assert.deepEqual(settings.permissions.ask, [
     "Edit(qa/receipt-check.mjs)",

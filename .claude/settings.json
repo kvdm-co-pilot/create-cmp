@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs\" \"gh|npm|npx|pnpm|bun|yarn|git push|fleet-check\" 10",
+            "command": "sh -c 'f=\"$1\"; shift; [ -f \"$f\" ] || exit 0; exec sh \"$f\" \"$@\"' _ \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/fail-closed.sh\" \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/proof-gate.mjs\" \"gh|npm|npx|pnpm|bun|yarn|git push|fleet-check\" 10",
             "timeout": 11
           }
         ]
