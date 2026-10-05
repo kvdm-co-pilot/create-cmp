@@ -20,8 +20,10 @@ Nothing is published.
   mirroring each file's path — Gradle's root output, ignored by the stamp's `build/` line and never a
   source set; `clean` removes them with the rest of `build/`. This holds for both modes (version set and
   `--harness`) and for `harden`; the consent text and the printed `mv` revert lines name the new paths.
-  A `.cmp-new` conflict sidecar stays beside its file, except inside a `res/` directory under `src/`,
-  where it lands in the run directory and the conflict line names it there. One pure rule decides both,
+  A `.cmp-new` conflict sidecar stays beside its file, except inside anything a build tool reads whole —
+  any path with a `src/` segment (every Gradle source set: `res/`, `composeResources/`, `resources/`,
+  `assets/`, `kotlin/` …) or under `iosApp/` (KD-287) — where it lands in the run directory and the
+  conflict line names it there. One pure rule decides both,
   `upgradeArtifactPath(rel, kind, runDir)` in `src/lib/upgrade.mjs`. An upgrade also heals what earlier
   engines left: before it writes, every legacy `*.bak-upgrade` and `*.cmp-new` found on disk — tracked,
   untracked, ignored or not, in a git repository or not — is moved to

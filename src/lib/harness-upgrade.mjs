@@ -573,7 +573,8 @@ export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeT
  * the same rule as the version-catalog upgrade path, so one revert story
  * covers both modes; never beside the file — KD-284).
  * Conflicted entries never touch the app's file — only the `.cmp-new` sidecar
- * is written, beside the file or, inside an Android `res/` directory, in the
+ * is written, beside the file or, inside anything a build tool reads whole
+ * (a `src/` segment, or `iosApp/` — isBuildReadPath), in the
  * run directory (`upgradeArtifactPath(rel, "sidecar", runDir)`).
  * Returns what happened so the CLI can print revert commands.
  * @param {string} projectDir
