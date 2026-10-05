@@ -907,3 +907,22 @@ count work (tokens visited, or a deterministic operation counter) or compare aga
 
 **Fires when:** the suite runs on a loaded machine; the gate itself is unaffected.
 *Logged 2026-09-30, at the close of slice `harness/hooks-never-grant` batch 2 (after the last review round).*
+
+### KD-284 — an upgrade's backup inside an Android resource directory breaks the build
+
+`src/lib/upgrade.mjs` (`BACKUP_SUFFIX`), written by `create-cmp upgrade --harness --yes` (`src/commands/upgrade.mjs`)
+
+Every file the upgrade overwrites gets a `<file>.bak-upgrade` sibling. When that file lives under
+`composeApp/src/**/res/` — the stamp ships `androidDebug/res/xml/debug_network_security_config.xml`, which the
+engine changed between 0.17.1 and 0.28.9 — the backup lands inside an Android resource directory, and the
+resource merger rejects it: `debug_network_security_config.xml.bak-upgrade: Error: The file name must end with
+.xml`. `assembleDebug` fails, so the lane's `build` step FAILs and every step after it is skipped. Observed on
+create-cmp-showcase, 2026-10-05, on the first full lane run after the 0.28.9 harness upgrade; deleting the
+backups made `build` PASS on the next run. Being gitignored keeps the backup out of commits, not out of Gradle's
+source sets. The repair: backups go outside the source tree (one directory under `build/` or `.create-cmp/`),
+or never beside a file under a `res/` directory — with a test that upgrades a stamp whose `res/` file changed
+and builds it.
+
+**Fires when:** an upgrade overwrites any file under an Android `res/` directory; the app's build stays broken
+until the backup is deleted by hand, and the upgrade's own advice ("Prove the build") fails on it.
+*Logged 2026-10-05, from the showcase live-check session (PATTERN-REVIEW-2026-09-28 item 1).*
