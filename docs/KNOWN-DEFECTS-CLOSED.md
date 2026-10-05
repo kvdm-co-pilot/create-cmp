@@ -9,6 +9,38 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-284 — an upgrade's backup inside an Android resource directory breaks the build — **CLOSED 2026-10-05**
+
+`src/lib/upgrade.mjs` (`BACKUP_SUFFIX`), written by `create-cmp upgrade --harness --yes` (`src/commands/upgrade.mjs`)
+
+Every file the upgrade overwrites gets a `<file>.bak-upgrade` sibling. When that file lives under
+`composeApp/src/**/res/` — the stamp ships `androidDebug/res/xml/debug_network_security_config.xml`, which the
+engine changed between 0.17.1 and 0.28.9 — the backup lands inside an Android resource directory, and the
+resource merger rejects it: `debug_network_security_config.xml.bak-upgrade: Error: The file name must end with
+.xml`. `assembleDebug` fails, so the lane's `build` step FAILs and every step after it is skipped. Observed on
+create-cmp-showcase, 2026-10-05, on the first full lane run after the 0.28.9 harness upgrade; deleting the
+backups made `build` PASS on the next run. Being gitignored keeps the backup out of commits, not out of Gradle's
+source sets. The repair: backups go outside the source tree (one directory under `build/` or `.create-cmp/`),
+or never beside a file under a `res/` directory — with a test that upgrades a stamp whose `res/` file changed
+and builds it.
+
+**Fires when:** an upgrade overwrites any file under an Android `res/` directory; the app's build stays broken
+until the backup is deleted by hand, and the upgrade's own advice ("Prove the build") fails on it.
+*Logged 2026-10-05, from the showcase live-check session (PATTERN-REVIEW-2026-09-28 item 1).*
+
+*Closed 2026-10-05, branch `fix/kd-284-upgrade-backups-outside-source` (fix e6a4ad4): one pure rule,
+`upgradeArtifactPath(rel, kind, runDir)` in `src/lib/upgrade.mjs`, places what an upgrade writes besides the
+app's files. Every backup goes to `build/create-cmp-upgrade/<path-safe ISO timestamp>/<rel>` — one directory per
+run under Gradle's root output, ignored by the stamp's `build/` line — in both upgrade modes and `harden`; a
+`.cmp-new` sidecar stays beside its file except inside a `res/` directory under `src/`, where it joins the run
+directory. Healing: legacy `*.bak-upgrade` files are removed everywhere before the run writes, and a legacy
+`*.cmp-new` under `res/` is moved into the run directory and reported, never deleted.
+`test/an-upgrade-never-writes-into-an-android-resource-directory.test.mjs` stamps an app whose `res/` file the
+engine changed, plants both legacy kinds, runs `upgrade --harness --yes`, and asserts every file under
+`src/**/res/` carries a resource extension, the backup and the moved sidecar are in the run directory, and the
+revert line names the backup; two `applyHarnessPlan` cases pin a `res/` conflict's sidecar in the run directory
+and a non-`res/` one beside its file. Not proven here: the Gradle build of the upgraded stamp (no L2 run).*
+
 ### KD-270 — an uncommitted path with a space in it is unclassified, and falsely owes a review — **CLOSED 2026-09-29**
 
 `scripts/proof-plan.mjs` (`dirty = sh("git", ["status", "--porcelain"])`, beside `git diff --name-only`)

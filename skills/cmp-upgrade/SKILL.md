@@ -52,8 +52,11 @@ What the engine does when applying:
 - Rewrites `compileSdk` / `targetSdk` in `composeApp/build.gradle.kts` when the set pins them
   (its `androidSdk` block) — the Android SDK levels are coupled to the set (a newer AGP + newer
   androidx force a higher `compileSdk`), so the version set manages them too, not just the catalog.
-- Backs up every touched file as `<file>.bak-upgrade` **before** writing and prints the exact
-  `mv` commands to revert.
+- Backs up every touched file **before** writing into one directory per run,
+  `build/create-cmp-upgrade/<timestamp>/<file>` (Gradle's ignored output root — never beside the
+  file, where a backup inside an Android `res/` directory breaks the build), and prints the exact
+  `mv` commands to revert. Backups an earlier engine left beside files (`*.bak-upgrade`) are
+  removed first.
 - Versions the project declares that the set doesn't know are **left untouched** (and warned), so
   project-specific dependencies survive.
 
@@ -82,7 +85,7 @@ doesn't know), and lean on the warned "left untouched" list.
 ## Report
 
 Tell the user: which set was targeted (and its notes — they explain the lockstep and the KSP2/iOS
-catch-22), the change table, which files were written and where the `.bak-upgrade` backups are, the
+catch-22), the change table, which files were written and where the backups are (`build/create-cmp-upgrade/<timestamp>/`), the
 revert commands, and the **GREEN/FAIL verdict** if `--verify`/`verify` was run. If the build is not
 green afterwards, revert with the printed `mv` commands and run **cmp-doctor** to diagnose. If the
 toolchain itself is incomplete, point them at **cmp-doctor** first.

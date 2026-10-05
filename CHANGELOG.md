@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.10] - 2026-10-05
+
+Nothing is published.
+
+### Fixed
+
+- `create-cmp upgrade` no longer breaks the Android build it just upgraded (KD-284). Every file it
+  overwrote got a `<file>.bak-upgrade` sibling, and under `composeApp/src/**/res/` Android's resource
+  merger rejects any file whose name does not end in a resource extension — `assembleDebug` failed on
+  `debug_network_security_config.xml.bak-upgrade` after the 0.28.9 harness upgrade of
+  create-cmp-showcase. Backups now go to one directory per run, `build/create-cmp-upgrade/<timestamp>/`,
+  mirroring each file's path — Gradle's root output, ignored by the stamp's `build/` line and never a
+  source set; `clean` removes them with the rest of `build/`. This holds for both modes (version set and
+  `--harness`) and for `harden`; the consent text and the printed `mv` revert lines name the new paths.
+  A `.cmp-new` conflict sidecar stays beside its file, except inside a `res/` directory under `src/`,
+  where it lands in the run directory and the conflict line names it there. One pure rule decides both,
+  `upgradeArtifactPath(rel, kind, runDir)` in `src/lib/upgrade.mjs`. An upgrade also heals what earlier
+  engines left: legacy `*.bak-upgrade` files are removed everywhere, `res/` included, before it writes,
+  and a legacy `*.cmp-new` inside `res/` — which may hold an unresolved conflict — is moved into the run
+  directory and reported, never deleted. The conflict report's "the sidecar lacks N lines" warning
+  reads the sidecar from where it was written; it never fired before.
+
 ## [0.28.9] - 2026-09-30
 
 The numbers move with the bytes: `prooflane-harness` 0.23.6 and `prooflane-receipts` 0.1.5 carry the
