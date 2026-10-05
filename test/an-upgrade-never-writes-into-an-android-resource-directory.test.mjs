@@ -179,12 +179,14 @@ test("upgrade --harness --yes on a stamp whose res/ file changed leaves res/ cle
   assert.ok(run.stdout.includes(dir), "the consent text / report never names the run directory");
 });
 
-test("legacy *.bak-upgrade files are removed everywhere (res/ included) and a legacy *.cmp-new under res/ is moved, not deleted", () => {
-  for (const rel of LEGACY_BACKUPS) assert.equal(fs.existsSync(path.join(app, rel)), false, `legacy ${rel} survived the upgrade`);
-  assert.equal(fs.existsSync(path.join(app, LEGACY_SIDECAR)), false, "a legacy .cmp-new was left inside res/");
+test("legacy *.bak-upgrade and *.cmp-new files are MOVED to <run>/legacy/<path> — never deleted, never left in the source tree — and each move is reported", () => {
   const dir = runDirOf(app);
   assert.ok(dir, `no ${RUNS}/<run>/ directory was written`);
-  const moved = path.join(app, dir, LEGACY_SIDECAR);
-  assert.equal(fs.readFileSync(moved, "utf8"), "<!-- an unresolved conflict -->\n", "the legacy sidecar's content was lost — it may hold an unresolved conflict");
-  assert.ok(run.stdout.includes(`${dir}/${LEGACY_SIDECAR}`), `the move is not reported:\n${run.stdout}`);
+  for (const rel of [...LEGACY_BACKUPS, LEGACY_SIDECAR]) {
+    assert.equal(fs.existsSync(path.join(app, rel)), false, `legacy ${rel} survived the upgrade in place`);
+    const moved = `${dir}/legacy/${rel}`;
+    assert.ok(fs.existsSync(path.join(app, moved)), `legacy ${rel} was not moved to ${moved}`);
+    assert.ok(run.stdout.includes(`${rel} → ${moved}`), `the move of ${rel} is not reported:\n${run.stdout}`);
+  }
+  assert.equal(fs.readFileSync(path.join(app, dir, "legacy", LEGACY_SIDECAR), "utf8"), "<!-- an unresolved conflict -->\n", "the legacy sidecar's content was lost — it may hold an unresolved conflict");
 });

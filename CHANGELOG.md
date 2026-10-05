@@ -23,9 +23,11 @@ Nothing is published.
   A `.cmp-new` conflict sidecar stays beside its file, except inside a `res/` directory under `src/`,
   where it lands in the run directory and the conflict line names it there. One pure rule decides both,
   `upgradeArtifactPath(rel, kind, runDir)` in `src/lib/upgrade.mjs`. An upgrade also heals what earlier
-  engines left: legacy `*.bak-upgrade` files are removed everywhere, `res/` included, before it writes,
-  and a legacy `*.cmp-new` inside `res/` — which may hold an unresolved conflict — is moved into the run
-  directory and reported, never deleted. The conflict report's "the sidecar lacks N lines" warning
+  engines left: before it writes, every legacy `*.bak-upgrade` and `*.cmp-new` found on disk — tracked,
+  untracked, ignored or not, in a git repository or not — is moved to
+  `build/create-cmp-upgrade/<run>/legacy/<its path>` and each move is reported; none is deleted (a
+  sidecar may hold an unresolved conflict). A tracked one shows in git as deleted, and the report says
+  where it went. Under `legacy/`, a moved sidecar never shares a path with this run's own sidecar. The conflict report's "the sidecar lacks N lines" warning
   reads the sidecar from where it was written; it never fired before.
 
 ## [0.28.9] - 2026-09-30

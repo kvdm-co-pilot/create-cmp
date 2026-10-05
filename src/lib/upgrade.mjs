@@ -6,11 +6,13 @@
 
 import { parseVersions, updateTomlValues, upsertProperty, parseProperties } from "./toml.mjs";
 
-import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 /**
  * Suffix of the LEGACY backups engines before 0.28.10 wrote beside each file.
- * No backup is written with it any more (KD-284) — it names what healing removes.
+ * No backup is written with it any more (KD-284) — it names what healing moves into
+ * `<run>/legacy/`.
  */
 export const BACKUP_SUFFIX = ".bak-upgrade";
 
@@ -284,54 +286,49 @@ export function sidecarDroppedLines(yours, sidecar) {
   return [...new Set(content(yours).filter((l) => !have.has(l)))];
 }
 
-/** Untracked files git lists for `projectDir` (ignored ones only, or all); null without git. */
-function untrackedPaths(projectDir, runGit, { ignoredOnly }) {
-  const git =
-    runGit ??
-    ((args, cwd) => {
-      try {
-        return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 256 * 1024 * 1024 });
-      } catch {
-        return null;
+/** Directories the legacy walk never enters: VCS, dependencies, every build output (this run's own directory included). */
+const LEGACY_WALK_SKIP = new Set([".git", "node_modules", "build", ".gradle"]);
+
+/**
+ * Every `*.bak-upgrade` backup and `*.cmp-new` sidecar an EARLIER engine left
+ * in the project, found on DISK — tracked, untracked, ignored or not, git
+ * repository or not (KD-284 review round 1: asking git left them behind
+ * whenever the app's `.gitignore` did not ignore them, or there was no git).
+ * Skips `.git/`, `node_modules/`, `.gradle/` and every `build/` directory, so
+ * this run's own artifacts under `build/create-cmp-upgrade/` are never listed.
+ * Root-relative POSIX paths, sorted.
+ * @param {string} projectDir
+ * @returns {string[]}
+ */
+export function legacyUpgradeArtifactPaths(projectDir) {
+  const found = [];
+  const walk = (absDir, relDir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(absDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const rel = relDir ? `${relDir}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (!LEGACY_WALK_SKIP.has(e.name)) walk(path.join(absDir, e.name), rel);
+      } else if (e.name.endsWith(BACKUP_SUFFIX) || e.name.endsWith(SIDECAR_SUFFIX)) {
+        found.push(rel);
       }
-    });
-  const args = ignoredOnly
-    ? ["ls-files", "-z", "--others", "--ignored", "--exclude-standard"]
-    : ["ls-files", "-z", "--others"];
-  const out = git(args, projectDir);
-  if (out === null) return null;
-  return out.split("\0").filter(Boolean);
+    }
+  };
+  walk(projectDir, "");
+  return found.sort();
 }
 
 /**
- * Backups (*BACKUP_SUFFIX) left by EARLIER upgrades beside their files,
- * anywhere in the tree — `res/` included — gitignored, so git sees them as
- * ignored-untracked. One set per upgrade accumulated and nothing cleaned them
- * (the showcase carried 0.19.0's and 0.20.0's). Returns root-relative paths;
- * [] when git is unavailable (then nothing is touched).
- * @param {string} projectDir
- * @param {{runGit?: (args: string[], cwd: string) => string|null}} [deps]
- * @returns {string[]}
+ * Where a legacy artifact goes: `<runDir>/legacy/<rel>` — kept, never deleted,
+ * and never on a path this run writes its own sidecar or backup to.
+ * @param {string} rel     the legacy file's root-relative path
+ * @param {string} runDir  this run's directory, from upgradeRunDir()
+ * @returns {string}
  */
-export function staleBackupPaths(projectDir, { runGit } = {}) {
-  const all = untrackedPaths(projectDir, runGit, { ignoredOnly: true });
-  if (all === null) return [];
-  return all.filter((p) => p.endsWith(BACKUP_SUFFIX) && !p.startsWith(`${UPGRADE_RUNS_DIR}/`)).sort();
-}
-
-/**
- * Conflict sidecars (*SIDECAR_SUFFIX) an EARLIER engine left inside an Android
- * `res/` directory, where they break the build (KD-284). Untracked, ignored or
- * not. They may hold an unresolved conflict, so the caller MOVES them into the
- * run directory — never deletes them. Root-relative; [] without git.
- * @param {string} projectDir
- * @param {{runGit?: (args: string[], cwd: string) => string|null}} [deps]
- * @returns {string[]}
- */
-export function staleResSidecarPaths(projectDir, { runGit } = {}) {
-  const all = untrackedPaths(projectDir, runGit, { ignoredOnly: false });
-  if (all === null) return [];
-  return all
-    .filter((p) => p.endsWith(SIDECAR_SUFFIX) && isAndroidResPath(p) && !p.startsWith(`${UPGRADE_RUNS_DIR}/`))
-    .sort();
+export function legacyArtifactDestination(rel, runDir) {
+  return `${runDir}/legacy/${rel.split("\\").join("/")}`;
 }

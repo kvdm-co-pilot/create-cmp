@@ -46,10 +46,9 @@ import { consent } from "../bootstrap/exec.mjs";
 import { loadRegistry, latestSet, getSet } from "../lib/registry.mjs";
 import {
   planUpgrade,
-  BACKUP_SUFFIX,
   sidecarDroppedLines,
-  staleBackupPaths,
-  staleResSidecarPaths,
+  legacyUpgradeArtifactPaths,
+  legacyArtifactDestination,
   upgradeArtifactPath,
   upgradeRunDir,
 } from "../lib/upgrade.mjs";
@@ -692,30 +691,25 @@ export async function runUpgrade(flags, positional) {
 
 
 /**
- * Heal what EARLIER engines left before this run writes (KD-284): their
- * gitignored `*.bak-upgrade` backups beside files are removed — everywhere,
- * `res/` included — and a `*.cmp-new` sidecar inside an Android `res/`
- * directory, which breaks the build there but may hold an unresolved
- * conflict, is MOVED into this run's directory, never deleted.
+ * Heal what EARLIER engines left before this run writes (KD-284): every
+ * `*.bak-upgrade` backup and every `*.cmp-new` sidecar found on disk — tracked,
+ * untracked, ignored or not, git repository or not — is MOVED to
+ * `<runDir>/legacy/<its path>`, never deleted (a sidecar may hold an unresolved
+ * conflict). The legacy/ subtree keeps a moved sidecar off the path this run
+ * writes its own sidecar to. A tracked one shows in git as deleted; the line
+ * printed here says where it went.
  */
 function healLegacyUpgradeArtifacts(projectDir, runDir) {
-  const stale = staleBackupPaths(projectDir);
-  for (const rel of stale) {
-    try {
-      fs.rmSync(path.join(projectDir, rel), { force: true });
-    } catch {
-      /* a backup that cannot be removed is left, and named below either way */
-    }
-  }
-  if (stale.length) ok(`removed ${stale.length} stale *${BACKUP_SUFFIX} file${stale.length === 1 ? "" : "s"} from earlier upgrades`);
-  for (const rel of staleResSidecarPaths(projectDir)) {
-    const to = upgradeArtifactPath(rel.slice(0, -SIDECAR_SUFFIX.length), "sidecar", runDir);
+  for (const rel of legacyUpgradeArtifactPaths(projectDir)) {
+    const to = legacyArtifactDestination(rel, runDir);
+    const what = rel.endsWith(SIDECAR_SUFFIX) ? "conflict sidecar" : "backup";
     try {
       fs.mkdirSync(path.dirname(path.join(projectDir, to)), { recursive: true });
       fs.renameSync(path.join(projectDir, rel), path.join(projectDir, to));
-      warn(`moved an earlier upgrade's conflict sidecar out of an Android res/ directory: ${rel} → ${to} — resolve by hand, then delete it`);
+      const tail = what === "conflict sidecar" ? " — resolve by hand, then delete it" : "";
+      warn(`moved an earlier upgrade's ${what}: ${rel} → ${to}${tail}`);
     } catch (e) {
-      warn(`could not move ${rel} out of its res/ directory (${e.message}) — move or delete it by hand; the Android build rejects it there`);
+      warn(`could not move an earlier upgrade's ${what} ${rel} (${e.message}) — move it out of the source tree by hand; inside an Android res/ directory it breaks the build`);
     }
   }
 }
