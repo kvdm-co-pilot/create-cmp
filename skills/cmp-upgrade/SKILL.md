@@ -55,8 +55,9 @@ What the engine does when applying:
 - Backs up every touched file **before** writing into one directory per run,
   `build/create-cmp-upgrade/<timestamp>/<file>` (Gradle's ignored output root — never beside the
   file, where a backup inside an Android `res/` directory breaks the build), and prints the exact
-  `mv` commands to revert. Backups an earlier engine left beside files (`*.bak-upgrade`) are
-  removed first.
+  `mv` commands to revert. Every `*.bak-upgrade` and `*.cmp-new` an earlier engine left in the
+  tree is moved first to `build/create-cmp-upgrade/<timestamp>/legacy/<its path>` — never deleted,
+  each move reported (a tracked one shows in git as deleted; the report says where it went).
 - Versions the project declares that the set doesn't know are **left untouched** (and warned), so
   project-specific dependencies survive.
 

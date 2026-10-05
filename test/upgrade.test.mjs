@@ -203,8 +203,7 @@ test("template-marker detection softens messaging only (never refuses)", () => {
 
 // ── Two upgrade courtesies (create-cmp-showcase, 2026-09-03) ────────────────
 import os from "node:os";
-import { execFileSync } from "node:child_process";
-import { sidecarDroppedLines, staleBackupPaths, BACKUP_SUFFIX } from "../src/lib/upgrade.mjs";
+import { sidecarDroppedLines, legacyUpgradeArtifactPaths, legacyArtifactDestination, BACKUP_SUFFIX, SIDECAR_SUFFIX } from "../src/lib/upgrade.mjs";
 
 test("sidecarDroppedLines: names the content lines YOUR file has that the sidecar lacks — the signing-key ignores, three upgrades running", () => {
   const yours = "# comment\nbuild/\n\nkeystore.properties\nkeystore/\n*.jks\n*.keystore\n.DS_Store\n";
@@ -214,19 +213,32 @@ test("sidecarDroppedLines: names the content lines YOUR file has that the sideca
   assert.deepEqual(sidecarDroppedLines("", ""), []);
 });
 
-test("staleBackupPaths: gitignored *.bak-upgrade files from earlier upgrades are found through git; without git, nothing is touched", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-stale-bak-"));
+test("legacyUpgradeArtifactPaths: every *.bak-upgrade / *.cmp-new on disk, whatever git says — never inside .git/, node_modules/, .gradle/ or any build/", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-legacy-artifacts-"));
   try {
-    const git = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "ignore"] });
-    git("init", "-q");
-    fs.writeFileSync(path.join(root, ".gitignore"), `*${BACKUP_SUFFIX}\n`);
-    fs.writeFileSync(path.join(root, "AGENTS.md"), "x\n");
-    fs.writeFileSync(path.join(root, `AGENTS.md${BACKUP_SUFFIX}`), "old\n");
-    fs.mkdirSync(path.join(root, "docs"), { recursive: true });
-    fs.writeFileSync(path.join(root, "docs", `ARCHITECTURE.md${BACKUP_SUFFIX}`), "old\n");
-    fs.writeFileSync(path.join(root, "keep.txt"), "not a backup\n");
-    assert.deepEqual(staleBackupPaths(root), [`AGENTS.md${BACKUP_SUFFIX}`, `docs/ARCHITECTURE.md${BACKUP_SUFFIX}`]);
-    assert.deepEqual(staleBackupPaths(root, { runGit: () => null }), [], "git unavailable → [] (nothing is deleted on a guess)");
+    const put = (rel) => {
+      fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, rel), "x\n");
+    };
+    // No git repository at all: the walk does not ask git.
+    for (const rel of [
+      `AGENTS.md${BACKUP_SUFFIX}`,
+      `docs/ARCHITECTURE.md${BACKUP_SUFFIX}`,
+      `composeApp/src/main/res/values/strings.xml${SIDECAR_SUFFIX}`,
+      "keep.txt",
+      `.git/x${BACKUP_SUFFIX}`,
+      `node_modules/p/y${SIDECAR_SUFFIX}`,
+      `.gradle/z${BACKUP_SUFFIX}`,
+      `composeApp/build/intermediates/a${SIDECAR_SUFFIX}`,
+      `build/create-cmp-upgrade/2026-10-05T10-00-00-000Z/AGENTS.md${SIDECAR_SUFFIX}`,
+    ]) put(rel);
+    assert.deepEqual(legacyUpgradeArtifactPaths(root), [
+      `AGENTS.md${BACKUP_SUFFIX}`,
+      `composeApp/src/main/res/values/strings.xml${SIDECAR_SUFFIX}`,
+      `docs/ARCHITECTURE.md${BACKUP_SUFFIX}`,
+    ]);
+    const run = "build/create-cmp-upgrade/2026-10-05T10-00-00-000Z";
+    assert.equal(legacyArtifactDestination(`docs/ARCHITECTURE.md${BACKUP_SUFFIX}`, run), `${run}/legacy/docs/ARCHITECTURE.md${BACKUP_SUFFIX}`);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

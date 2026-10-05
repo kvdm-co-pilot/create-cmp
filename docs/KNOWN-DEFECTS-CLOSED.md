@@ -33,13 +33,18 @@ until the backup is deleted by hand, and the upgrade's own advice ("Prove the bu
 app's files. Every backup goes to `build/create-cmp-upgrade/<path-safe ISO timestamp>/<rel>` — one directory per
 run under Gradle's root output, ignored by the stamp's `build/` line — in both upgrade modes and `harden`; a
 `.cmp-new` sidecar stays beside its file except inside a `res/` directory under `src/`, where it joins the run
-directory. Healing: legacy `*.bak-upgrade` files are removed everywhere before the run writes, and a legacy
-`*.cmp-new` under `res/` is moved into the run directory and reported, never deleted.
+directory. Healing (as amended after review round 1, which showed a git-based heal left leftovers in `res/` when
+the app's `.gitignore` did not ignore them or there was no git): before the run writes, every legacy
+`*.bak-upgrade` and `*.cmp-new` on disk — whatever git says — is moved to `<run>/legacy/<its path>` and
+reported, never deleted; under `legacy/` it cannot collide with this run's own sidecar.
 `test/an-upgrade-never-writes-into-an-android-resource-directory.test.mjs` stamps an app whose `res/` file the
 engine changed, plants both legacy kinds, runs `upgrade --harness --yes`, and asserts every file under
 `src/**/res/` carries a resource extension, the backup and the moved sidecar are in the run directory, and the
 revert line names the backup; two `applyHarnessPlan` cases pin a `res/` conflict's sidecar in the run directory
-and a non-`res/` one beside its file. Not proven here: the Gradle build of the upgraded stamp (no L2 run).*
+and a non-`res/` one beside its file. Review round 1's
+`test/an-upgrade-leaves-no-build-breaking-file-in-res-whatever-git-says.test.mjs` (an un-ignored leftover; no git
+repository) and `test/an-upgrade-never-overwrites-a-sidecar-it-says-it-moved.test.mjs` (a moved sidecar keeps its
+content where the report says) pin the heal. Not proven here: the Gradle build of the upgraded stamp (no L2 run).*
 
 ### KD-270 — an uncommitted path with a space in it is unclassified, and falsely owes a review — **CLOSED 2026-09-29**
 
