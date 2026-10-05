@@ -336,3 +336,86 @@ export function legacyUpgradeArtifactPaths(projectDir) {
 export function legacyArtifactDestination(rel, runDir) {
   return `${runDir}/legacy/${rel.split("\\").join("/")}`;
 }
+
+/**
+ * The ONE record of every file a run touches (KD-284 review round 2). Every write to a
+ * file that exists first backs its original bytes up to `<runDir>/<rel>`
+ * (upgradeArtifactPath "backup") — once, on the first touch, so the backup is the
+ * pre-run file; every file the run creates is recorded as created; every legacy
+ * artifact moved into `<runDir>/legacy/` is recorded as moved. The printed "To revert"
+ * block is generated from this record and nothing else, so a writer routed through it
+ * cannot be missing from the revert. Paths under the run directory itself (a sidecar a
+ * build tool must not read, the backups) are the run's own artifacts, not recorded.
+ * @param {string} projectDir
+ * @param {string} runDir  this run's directory, from upgradeRunDir()
+ */
+export function createRunRecord(projectDir, runDir) {
+  const backups = [];
+  const created = [];
+  const moved = [];
+  const seen = new Set();
+  const norm = (rel) => rel.split("\\").join("/");
+  const abs = (rel) => path.join(projectDir, rel);
+  const ensureDir = (file) => fs.mkdirSync(path.dirname(file), { recursive: true });
+
+  /** Record `rel` before its first change: back up an existing file, or mark it created. */
+  function touch(rel) {
+    const r = norm(rel);
+    if (seen.has(r)) return r;
+    seen.add(r);
+    if (r === runDir || r.startsWith(`${runDir}/`)) return r;
+    if (fs.existsSync(abs(r))) {
+      const to = abs(upgradeArtifactPath(r, "backup", runDir));
+      ensureDir(to);
+      fs.copyFileSync(abs(r), to);
+      backups.push(r);
+    } else {
+      created.push(r);
+    }
+    return r;
+  }
+
+  return {
+    runDir,
+    backups,
+    created,
+    moved,
+    touch,
+    /** Write `content` to `rel` — recorded first. */
+    write(rel, content) {
+      const r = touch(rel);
+      ensureDir(abs(r));
+      fs.writeFileSync(abs(r), content);
+    },
+    /** Copy `fromAbs` over `rel` — recorded first. */
+    copy(rel, fromAbs) {
+      const r = touch(rel);
+      ensureDir(abs(r));
+      fs.copyFileSync(fromAbs, abs(r));
+    },
+    /** Delete `rel` — backed up first. */
+    remove(rel) {
+      const r = touch(rel);
+      fs.rmSync(abs(r));
+    },
+    /** Move a legacy artifact `fromRel` → `toRel` (under `<runDir>/legacy/`). Throws on failure. */
+    move(fromRel, toRel) {
+      ensureDir(abs(toRel));
+      fs.renameSync(abs(fromRel), abs(toRel));
+      moved.push({ from: norm(fromRel), to: norm(toRel) });
+    },
+    /**
+     * The revert, as shell lines: an `mv` per backup, an `rm` per created file still on
+     * disk, then an `mv` back per legacy move (after the `rm`s, so a sidecar this run
+     * created on a moved artifact's path is gone before the artifact returns).
+     * @returns {string[]}
+     */
+    revertLines() {
+      const lines = [];
+      for (const r of backups) lines.push(`mv "${abs(upgradeArtifactPath(r, "backup", runDir))}" "${abs(r)}"`);
+      for (const r of created) if (fs.existsSync(abs(r))) lines.push(`rm "${abs(r)}"`);
+      for (const { from, to } of moved) lines.push(`mv "${abs(to)}" "${abs(from)}"`);
+      return lines;
+    },
+  };
+}

@@ -48,14 +48,15 @@ import {
   SIDECAR_SUFFIX,
 } from "../lib/harness-upgrade.mjs";
 import { listFiles } from "../lib/fsutil.mjs";
-import { isBuildReadPath, upgradeArtifactPath, upgradeRunDir } from "../lib/upgrade.mjs";
+import { createRunRecord, isBuildReadPath, upgradeArtifactPath, upgradeRunDir } from "../lib/upgrade.mjs";
 import { regenerateArchDoc } from "../lib/add-firebase.mjs";
 import {
+  LOCK_PATH as HARNESS_LOCK_PATH,
   writeHarnessLock,
   checkHarnessIntegrity,
   describeIntegrity,
 } from "../../packages/harness/src/lib/harness-lock.mjs";
-import { writeHarnessSource, HARNESS_PKG_NAME } from "../../packages/harness/src/lib/harness-source.mjs";
+import { SOURCE_PATH as HARNESS_SOURCE_PATH, writeHarnessSource, HARNESS_PKG_NAME } from "../../packages/harness/src/lib/harness-source.mjs";
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -145,13 +146,15 @@ export async function hardenProject({ projectDir, templateDir, apply = false, lo
     const actionable = plan.entries.filter(
       (e) => e.write !== null || e.sidecar !== null || e.remove
     );
-    const result = applyHarnessPlan(projectDir, actionable, { runDir });
+    // Every file this run writes or creates goes through ONE record, and the printed
+    // revert is generated from it (KD-284 review round 2) — engine files, seeds, the
+    // arch doc, the harness source and lock, and create-cmp.json alike.
+    const run = createRunRecord(projectDir, runDir);
+    const result = applyHarnessPlan(projectDir, actionable, { runDir, record: run });
 
     const seeded = [];
     for (const rel of seedPlan) {
-      const target = path.join(projectDir, rel);
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.copyFileSync(path.join(newDir, rel), target);
+      run.copy(rel, path.join(newDir, rel));
       seeded.push(rel);
     }
 
@@ -160,20 +163,23 @@ export async function hardenProject({ projectDir, templateDir, apply = false, lo
     // screen the adopter wrote — reached the doc's generated sections, and the merge above only
     // carries the stamps' view of them. The walker is installed now: regenerate with it, the one
     // the lane's archDoc step checks against, before the lock is taken.
+    run.touch("docs/ARCHITECTURE.md");
     const archDoc = await regenerateArchDoc(projectDir);
 
     const harnessVersion = shippedHarnessVersion();
     if (harnessVersion) {
       // Same ordering as the stamp: the record is inside the region the lock
       // hashes, so it exists first (ADR-0008).
+      run.touch(HARNESS_SOURCE_PATH);
       writeHarnessSource(projectDir, { name: HARNESS_PKG_NAME, version: harnessVersion, source: "local" });
+      run.touch(HARNESS_LOCK_PATH);
       writeHarnessLock(projectDir, { version: harnessVersion });
     }
 
     const updated = { ...record, harness: true, engineVersion: currentEngineVersion() };
-    fs.writeFileSync(specPath, JSON.stringify(updated, null, 2) + "\n");
+    run.write("create-cmp.json", JSON.stringify(updated, null, 2) + "\n");
 
-    return { alreadyFull: false, plan, seedPlan, result, seeded, archDoc, record: updated };
+    return { alreadyFull: false, plan, seedPlan, result, seeded, archDoc, record: updated, runRecord: run };
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
@@ -272,16 +278,13 @@ export async function runHarden(flags, positional) {
   for (const f of r.sidecars) warn(`conflict sidecar ${f} — resolve by hand, then delete it`);
   ok(`create-cmp.json → harness: true · ${describeIntegrity(checkHarnessIntegrity(projectDir))}`);
 
-  // The same revert story `upgrade` prints (KD-286): where the backups are, and one line each.
-  if (r.backups.length > 0 || r.created.length > 0) {
-    if (r.backups.length > 0) process.stdout.write(`\nBackups in ${r.runDir}/\n`);
+  // The same revert story `upgrade` prints (KD-286), generated from the run's one record of
+  // every file it wrote or created (KD-284 review round 2): where the backups are, one line each.
+  const revert = applied.runRecord.revertLines();
+  if (revert.length > 0) {
+    if (applied.runRecord.backups.length > 0) process.stdout.write(`\nBackups in ${r.runDir}/\n`);
     process.stdout.write(`\n${colors.bold("To revert")}\n`);
-    for (const f of r.backups) {
-      process.stdout.write(`  mv "${path.join(projectDir, backupOf(f))}" "${path.join(projectDir, f)}"\n`);
-    }
-    for (const f of r.created) {
-      process.stdout.write(`  rm "${path.join(projectDir, f)}"\n`);
-    }
+    for (const line of revert) process.stdout.write(`  ${line}\n`);
   }
 
   process.stdout.write(
