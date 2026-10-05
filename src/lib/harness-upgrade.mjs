@@ -41,7 +41,7 @@ import { spawnSync } from "node:child_process";
 
 import { listFiles } from "./fsutil.mjs";
 import { isBinaryPath, replaceTokens } from "./tokens.mjs";
-import { SIDECAR_SUFFIX, upgradeArtifactPath, upgradeRunDir } from "./upgrade.mjs";
+import { SIDECAR_SUFFIX, createRunRecord, upgradeArtifactPath, upgradeRunDir } from "./upgrade.mjs";
 import { firebaseFromSpecRecord, recordedFirebaseRegion } from "./add-firebase.mjs";
 import { isHarnessFile } from "../../packages/harness/src/lib/harness-region.mjs";
 
@@ -579,10 +579,13 @@ export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeT
  * Returns what happened so the CLI can print revert commands.
  * @param {string} projectDir
  * @param {Array<{relPath:string, bucket:string, write:Buffer|null, sidecar:Buffer|null, remove:boolean}>} entries
- * @param {{runDir?: string}} [opts]  this run's directory (default: a fresh upgradeRunDir())
+ * @param {{runDir?: string, record?: ReturnType<typeof createRunRecord>}} [opts]  this run's
+ *   directory (default: a fresh upgradeRunDir()) and the run's one record of every file it
+ *   touches (default: a fresh one) — every write here goes through it, so the caller's
+ *   printed revert (record.revertLines()) covers this plan and whatever else the run writes.
  * @returns {{written:string[], created:string[], deleted:string[],
  *            sidecars:string[], conflicts:Array<{relPath:string, sidecar:string}>,
- *            backups:string[], runDir:string}}
+ *            backups:string[], runDir:string, record:object}}
  *   written   rel paths overwritten (backup exists)
  *   created   rel paths newly created (no previous content, no backup)
  *   deleted   rel paths removed (backup exists)
@@ -591,19 +594,13 @@ export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeT
  *   backups   rel paths that have a backup at `upgradeArtifactPath(rel, "backup", runDir)`
  *   runDir    the run directory backups (and res/ sidecars) went to
  */
-export function applyHarnessPlan(projectDir, entries, { runDir = upgradeRunDir() } = {}) {
+export function applyHarnessPlan(projectDir, entries, { runDir = upgradeRunDir(), record = createRunRecord(projectDir, runDir) } = {}) {
   const written = [];
   const created = [];
   const deleted = [];
   const sidecars = [];
   const conflicts = [];
   const backups = [];
-  const backUp = (rel, abs) => {
-    const to = path.join(projectDir, upgradeArtifactPath(rel, "backup", runDir));
-    fs.mkdirSync(path.dirname(to), { recursive: true });
-    fs.copyFileSync(abs, to);
-    backups.push(rel);
-  };
   const patched = [];
   const patchChunks = [];
   for (const e of entries) {
@@ -614,27 +611,24 @@ export function applyHarnessPlan(projectDir, entries, { runDir = upgradeRunDir()
     const abs = path.join(projectDir, e.relPath);
     if (e.sidecar !== null && e.sidecar !== undefined) {
       const sidecarRel = upgradeArtifactPath(e.relPath, "sidecar", runDir);
-      const sidecarPath = path.join(projectDir, sidecarRel);
-      fs.mkdirSync(path.dirname(sidecarPath), { recursive: true });
-      fs.writeFileSync(sidecarPath, e.sidecar);
+      record.write(sidecarRel, e.sidecar);
       sidecars.push(sidecarRel);
       conflicts.push({ relPath: e.relPath, sidecar: sidecarRel });
       continue;
     }
     if (e.remove) {
-      backUp(e.relPath, abs);
-      fs.rmSync(abs);
+      record.remove(e.relPath);
+      backups.push(e.relPath);
       deleted.push(e.relPath);
       continue;
     }
     if (e.write !== null && e.write !== undefined) {
-      fs.mkdirSync(path.dirname(abs), { recursive: true });
-      if (fs.existsSync(abs)) {
-        backUp(e.relPath, abs);
-        fs.writeFileSync(abs, e.write);
+      const existed = fs.existsSync(abs);
+      record.write(e.relPath, e.write);
+      if (existed) {
+        backups.push(e.relPath);
         written.push(e.relPath);
       } else {
-        fs.writeFileSync(abs, e.write);
         created.push(e.relPath);
       }
     }
@@ -644,10 +638,8 @@ export function applyHarnessPlan(projectDir, entries, { runDir = upgradeRunDir()
   // something to preserve, and only after the writes above succeeded.
   let patchPath = null;
   if (patchChunks.length > 0) {
-    const abs = path.join(projectDir, LOCAL_PATCH_PATH);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(
-      abs,
+    record.write(
+      LOCAL_PATCH_PATH,
       `# Local changes to machine-owned lane code, preserved by \`create-cmp upgrade --harness\`.\n` +
         `#\n` +
         `# The lane was replaced with the new engine's version. These edits were NOT\n` +
@@ -669,7 +661,7 @@ export function applyHarnessPlan(projectDir, entries, { runDir = upgradeRunDir()
     );
     patchPath = LOCAL_PATCH_PATH;
   }
-  return { written, created, deleted, sidecars, conflicts, backups, runDir, patched, patchPath };
+  return { written, created, deleted, sidecars, conflicts, backups, runDir, patched, patchPath, record };
 }
 
 /**

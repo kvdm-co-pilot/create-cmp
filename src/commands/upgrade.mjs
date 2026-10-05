@@ -50,11 +50,12 @@ import {
   sidecarDroppedLines,
   legacyUpgradeArtifactPaths,
   legacyArtifactDestination,
+  createRunRecord,
   upgradeArtifactPath,
   upgradeRunDir,
 } from "../lib/upgrade.mjs";
-import { writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "../../packages/harness/src/lib/harness-lock.mjs";
-import { writeHarnessSource, HARNESS_PKG_NAME } from "../../packages/harness/src/lib/harness-source.mjs";
+import { LOCK_PATH as HARNESS_LOCK_PATH, writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "../../packages/harness/src/lib/harness-lock.mjs";
+import { SOURCE_PATH as HARNESS_SOURCE_PATH, writeHarnessSource, HARNESS_PKG_NAME } from "../../packages/harness/src/lib/harness-source.mjs";
 import { LOCAL_PATCH_PATH, stampBaseWith } from "../lib/harness-upgrade.mjs";
 import { buildTokenMap } from "../lib/tokens.mjs";
 import {
@@ -108,14 +109,18 @@ function shippedHarnessVersion() {
  * @param {string} version
  * @returns {boolean} whether the record was updated
  */
-function writeBackEngineVersion(projectDir, version) {
+function writeBackEngineVersion(projectDir, version, run = null) {
   const specPath = path.join(projectDir, "create-cmp.json");
   try {
     const record = JSON.parse(fs.readFileSync(specPath, "utf8"));
     if (record.engineVersion === version) return false;
     record.engineVersion = version;
     record.upgradedAt = new Date().toISOString();
-    fs.writeFileSync(specPath, `${JSON.stringify(record, null, 2)}\n`);
+    const body = `${JSON.stringify(record, null, 2)}\n`;
+    // Inside an applied run, the run's record backs the file up first, so the printed
+    // revert returns engineVersion with the files (KD-284 review round 2).
+    if (run) run.write("create-cmp.json", body);
+    else fs.writeFileSync(specPath, body);
     return true;
   } catch {
     return false; // best-effort — never fail an applied upgrade over metadata
@@ -444,8 +449,11 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
   const actionable = plan.entries.filter(
     (e) => e.write !== null || e.sidecar !== null || e.remove
   );
-  healLegacyUpgradeArtifacts(projectDir, runDir);
-  const result = applyHarnessPlan(projectDir, actionable, { runDir });
+  // ONE record of every file this run writes, creates or moves; the printed revert is
+  // generated from it alone (KD-284 review round 2).
+  const run = createRunRecord(projectDir, runDir);
+  healLegacyUpgradeArtifacts(projectDir, run);
+  const result = applyHarnessPlan(projectDir, actionable, { runDir, record: run });
   const backupOf = (f) => upgradeArtifactPath(f, "backup", runDir);
   for (const f of result.written) ok(`wrote ${f} ${colors.dim(`(backup: ${backupOf(f)})`)}`);
   for (const f of result.created) ok(`created ${f}`);
@@ -476,7 +484,9 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
     // rather than only in a number (ADR-0008 / Stage 1 criterion D). Without
     // this a stamped app upgraded here moved its lock's `version` and not one
     // digest — the shape the criterion forbids.
+    run.touch(HARNESS_SOURCE_PATH);
     writeHarnessSource(projectDir, { name: HARNESS_PKG_NAME, version: harnessVersion, source: "local" });
+    run.touch(HARNESS_LOCK_PATH);
     writeHarnessLock(projectDir, { version: harnessVersion });
     ok(`lane locked at ${colors.bold(harnessVersion)} — ${describeIntegrity(checkHarnessIntegrity(projectDir))}`);
   }
@@ -496,15 +506,17 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
     );
   }
 
-  if (result.backups.length > 0 || result.created.length > 0) {
-    process.stdout.write(`\n${colors.bold("To revert")}\n`);
-    for (const f of result.backups) {
-      process.stdout.write(`  mv "${path.join(projectDir, backupOf(f))}" "${path.join(projectDir, f)}"\n`);
-    }
-    for (const f of result.created) {
-      process.stdout.write(`  rm "${path.join(projectDir, f)}"\n`);
-    }
+  // ── Advance the recorded engine version ───────────────────────────────────
+  // Only with nothing conflicted: the sweep landed completely, so the
+  // next upgrade's merge base is genuinely this version. Skipping this is what
+  // made repeat upgrades compound — the base stayed stale and every
+  // already-resolved conflict came back. Through the run's record, and before
+  // the revert is printed, so the revert returns the record with the files.
+  if (result.sidecars.length === 0 && writeBackEngineVersion(projectDir, currentVersion, run)) {
+    ok(`create-cmp.json engineVersion → ${colors.bold(currentVersion)}`);
   }
+
+  printRevert(run);
 
   if (result.sidecars.length > 0) {
     fail(
@@ -512,14 +524,6 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
         `each *${SIDECAR_SUFFIX} sidecar carries the new engine content.`
     );
     return 1;
-  }
-  // ── Advance the recorded engine version ───────────────────────────────────
-  // Only now, with nothing conflicted: the sweep landed completely, so the
-  // next upgrade's merge base is genuinely this version. Skipping this is what
-  // made repeat upgrades compound — the base stayed stale and every
-  // already-resolved conflict came back.
-  if (writeBackEngineVersion(projectDir, currentVersion)) {
-    ok(`create-cmp.json engineVersion → ${colors.bold(currentVersion)}`);
   }
 
   process.stdout.write(
@@ -651,30 +655,23 @@ export async function runUpgrade(flags, positional) {
     process.exit(0);
   }
 
-  // Apply, backing up each file before its first write.
-  const touched = [];
+  // Apply, backing up each file before its first write — through the run's one record.
+  const run = createRunRecord(projectDir, runDir);
   const writes = [
     { path: tomlPath, content: plan.newTomlContent },
     { path: gradlePropsPath, content: plan.newGradlePropertiesContent },
     { path: wrapperPropsPath, content: plan.newWrapperPropertiesContent },
     { path: buildGradlePath, content: plan.newBuildGradleContent },
   ];
-  healLegacyUpgradeArtifacts(projectDir, runDir);
+  healLegacyUpgradeArtifacts(projectDir, run);
   for (const w of writes) {
     if (w.content === null) continue;
     const rel = path.relative(projectDir, w.path).split(path.sep).join("/");
-    const backup = path.join(projectDir, upgradeArtifactPath(rel, "backup", runDir));
-    fs.mkdirSync(path.dirname(backup), { recursive: true });
-    fs.copyFileSync(w.path, backup);
-    fs.writeFileSync(w.path, w.content);
-    touched.push({ path: w.path, backup });
-    ok(`wrote ${rel} ${colors.dim(`(backup: ${path.relative(projectDir, backup)})`)}`);
+    run.write(rel, w.content);
+    ok(`wrote ${rel} ${colors.dim(`(backup: ${upgradeArtifactPath(rel, "backup", runDir)})`)}`);
   }
 
-  process.stdout.write(`\n${colors.bold("To revert")}\n`);
-  for (const t of touched) {
-    process.stdout.write(`  mv "${t.backup}" "${t.path}"\n`);
-  }
+  printRevert(run);
 
   if (flagBool(flags, "verify", false)) {
     process.stdout.write("\n");
@@ -700,17 +697,29 @@ export async function runUpgrade(flags, positional) {
  * writes its own sidecar to. A tracked one shows in git as deleted; the line
  * printed here says where it went.
  */
-function healLegacyUpgradeArtifacts(projectDir, runDir) {
+function healLegacyUpgradeArtifacts(projectDir, run) {
   for (const rel of legacyUpgradeArtifactPaths(projectDir)) {
-    const to = legacyArtifactDestination(rel, runDir);
+    const to = legacyArtifactDestination(rel, run.runDir);
     const what = rel.endsWith(SIDECAR_SUFFIX) ? "conflict sidecar" : "backup";
     try {
-      fs.mkdirSync(path.dirname(path.join(projectDir, to)), { recursive: true });
-      fs.renameSync(path.join(projectDir, rel), path.join(projectDir, to));
+      run.move(rel, to);
       const tail = what === "conflict sidecar" ? " — resolve by hand, then delete it" : "";
       warn(`moved an earlier upgrade's ${what}: ${rel} → ${to}${tail}`);
     } catch (e) {
       warn(`could not move an earlier upgrade's ${what} ${rel} (${e.message}) — move it out of the source tree by hand; inside an Android res/ directory it breaks the build`);
     }
   }
+}
+
+/**
+ * Print the run's "To revert" block — generated from its one record of every file it
+ * backed up, created or moved (KD-284 review round 2), so running every line returns
+ * every file outside build/ to its pre-run bytes.
+ * @param {ReturnType<typeof createRunRecord>} run
+ */
+function printRevert(run) {
+  const lines = run.revertLines();
+  if (lines.length === 0) return;
+  process.stdout.write(`\n${colors.bold("To revert")}\n`);
+  for (const line of lines) process.stdout.write(`  ${line}\n`);
 }
