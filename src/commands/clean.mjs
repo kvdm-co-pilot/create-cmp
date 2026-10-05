@@ -8,7 +8,9 @@
 //     kotlin-native(-prebuilt) dirs whose version ≠ the project's kotlin
 //     version (no known project kotlin → report only).
 //   - project: deletes Gradle `build/` dirs (only those next to a
-//     build.gradle[.kts]) and the root `.gradle/` dir.
+//     build.gradle[.kts]) and the root `.gradle/` dir. A
+//     `build/create-cmp-upgrade/` holding a `*.cmp-new` (an unresolved
+//     upgrade conflict) is kept and named; the rest of that build/ goes.
 //   - ~/.gradle/caches: size REPORT ONLY — never auto-deleted; the manual
 //     command is printed instead.
 //   - Sizes are shown before and after; every deletion is consent-gated
@@ -21,7 +23,7 @@ import path from "node:path";
 import { colors, ok, warn } from "../lib/log.mjs";
 import { flagBool } from "../lib/args.mjs";
 import { probe, consent } from "../bootstrap/exec.mjs";
-import { selectStaleKonan, selectProjectCleanDirs } from "../lib/clean.mjs";
+import { selectStaleKonan, selectProjectCleanDirs, keepUnresolvedUpgradeConflicts, UPGRADE_RUNS_CHILD } from "../lib/clean.mjs";
 import { formatBytes } from "../lib/project-doctor.mjs";
 import { parseVersions } from "../lib/toml.mjs";
 
@@ -31,6 +33,25 @@ function duBytes(p) {
   if (!r.ok) return null;
   const kb = parseInt(r.stdout.split(/\s+/)[0], 10);
   return Number.isFinite(kb) ? kb * 1024 : null;
+}
+
+/** Every `*.cmp-new` under `<projectDir>/<rel>` (root-relative paths); [] when it does not exist. */
+function sidecarsUnder(projectDir, rel) {
+  const out = [];
+  const walk = (abs, r) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(abs, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isDirectory()) walk(path.join(abs, e.name), `${r}/${e.name}`);
+      else if (e.name.endsWith(".cmp-new")) out.push(`${r}/${e.name}`);
+    }
+  };
+  walk(path.join(projectDir, rel), rel);
+  return out.sort();
 }
 
 function listProjectTree(projectDir) {
@@ -125,7 +146,17 @@ export async function runClean(flags, positional) {
   if (fs.existsSync(projectDir)) {
     const tree = listProjectTree(projectDir);
     const cleanDirs = selectProjectCleanDirs(tree);
-    for (const rel of cleanDirs) {
+    const { remove, kept } = keepUnresolvedUpgradeConflicts(cleanDirs, {
+      conflictsUnder: (dir) => sidecarsUnder(projectDir, `${dir}/${UPGRADE_RUNS_CHILD}`),
+      childrenOf: (dir) => fs.readdirSync(path.join(projectDir, dir)),
+    });
+    for (const k of kept) {
+      warn(
+        `kept ${k.path}/ — it holds ${k.conflicts.length} unresolved upgrade conflict(s) (*.cmp-new), e.g. ${k.conflicts[0]}; ` +
+          `resolve each, then delete the directory`
+      );
+    }
+    for (const rel of remove) {
       const abs = path.join(projectDir, rel);
       plan.push({ label: `${path.basename(projectDir)}/${rel}`, absPath: abs, bytes: duBytes(abs) });
     }

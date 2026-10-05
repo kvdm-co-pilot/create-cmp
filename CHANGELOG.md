@@ -18,8 +18,12 @@ Nothing is published.
   `debug_network_security_config.xml.bak-upgrade` after the 0.28.9 harness upgrade of
   create-cmp-showcase. Backups now go to one directory per run, `build/create-cmp-upgrade/<timestamp>/`,
   mirroring each file's path — Gradle's root output, ignored by the stamp's `build/` line and never a
-  source set; `clean` removes them with the rest of `build/`. This holds for both modes (version set and
-  `--harness`) and for `harden`; the consent text and the printed `mv` revert lines name the new paths.
+  source set. `./gradlew clean` does not remove them — a stamped app's root project has no `clean` task
+  (`./gradlew :clean --dry-run` fails; create-cmp-showcase, 2026-10-05) — but `create-cmp clean` does,
+  with the rest of `build/`; it keeps `build/create-cmp-upgrade/` while that holds an unresolved
+  `*.cmp-new`, and names it. This holds for both modes (version set and `--harness`) and for `harden`;
+  the consent text and the printed `mv` revert lines name the new paths, and `harden` now prints its
+  run directory, a backup path per refreshed or deleted file, and the same revert lines.
   A `.cmp-new` conflict sidecar stays beside its file, except inside anything a build tool reads whole —
   any path with a `src/` segment (every Gradle source set: `res/`, `composeResources/`, `resources/`,
   `assets/`, `kotlin/` …) or under `iosApp/` (KD-287) — where it lands in the run directory and the

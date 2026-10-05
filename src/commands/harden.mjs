@@ -48,7 +48,7 @@ import {
   SIDECAR_SUFFIX,
 } from "../lib/harness-upgrade.mjs";
 import { listFiles } from "../lib/fsutil.mjs";
-import { isBuildReadPath } from "../lib/upgrade.mjs";
+import { isBuildReadPath, upgradeArtifactPath, upgradeRunDir } from "../lib/upgrade.mjs";
 import { regenerateArchDoc } from "../lib/add-firebase.mjs";
 import {
   writeHarnessLock,
@@ -90,7 +90,7 @@ function currentEngineVersion() {
  * @returns {Promise<{alreadyFull:boolean, plan?:object, result?:object,
  *           seeded?:string[], record?:object}>}
  */
-export async function hardenProject({ projectDir, templateDir, apply = false, log = () => {} }) {
+export async function hardenProject({ projectDir, templateDir, apply = false, log = () => {}, runDir = upgradeRunDir() }) {
   const specPath = path.join(projectDir, "create-cmp.json");
   if (!fs.existsSync(specPath)) {
     throw new Error(
@@ -145,7 +145,7 @@ export async function hardenProject({ projectDir, templateDir, apply = false, lo
     const actionable = plan.entries.filter(
       (e) => e.write !== null || e.sidecar !== null || e.remove
     );
-    const result = applyHarnessPlan(projectDir, actionable);
+    const result = applyHarnessPlan(projectDir, actionable, { runDir });
 
     const seeded = [];
     for (const rel of seedPlan) {
@@ -244,8 +244,9 @@ export async function runHarden(flags, positional) {
     process.exit(0);
   }
 
+  const runDir = upgradeRunDir();
   const approved = await consent(
-    `\nInstall the harness (existing files are backed up to build/create-cmp-upgrade/<run>/; edited files get *${SIDECAR_SUFFIX} sidecars, never clobbered)?`,
+    `\nInstall the harness (backups written to ${runDir}/; edited files get *${SIDECAR_SUFFIX} sidecars, never clobbered)?`,
     { assumeYes: flagBool(flags, "yes", false) }
   );
   if (!approved) {
@@ -255,7 +256,7 @@ export async function runHarden(flags, positional) {
 
   let applied;
   try {
-    applied = await hardenProject({ projectDir, apply: true, log: (m) => step(m) });
+    applied = await hardenProject({ projectDir, apply: true, log: (m) => step(m), runDir });
   } catch (e) {
     fail(e.message);
     process.exit(1);
@@ -263,11 +264,25 @@ export async function runHarden(flags, positional) {
 
   const r = applied.result;
   for (const f of r.created) ok(`installed ${f}`);
-  for (const f of r.written) ok(`refreshed ${f}`);
+  const backupOf = (f) => upgradeArtifactPath(f, "backup", r.runDir);
+  for (const f of r.written) ok(`refreshed ${f} ${colors.dim(`(backup: ${backupOf(f)})`)}`);
+  for (const f of r.deleted) ok(`deleted ${f} ${colors.dim(`(backup: ${backupOf(f)})`)}`);
   for (const f of applied.seeded) ok(`seeded ${f}`);
   if (applied.archDoc?.wrote) ok(`regenerated docs/ARCHITECTURE.md → ${applied.archDoc.changedSections.join(", ")}`);
   for (const f of r.sidecars) warn(`conflict sidecar ${f} — resolve by hand, then delete it`);
   ok(`create-cmp.json → harness: true · ${describeIntegrity(checkHarnessIntegrity(projectDir))}`);
+
+  // The same revert story `upgrade` prints (KD-286): where the backups are, and one line each.
+  if (r.backups.length > 0 || r.created.length > 0) {
+    if (r.backups.length > 0) process.stdout.write(`\nBackups in ${r.runDir}/\n`);
+    process.stdout.write(`\n${colors.bold("To revert")}\n`);
+    for (const f of r.backups) {
+      process.stdout.write(`  mv "${path.join(projectDir, backupOf(f))}" "${path.join(projectDir, f)}"\n`);
+    }
+    for (const f of r.created) {
+      process.stdout.write(`  rm "${path.join(projectDir, f)}"\n`);
+    }
+  }
 
   process.stdout.write(
     `\nProve it: ${colors.bold("node qa/verify.mjs --profile scaffold")}` +
