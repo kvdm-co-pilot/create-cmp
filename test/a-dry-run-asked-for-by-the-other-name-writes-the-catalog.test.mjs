@@ -108,7 +108,8 @@ function upgradePreviewed(spelling) {
     fs.writeFileSync(toml, CATALOG);
     const r = run(["upgrade", ...spelling, "--yes"], dir);
     assert.equal(r.code, 0, `create-cmp upgrade ${spelling.join(" ")} --yes failed:\n${r.out}`);
-    return fs.readFileSync(toml, "utf8") === CATALOG && !fs.existsSync(`${toml}.bak-upgrade`);
+    // A write is backed up into build/create-cmp-upgrade/<run>/ (KD-284); a preview writes neither.
+    return fs.readFileSync(toml, "utf8") === CATALOG && !fs.existsSync(path.join(dir, "build", "create-cmp-upgrade"));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

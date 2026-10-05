@@ -11,8 +11,9 @@
 //   - Applying rewrites ONLY the changed version values in-place (surgical
 //     line edits — formatting/comments preserved), updates gradle.properties
 //     flags the set requires (ksp.useKSP2), and the wrapper distributionUrl.
-//   - Every touched file gets a `<file>.bak-upgrade` backup first, and the
-//     revert commands are printed.
+//   - Every touched file is backed up first into this run's directory,
+//     `build/create-cmp-upgrade/<timestamp>/<file>` (Gradle's ignored output
+//     root, never a source set — KD-284), and the revert commands are printed.
 //   - Lockstep guardrail: refuses to write a file where ksp is not
 //     `<kotlin>-…`.
 //   - Works on ANY project with a libs.versions.toml — template markers only
@@ -27,7 +28,9 @@
 //   app's tree — both stamps use the app's own recorded config from
 //   create-cmp.json so every diff is pure engine change). Conflicts never
 //   clobber: the app's file stays put and a `.cmp-new` sidecar carries the
-//   new engine content. Decision logic lives in src/lib/harness-upgrade.mjs;
+//   new engine content — beside the file, or in the run directory when the
+//   file is inside an Android `res/` directory (KD-284). Backups go to the
+//   run directory, as in the first mode. Decision logic lives in src/lib/harness-upgrade.mjs;
 //   this file does the filesystem/CLI orchestration (npm pack of the base
 //   version, temp-dir stamps, consent, backups, report, exit code).
 
@@ -41,7 +44,15 @@ import { flagBool } from "../lib/args.mjs";
 import { colors, ok, warn, fail, step } from "../lib/log.mjs";
 import { consent } from "../bootstrap/exec.mjs";
 import { loadRegistry, latestSet, getSet } from "../lib/registry.mjs";
-import { planUpgrade, BACKUP_SUFFIX, sidecarDroppedLines, staleBackupPaths } from "../lib/upgrade.mjs";
+import {
+  planUpgrade,
+  BACKUP_SUFFIX,
+  sidecarDroppedLines,
+  staleBackupPaths,
+  staleResSidecarPaths,
+  upgradeArtifactPath,
+  upgradeRunDir,
+} from "../lib/upgrade.mjs";
 import { writeHarnessLock, checkHarnessIntegrity, describeIntegrity } from "../../packages/harness/src/lib/harness-lock.mjs";
 import { writeHarnessSource, HARNESS_PKG_NAME } from "../../packages/harness/src/lib/harness-source.mjs";
 import { LOCAL_PATCH_PATH, stampBaseWith } from "../lib/harness-upgrade.mjs";
@@ -234,7 +245,7 @@ function printHarnessReport(plan) {
     ["added", "added (new engine files absent from the app)", ok],
     ["removed", "removed (engine deleted, app never touched — will be deleted)", warn],
     ["orphaned", "orphaned (engine deleted these but the app modified them — left in place)", warn],
-    ["conflicted", `conflicted (NEVER clobbered — new engine content lands beside as *${SIDECAR_SUFFIX})`, fail],
+    ["conflicted", `conflicted (NEVER clobbered — new engine content lands as a *${SIDECAR_SUFFIX} sidecar beside the file, or under build/create-cmp-upgrade/ for a file inside an Android res/ directory)`, fail],
   ];
   let actionable = 0;
   for (const [bucket, label, log] of groups) {
@@ -419,8 +430,10 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
     process.stdout.write(`\n${colors.yellow("Dry run")} — nothing written. Re-run with --yes to apply.\n`);
     return 0;
   }
+  const runDir = upgradeRunDir();
   const approved = await consent(
-    `\nApply these changes (backups written as *${BACKUP_SUFFIX}; conflicts only get *${SIDECAR_SUFFIX} sidecars)?`,
+    `\nApply these changes (backups written to ${runDir}/; conflicts only get *${SIDECAR_SUFFIX} sidecars — ` +
+      `beside the file, or in ${runDir}/ for a file inside an Android res/ directory)?`,
     { assumeYes: flagBool(flags, "yes", false) }
   );
   if (!approved) {
@@ -431,18 +444,19 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
   const actionable = plan.entries.filter(
     (e) => e.write !== null || e.sidecar !== null || e.remove
   );
-  removeStaleBackups(projectDir);
-  const result = applyHarnessPlan(projectDir, actionable);
-  for (const f of result.written) ok(`wrote ${f} ${colors.dim(`(backup: ${f}${BACKUP_SUFFIX})`)}`);
+  healLegacyUpgradeArtifacts(projectDir, runDir);
+  const result = applyHarnessPlan(projectDir, actionable, { runDir });
+  const backupOf = (f) => upgradeArtifactPath(f, "backup", runDir);
+  for (const f of result.written) ok(`wrote ${f} ${colors.dim(`(backup: ${backupOf(f)})`)}`);
   for (const f of result.created) ok(`created ${f}`);
-  for (const f of result.deleted) ok(`deleted ${f} ${colors.dim(`(backup: ${f}${BACKUP_SUFFIX})`)}`);
-  for (const f of result.sidecars) {
-    warn(`conflict sidecar ${f} — resolve by hand, then delete it`);
+  for (const f of result.deleted) ok(`deleted ${f} ${colors.dim(`(backup: ${backupOf(f)})`)}`);
+  for (const { relPath: f, sidecar } of result.conflicts) {
+    warn(`conflict on ${f}: sidecar ${sidecar} — resolve by hand, then delete it`);
     // Name what taking the sidecar would DROP, so the obvious resolution is
     // never a silent loss (the showcase's signing-key ignores, three upgrades running).
     let dropped = [];
     try {
-      dropped = sidecarDroppedLines(fs.readFileSync(path.join(projectDir, f), "utf8"), fs.readFileSync(path.join(projectDir, f + SIDECAR_SUFFIX), "utf8"));
+      dropped = sidecarDroppedLines(fs.readFileSync(path.join(projectDir, f), "utf8"), fs.readFileSync(path.join(projectDir, sidecar), "utf8"));
     } catch {
       dropped = [];
     }
@@ -485,7 +499,7 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
   if (result.backups.length > 0 || result.created.length > 0) {
     process.stdout.write(`\n${colors.bold("To revert")}\n`);
     for (const f of result.backups) {
-      process.stdout.write(`  mv "${path.join(projectDir, f)}${BACKUP_SUFFIX}" "${path.join(projectDir, f)}"\n`);
+      process.stdout.write(`  mv "${path.join(projectDir, backupOf(f))}" "${path.join(projectDir, f)}"\n`);
     }
     for (const f of result.created) {
       process.stdout.write(`  rm "${path.join(projectDir, f)}"\n`);
@@ -628,7 +642,8 @@ export async function runUpgrade(flags, positional) {
     process.exit(0);
   }
 
-  const approved = await consent(`\nApply these changes (backups written as *${BACKUP_SUFFIX})?`, {
+  const runDir = upgradeRunDir();
+  const approved = await consent(`\nApply these changes (backups written to ${runDir}/)?`, {
     assumeYes: flagBool(flags, "yes", false),
   });
   if (!approved) {
@@ -644,18 +659,21 @@ export async function runUpgrade(flags, positional) {
     { path: wrapperPropsPath, content: plan.newWrapperPropertiesContent },
     { path: buildGradlePath, content: plan.newBuildGradleContent },
   ];
-  removeStaleBackups(projectDir);
+  healLegacyUpgradeArtifacts(projectDir, runDir);
   for (const w of writes) {
     if (w.content === null) continue;
-    fs.copyFileSync(w.path, w.path + BACKUP_SUFFIX);
+    const rel = path.relative(projectDir, w.path).split(path.sep).join("/");
+    const backup = path.join(projectDir, upgradeArtifactPath(rel, "backup", runDir));
+    fs.mkdirSync(path.dirname(backup), { recursive: true });
+    fs.copyFileSync(w.path, backup);
     fs.writeFileSync(w.path, w.content);
-    touched.push(w.path);
-    ok(`wrote ${path.relative(projectDir, w.path)} ${colors.dim(`(backup: ${path.relative(projectDir, w.path)}${BACKUP_SUFFIX})`)}`);
+    touched.push({ path: w.path, backup });
+    ok(`wrote ${rel} ${colors.dim(`(backup: ${path.relative(projectDir, backup)})`)}`);
   }
 
   process.stdout.write(`\n${colors.bold("To revert")}\n`);
   for (const t of touched) {
-    process.stdout.write(`  mv "${t}${BACKUP_SUFFIX}" "${t}"\n`);
+    process.stdout.write(`  mv "${t.backup}" "${t.path}"\n`);
   }
 
   if (flagBool(flags, "verify", false)) {
@@ -673,8 +691,14 @@ export async function runUpgrade(flags, positional) {
 }
 
 
-/** Backups an EARLIER upgrade left (gitignored *.bak-upgrade) go before this one writes its own. */
-function removeStaleBackups(projectDir) {
+/**
+ * Heal what EARLIER engines left before this run writes (KD-284): their
+ * gitignored `*.bak-upgrade` backups beside files are removed — everywhere,
+ * `res/` included — and a `*.cmp-new` sidecar inside an Android `res/`
+ * directory, which breaks the build there but may hold an unresolved
+ * conflict, is MOVED into this run's directory, never deleted.
+ */
+function healLegacyUpgradeArtifacts(projectDir, runDir) {
   const stale = staleBackupPaths(projectDir);
   for (const rel of stale) {
     try {
@@ -684,4 +708,14 @@ function removeStaleBackups(projectDir) {
     }
   }
   if (stale.length) ok(`removed ${stale.length} stale *${BACKUP_SUFFIX} file${stale.length === 1 ? "" : "s"} from earlier upgrades`);
+  for (const rel of staleResSidecarPaths(projectDir)) {
+    const to = upgradeArtifactPath(rel.slice(0, -SIDECAR_SUFFIX.length), "sidecar", runDir);
+    try {
+      fs.mkdirSync(path.dirname(path.join(projectDir, to)), { recursive: true });
+      fs.renameSync(path.join(projectDir, rel), path.join(projectDir, to));
+      warn(`moved an earlier upgrade's conflict sidecar out of an Android res/ directory: ${rel} → ${to} — resolve by hand, then delete it`);
+    } catch (e) {
+      warn(`could not move ${rel} out of its res/ directory (${e.message}) — move or delete it by hand; the Android build rejects it there`);
+    }
+  }
 }

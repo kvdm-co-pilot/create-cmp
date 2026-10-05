@@ -48,6 +48,7 @@ import {
   SIDECAR_SUFFIX,
 } from "../lib/harness-upgrade.mjs";
 import { listFiles } from "../lib/fsutil.mjs";
+import { isAndroidResPath } from "../lib/upgrade.mjs";
 import { regenerateArchDoc } from "../lib/add-firebase.mjs";
 import {
   writeHarnessLock,
@@ -223,7 +224,11 @@ export async function runHarden(flags, positional) {
       `${colors.dim(`already current ${counts.current + counts.unchanged}`)}\n`
   );
   for (const f of conflicts) {
-    warn(`edited since stamp — full-mode content will land beside as ${f}${SIDECAR_SUFFIX}`);
+    warn(
+      isAndroidResPath(f)
+        ? `edited since stamp — full-mode content will land as build/create-cmp-upgrade/<run>/${f}${SIDECAR_SUFFIX} (never inside res/)`
+        : `edited since stamp — full-mode content will land beside as ${f}${SIDECAR_SUFFIX}`
+    );
   }
 
   if (installing === 0 && seedPlan.length === 0 && conflicts.length === 0) {
@@ -240,7 +245,7 @@ export async function runHarden(flags, positional) {
   }
 
   const approved = await consent(
-    `\nInstall the harness (existing files are backed up; edited files get *${SIDECAR_SUFFIX} sidecars, never clobbered)?`,
+    `\nInstall the harness (existing files are backed up to build/create-cmp-upgrade/<run>/; edited files get *${SIDECAR_SUFFIX} sidecars, never clobbered)?`,
     { assumeYes: flagBool(flags, "yes", false) }
   );
   if (!approved) {
