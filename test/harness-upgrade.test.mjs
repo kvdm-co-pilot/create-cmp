@@ -29,7 +29,7 @@ import {
   stampBaseWith,
 } from "../src/lib/harness-upgrade.mjs";
 import { buildTokenMap } from "../src/lib/tokens.mjs";
-import { BACKUP_SUFFIX } from "../src/lib/upgrade.mjs";
+import { BACKUP_SUFFIX, upgradeArtifactPath } from "../src/lib/upgrade.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.join(__dirname, "..", "bin", "create-cmp.mjs");
@@ -413,6 +413,7 @@ test("apply: conflict leaves the app's file byte-for-byte and writes a .cmp-new 
     const appFile = path.join(t.app, "composeApp", "build.gradle.kts");
     assert.equal(fs.readFileSync(appFile, "utf8"), appContent, "app file must be untouched");
     assert.equal(fs.existsSync(appFile + BACKUP_SUFFIX), false, "no backup — nothing was changed");
+    assert.deepEqual(result.backups, [], "no backup — nothing was changed");
     const sidecar = appFile + SIDECAR_SUFFIX;
     assert.ok(fs.existsSync(sidecar), "sidecar must exist");
     assert.equal(fs.readFileSync(sidecar, "utf8"), "x\ny ENGINE\nz\n", "sidecar carries the NEW engine content");
@@ -447,21 +448,27 @@ test("apply: applied/merged/added/removed all land with backups where a file cha
       plan.entries.filter((e) => e.write !== null || e.sidecar !== null || e.remove)
     );
 
+    // Backups live in the run directory (KD-284), never beside the file.
+    const backup = (rel) => path.join(t.app, upgradeArtifactPath(rel, "backup", result.runDir));
+    assert.match(result.runDir, /^build\/create-cmp-upgrade\//);
+    for (const rel of ["applied.txt", "merged.txt", "removed.txt"]) {
+      assert.equal(fs.existsSync(path.join(t.app, rel + BACKUP_SUFFIX)), false, `${rel}: no backup beside the file`);
+    }
     // applied: new content, backup of the old
     assert.equal(fs.readFileSync(path.join(t.app, "applied.txt"), "utf8"), "v2\n");
-    assert.equal(fs.readFileSync(path.join(t.app, "applied.txt" + BACKUP_SUFFIX), "utf8"), "v1\n");
+    assert.equal(fs.readFileSync(backup("applied.txt"), "utf8"), "v1\n");
     // merged: both edits, backup of the pre-merge file
     const merged = fs.readFileSync(path.join(t.app, "merged.txt"), "utf8");
     assert.match(merged, /one APP/);
     assert.match(merged, /five ENGINE/);
-    assert.ok(fs.existsSync(path.join(t.app, "merged.txt" + BACKUP_SUFFIX)));
+    assert.ok(fs.existsSync(backup("merged.txt")));
     // added: created (into a new dir), no backup
     assert.equal(fs.readFileSync(path.join(t.app, "sub", "added.txt"), "utf8"), "fresh\n");
-    assert.equal(fs.existsSync(path.join(t.app, "sub", "added.txt" + BACKUP_SUFFIX)), false);
+    assert.equal(fs.existsSync(backup("sub/added.txt")), false);
     assert.deepEqual(result.created, ["sub/added.txt"]);
     // removed: gone, backup remains
     assert.equal(fs.existsSync(path.join(t.app, "removed.txt")), false);
-    assert.equal(fs.readFileSync(path.join(t.app, "removed.txt" + BACKUP_SUFFIX), "utf8"), "old\n");
+    assert.equal(fs.readFileSync(backup("removed.txt"), "utf8"), "old\n");
     assert.deepEqual(result.deleted, ["removed.txt"]);
     assert.equal(result.sidecars.length, 0);
   } finally {

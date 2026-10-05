@@ -41,12 +41,12 @@ import { spawnSync } from "node:child_process";
 
 import { listFiles } from "./fsutil.mjs";
 import { isBinaryPath, replaceTokens } from "./tokens.mjs";
-import { BACKUP_SUFFIX } from "./upgrade.mjs";
+import { SIDECAR_SUFFIX, upgradeArtifactPath, upgradeRunDir } from "./upgrade.mjs";
 import { firebaseFromSpecRecord, recordedFirebaseRegion } from "./add-firebase.mjs";
 import { isHarnessFile } from "../../packages/harness/src/lib/harness-region.mjs";
 
-/** Sidecar suffix for the new engine content beside a conflicted file. */
-export const SIDECAR_SUFFIX = ".cmp-new";
+/** Sidecar suffix for the new engine content of a conflicted file (defined beside the placement rule). */
+export { SIDECAR_SUFFIX };
 
 /**
  * Hard exclusion list — the app's own state, or its secrets, that the engine
@@ -568,26 +568,41 @@ export function planHarnessUpgrade({ baseDir, newDir, projectDir, merge = mergeT
 
 /**
  * Apply a plan to the app's working tree. Every file that gets written over
- * or deleted is backed up first as `<file>${BACKUP_SUFFIX}` (same suffix as
- * the version-catalog upgrade path, so one revert story covers both modes).
+ * or deleted is backed up first into this run's directory
+ * (`upgradeArtifactPath(rel, "backup", runDir)` — `build/create-cmp-upgrade/<run>/<rel>`,
+ * the same rule as the version-catalog upgrade path, so one revert story
+ * covers both modes; never beside the file — KD-284).
  * Conflicted entries never touch the app's file — only the `.cmp-new` sidecar
- * is written. Returns what happened so the CLI can print revert commands.
+ * is written, beside the file or, inside an Android `res/` directory, in the
+ * run directory (`upgradeArtifactPath(rel, "sidecar", runDir)`).
+ * Returns what happened so the CLI can print revert commands.
  * @param {string} projectDir
  * @param {Array<{relPath:string, bucket:string, write:Buffer|null, sidecar:Buffer|null, remove:boolean}>} entries
+ * @param {{runDir?: string}} [opts]  this run's directory (default: a fresh upgradeRunDir())
  * @returns {{written:string[], created:string[], deleted:string[],
- *            sidecars:string[], backups:string[]}}
- *   written  rel paths overwritten (backup exists)
- *   created  rel paths newly created (no previous content, no backup)
- *   deleted  rel paths removed (backup exists)
- *   sidecars rel paths of `.cmp-new` files written beside conflicts
- *   backups  rel paths that have a `${BACKUP_SUFFIX}` copy
+ *            sidecars:string[], conflicts:Array<{relPath:string, sidecar:string}>,
+ *            backups:string[], runDir:string}}
+ *   written   rel paths overwritten (backup exists)
+ *   created   rel paths newly created (no previous content, no backup)
+ *   deleted   rel paths removed (backup exists)
+ *   sidecars  rel paths where each conflict's `.cmp-new` was written
+ *   conflicts each conflicted rel path with its sidecar's rel path
+ *   backups   rel paths that have a backup at `upgradeArtifactPath(rel, "backup", runDir)`
+ *   runDir    the run directory backups (and res/ sidecars) went to
  */
-export function applyHarnessPlan(projectDir, entries) {
+export function applyHarnessPlan(projectDir, entries, { runDir = upgradeRunDir() } = {}) {
   const written = [];
   const created = [];
   const deleted = [];
   const sidecars = [];
+  const conflicts = [];
   const backups = [];
+  const backUp = (rel, abs) => {
+    const to = path.join(projectDir, upgradeArtifactPath(rel, "backup", runDir));
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(abs, to);
+    backups.push(rel);
+  };
   const patched = [];
   const patchChunks = [];
   for (const e of entries) {
@@ -597,15 +612,16 @@ export function applyHarnessPlan(projectDir, entries) {
     }
     const abs = path.join(projectDir, e.relPath);
     if (e.sidecar !== null && e.sidecar !== undefined) {
-      const sidecarPath = abs + SIDECAR_SUFFIX;
+      const sidecarRel = upgradeArtifactPath(e.relPath, "sidecar", runDir);
+      const sidecarPath = path.join(projectDir, sidecarRel);
       fs.mkdirSync(path.dirname(sidecarPath), { recursive: true });
       fs.writeFileSync(sidecarPath, e.sidecar);
-      sidecars.push(e.relPath + SIDECAR_SUFFIX);
+      sidecars.push(sidecarRel);
+      conflicts.push({ relPath: e.relPath, sidecar: sidecarRel });
       continue;
     }
     if (e.remove) {
-      fs.copyFileSync(abs, abs + BACKUP_SUFFIX);
-      backups.push(e.relPath);
+      backUp(e.relPath, abs);
       fs.rmSync(abs);
       deleted.push(e.relPath);
       continue;
@@ -613,8 +629,7 @@ export function applyHarnessPlan(projectDir, entries) {
     if (e.write !== null && e.write !== undefined) {
       fs.mkdirSync(path.dirname(abs), { recursive: true });
       if (fs.existsSync(abs)) {
-        fs.copyFileSync(abs, abs + BACKUP_SUFFIX);
-        backups.push(e.relPath);
+        backUp(e.relPath, abs);
         fs.writeFileSync(abs, e.write);
         written.push(e.relPath);
       } else {
@@ -653,7 +668,7 @@ export function applyHarnessPlan(projectDir, entries) {
     );
     patchPath = LOCAL_PATCH_PATH;
   }
-  return { written, created, deleted, sidecars, backups, patched, patchPath };
+  return { written, created, deleted, sidecars, conflicts, backups, runDir, patched, patchPath };
 }
 
 /**

@@ -126,7 +126,11 @@ test("`--dry-run false --yes` and `--dry-run=false --yes` apply — the flag is 
       assert.match(r.out, /Applied\./, `\`${line}\` did not apply:\n${r.out}`);
       const toml = path.join(dir, "gradle", "libs.versions.toml");
       assert.notEqual(fs.readFileSync(toml, "utf8"), CATALOG, `\`${line}\` said it applied and left the catalog as it was`);
-      assert.equal(fs.readFileSync(`${toml}.bak-upgrade`, "utf8"), CATALOG, `\`${line}\` wrote without the backup it promises`);
+      // The backup lands in this run's directory under build/ (KD-284), never beside the file.
+      const runs = path.join(dir, "build", "create-cmp-upgrade");
+      const [run] = fs.existsSync(runs) ? fs.readdirSync(runs) : [];
+      assert.ok(run, `\`${line}\` wrote without the backup it promises (no build/create-cmp-upgrade/<run>/)`);
+      assert.equal(fs.readFileSync(path.join(runs, run, "gradle", "libs.versions.toml"), "utf8"), CATALOG, `\`${line}\` wrote without the backup it promises`);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
