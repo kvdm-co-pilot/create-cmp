@@ -9,6 +9,36 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-286 — three surfaces still describe the upgrade's backups as they were before KD-284 — **CLOSED 2026-10-05**
+
+`template/gitignore:31-36`, `CHANGELOG.md` 0.28.10, `docs/USAGE.md` (`upgrade` row), `src/commands/harden.mjs:248,263-270`
+
+KD-284 moved every backup to `build/create-cmp-upgrade/<run>/`. The stamp's `.gitignore` comment above `*.bak-upgrade`
+still tells every new app that `create-cmp upgrade`'s pre-write backups are those files and to "delete them once you
+have reviewed the upgrade's diff" — no engine writes one any more; the ignore line itself is still right for legacy
+files. CHANGELOG 0.28.10 and USAGE state that "`clean` removes them with the rest of `build/`": the root
+`build.gradle.kts` applies every plugin `apply false`, so whether the root project has a `clean` task that deletes the
+root `build/` is unproven — no Gradle run backs the sentence, and if it is false, run directories accumulate (the old
+stale-backup sweep removed earlier runs' backups; nothing removes earlier run directories). `harden` says backups go to
+`build/create-cmp-upgrade/<run>/` and then never names the run, prints no backup path for a `refreshed` file, and does
+not report `deleted` files at all. *Logged 2026-10-05, KD-284 review round 1.*
+
+**Fires when:** an adopter reads the comment, runs `clean` expecting the backups gone, or looks for what `harden`
+backed up; nothing is lost and every backup is written.
+
+*Closed 2026-10-05, branch `fix/kd-284-upgrade-backups-outside-source` (fix 7c0d0bc). The `clean` sentence was false
+as written: a stamped app's root project has no `clean` task (`./gradlew :clean --dry-run` fails on
+create-cmp-showcase, 2026-10-05), so `./gradlew clean` leaves the root `build/` and the backups; `create-cmp clean`
+(`src/lib/clean.mjs`) deletes every `build/` beside a `build.gradle(.kts)`, the root included. CHANGELOG 0.28.10,
+the USAGE `upgrade` and `clean` rows and cmp-upgrade now say exactly that, and `create-cmp clean` keeps a
+`build/create-cmp-upgrade/` holding any `*.cmp-new` — an unresolved conflict — while deleting the rest of that
+`build/`, and names the kept path (`test/clean-keeps-an-unresolved-upgrade-conflict.test.mjs`). The stamp's
+`.gitignore` comment says `*.bak-upgrade` stays for files engines before 0.28.10 left, which the next upgrade moves
+into `build/create-cmp-upgrade/<run>/legacy/`. `harden` names its run directory, prints a backup path per refreshed
+or deleted file and the same `mv`/`rm` revert lines `upgrade` prints
+(`test/harden-prints-the-backups-it-wrote-and-how-to-revert.test.mjs` checks every printed backup exists). Not
+proven here: a Gradle run of the stamp (no L2 run); the `:clean` fact is the 2026-10-05 measurement above.*
+
 ### KD-287 — the sidecar rule protects Android `res/` and no other tree a build tool reads — **CLOSED 2026-10-05**
 
 `src/lib/upgrade.mjs` (`isAndroidResPath`, `upgradeArtifactPath`, `staleBackupPaths`, `staleResSidecarPaths`)
