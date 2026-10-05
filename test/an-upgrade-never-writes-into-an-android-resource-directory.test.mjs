@@ -58,19 +58,31 @@ function runDirOf(app) {
 
 // --- the placement rule, pure --------------------------------------------------
 
-test("upgradeArtifactPath: backups always go to the run directory; a sidecar goes there only from a res/ directory", () => {
+test("upgradeArtifactPath: backups always go to the run directory; a sidecar goes there from anything a build tool reads whole (a src/ segment, or iosApp/), beside the file otherwise", () => {
   const place = upgradeLib.upgradeArtifactPath;
   assert.equal(typeof place, "function", "src/lib/upgrade.mjs exports no upgradeArtifactPath");
   const run = `${RUNS}/2026-10-05T10-00-00-000Z`;
   assert.equal(place(RES_XML, "backup", run), `${run}/${RES_XML}`);
   assert.equal(place("gradle/libs.versions.toml", "backup", run), `${run}/gradle/libs.versions.toml`);
-  assert.equal(place("AGENTS.md", "sidecar", run), "AGENTS.md.cmp-new", "a non-res sidecar stays beside its file");
+  // Beside the file: nothing outside a source set or iosApp/ is read whole by a build tool.
+  assert.equal(place("AGENTS.md", "sidecar", run), "AGENTS.md.cmp-new", "a root sidecar stays beside its file");
   assert.equal(place("composeApp/build.gradle.kts", "sidecar", run), "composeApp/build.gradle.kts.cmp-new");
-  assert.equal(place(RES_XML, "sidecar", run), `${run}/${RES_XML}.cmp-new`, "a res/ sidecar joins the run directory");
-  assert.equal(place("composeApp/src/main/res/values/strings.xml", "sidecar", run), `${run}/composeApp/src/main/res/values/strings.xml.cmp-new`);
-  // `res` only counts as a segment under `src/` — a `res` elsewhere is not Android's.
   assert.equal(place("docs/res/notes.md", "sidecar", run), "docs/res/notes.md.cmp-new");
-  assert.equal(place("composeApp/src/commonMain/kotlin/resolve/Res.kt", "sidecar", run), "composeApp/src/commonMain/kotlin/resolve/Res.kt.cmp-new");
+  assert.equal(place(".github/workflows/lane.yml", "sidecar", run), ".github/workflows/lane.yml.cmp-new");
+  assert.equal(place("qa/verify.mjs", "sidecar", run), "qa/verify.mjs.cmp-new");
+  // The run directory: every Gradle source set (res/, composeResources/, resources/, assets/, kotlin/ …) and iosApp/.
+  for (const rel of [
+    RES_XML,
+    "composeApp/src/main/res/values/strings.xml",
+    "composeApp/src/commonMain/composeResources/font/Inter-Regular.ttf",
+    "composeApp/src/commonMain/kotlin/resolve/Res.kt",
+    "composeApp/src/androidMain/assets/seed.json",
+    "server/src/main/resources/application.conf",
+    "src/main/kotlin/App.kt",
+    "iosApp/iosApp/Info.plist",
+    "iosApp/project.yml",
+  ]) assert.equal(place(rel, "sidecar", run), `${run}/${rel}.cmp-new`, `${rel}'s sidecar joins the run directory`);
+  assert.equal(place("composeApp\\src\\main\\res\\values\\strings.xml", "sidecar", run), `${run}/composeApp/src/main/res/values/strings.xml.cmp-new`, "Windows separators");
   assert.throws(() => place(RES_XML, "other", run), /kind/);
 });
 
@@ -138,6 +150,21 @@ test("a conflict on a non-res file still puts its .cmp-new beside it", () => {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+for (const rel of ["composeApp/src/commonMain/composeResources/font/Inter-Regular.ttf", "iosApp/iosApp/ContentView.swift"]) {
+  test(`a conflict on ${rel} puts its sidecar in the run directory, never beside the file (KD-287)`, () => {
+    const { scratch, app, runDir, result } = conflictOn(rel);
+    try {
+      assert.equal(fs.readFileSync(path.join(app, rel), "utf8"), "x\ny APP\nz\n", "the app's file is untouched");
+      assert.equal(fs.existsSync(path.join(app, rel + ".cmp-new")), false, `a .cmp-new was written beside ${rel}, inside a directory a build tool reads whole`);
+      const sidecar = `${runDir}/${rel}.cmp-new`;
+      assert.equal(fs.readFileSync(path.join(app, sidecar), "utf8"), "x\ny ENGINE\nz\n", "the sidecar carries the new engine content");
+      assert.deepEqual(result.sidecars, [sidecar], "the result names where the sidecar actually is");
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+}
 
 // --- the CLI, on a real stamp whose res/ file the engine changed -------------------
 

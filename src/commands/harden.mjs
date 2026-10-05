@@ -48,7 +48,7 @@ import {
   SIDECAR_SUFFIX,
 } from "../lib/harness-upgrade.mjs";
 import { listFiles } from "../lib/fsutil.mjs";
-import { isAndroidResPath } from "../lib/upgrade.mjs";
+import { isBuildReadPath } from "../lib/upgrade.mjs";
 import { regenerateArchDoc } from "../lib/add-firebase.mjs";
 import {
   writeHarnessLock,
@@ -225,8 +225,8 @@ export async function runHarden(flags, positional) {
   );
   for (const f of conflicts) {
     warn(
-      isAndroidResPath(f)
-        ? `edited since stamp — full-mode content will land as build/create-cmp-upgrade/<run>/${f}${SIDECAR_SUFFIX} (never inside res/)`
+      isBuildReadPath(f)
+        ? `edited since stamp — full-mode content will land as build/create-cmp-upgrade/<run>/${f}${SIDECAR_SUFFIX} (never beside a file a build tool reads whole: a src/ segment, or iosApp/)`
         : `edited since stamp — full-mode content will land beside as ${f}${SIDECAR_SUFFIX}`
     );
   }

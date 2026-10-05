@@ -29,7 +29,8 @@
 //   create-cmp.json so every diff is pure engine change). Conflicts never
 //   clobber: the app's file stays put and a `.cmp-new` sidecar carries the
 //   new engine content — beside the file, or in the run directory when the
-//   file is inside an Android `res/` directory (KD-284). Backups go to the
+//   file is inside anything a build tool reads whole — a `src/` segment or
+//   `iosApp/` (KD-284, KD-287). Backups go to the
 //   run directory, as in the first mode. Decision logic lives in src/lib/harness-upgrade.mjs;
 //   this file does the filesystem/CLI orchestration (npm pack of the base
 //   version, temp-dir stamps, consent, backups, report, exit code).
@@ -244,7 +245,7 @@ function printHarnessReport(plan) {
     ["added", "added (new engine files absent from the app)", ok],
     ["removed", "removed (engine deleted, app never touched — will be deleted)", warn],
     ["orphaned", "orphaned (engine deleted these but the app modified them — left in place)", warn],
-    ["conflicted", `conflicted (NEVER clobbered — new engine content lands as a *${SIDECAR_SUFFIX} sidecar beside the file, or under build/create-cmp-upgrade/ for a file inside an Android res/ directory)`, fail],
+    ["conflicted", `conflicted (NEVER clobbered — new engine content lands as a *${SIDECAR_SUFFIX} sidecar beside the file, or under build/create-cmp-upgrade/ for a file a build tool reads whole (any path with a src/ segment, or under iosApp/))`, fail],
   ];
   let actionable = 0;
   for (const [bucket, label, log] of groups) {
@@ -432,7 +433,7 @@ async function harnessPlanAndApply({ flags, record, projectDir, targetDir, tmpRo
   const runDir = upgradeRunDir();
   const approved = await consent(
     `\nApply these changes (backups written to ${runDir}/; conflicts only get *${SIDECAR_SUFFIX} sidecars — ` +
-      `beside the file, or in ${runDir}/ for a file inside an Android res/ directory)?`,
+      `beside the file, or in ${runDir}/ for a file a build tool reads whole (any path with a src/ segment, or under iosApp/))?`,
     { assumeYes: flagBool(flags, "yes", false) }
   );
   if (!approved) {

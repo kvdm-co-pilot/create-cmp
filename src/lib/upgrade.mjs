@@ -39,15 +39,18 @@ export function upgradeRunDir(now = new Date()) {
 }
 
 /**
- * Is this project-relative path inside an Android resource directory — a
- * `res/` segment somewhere under a `src/` segment (`composeApp/src/main/res/…`)?
- * Every file there must carry a resource extension, so nothing of ours may land
- * there.
+ * Is this project-relative path inside something a build tool reads WHOLE —
+ * every file in it is compiled, merged or bundled, so a stray `<file>.cmp-new`
+ * there breaks or pollutes the build? That is any path with a `src/` segment
+ * (every Gradle source set: `res/`, whose merger rejects a non-resource name
+ * (KD-284), `composeResources/`, `resources/`, `assets/`, `kotlin/` …) and
+ * everything under `iosApp/` (XcodeGen sources the Xcode project globs) — KD-287.
  * @param {string} rel
  * @returns {boolean}
  */
-export function isAndroidResPath(rel) {
-  return /(^|\/)src\/(?:[^/]+\/)*res\//.test(rel.split("\\").join("/"));
+export function isBuildReadPath(rel) {
+  const r = rel.split("\\").join("/");
+  return /(^|\/)src\//.test(r) || r.startsWith("iosApp/");
 }
 
 /**
@@ -56,7 +59,8 @@ export function isAndroidResPath(rel) {
  *
  *   backup   → `<runDir>/<rel>` always — never beside the file.
  *   sidecar  → `<rel>.cmp-new` beside the file (the human resolves it there),
- *              EXCEPT inside an Android `res/` directory, where it is
+ *              EXCEPT inside anything a build tool reads whole
+ *              (isBuildReadPath: a `src/` segment, or `iosApp/`), where it is
  *              `<runDir>/<rel>.cmp-new`.
  *
  * @param {string} rel     the app file's path, relative to the project root
@@ -67,7 +71,7 @@ export function isAndroidResPath(rel) {
 export function upgradeArtifactPath(rel, kind, runDir) {
   const r = rel.split("\\").join("/");
   if (kind === "backup") return `${runDir}/${r}`;
-  if (kind === "sidecar") return isAndroidResPath(r) ? `${runDir}/${r}${SIDECAR_SUFFIX}` : `${r}${SIDECAR_SUFFIX}`;
+  if (kind === "sidecar") return isBuildReadPath(r) ? `${runDir}/${r}${SIDECAR_SUFFIX}` : `${r}${SIDECAR_SUFFIX}`;
   throw new Error(`upgradeArtifactPath: unknown kind ${JSON.stringify(kind)} (backup | sidecar)`);
 }
 
