@@ -124,6 +124,8 @@ you the same list without opening anything.
 | **KD-280** | `qa/hooks/firebase-consent.mjs` runs `main()` on import — anything that imports it for `decide`/`mutationsIn` blocks on stdin, then exits the process | nothing imports it today (the test spawns it); brief-check carries the entry-module guard this file lacks |
 | **KD-281** | the classifier note costs ~600 ms on every git/gh/npm/pnpm/yarn/npx call (measured 596–605 ms vs 44 ms for `ls`, 2026-09-30) and repeats the same line on each | steering only, inside the 10 s hook budget; the cost is latency per call, not a wrong answer |
 | **KD-282** | the harden/upgrade JSON merge identifies a hook by matcher + command, so an app's own field on a lane hook (a raised `timeout`) is dropped silently when the engine re-spells that hook's command | cannot fire until the engine re-spells a hook an app customised; the result keeps the engine's hook, never loses one |
+| **KD-288** | an upgrade with nothing to apply returns before the legacy heal, so a `*.bak-upgrade` left in `res/` stays there although the prose says the next upgrade moves it | every pre-0.28.10 stamp differs from 0.28.10 in `.gitignore`, so its first `upgrade --harness` has work and heals (measured); fires on a restored leftover or a version-set-only upgrade |
+| **KD-289** | the legacy heal moves tracked files and the app's own `*.bak-upgrade`/`*.cmp-new` with no dry-run or consent preview, into `build/`, which `clean` deletes for a backup | each move is reported on the run and git keeps the tracked bytes; no stamp tracks such a file |
 
 ---
 
@@ -926,3 +928,41 @@ truncates.
 **Fires when:** any multi-line FAIL/ERROR reason; the verdict and the receipt are right, only the console hides
 the evidence an adopter needs to act.
 *Logged 2026-10-05, from the showcase live-check session (PATTERN-REVIEW-2026-09-28 item 1).*
+
+### KD-288 — an upgrade with nothing to apply never heals the legacy leftovers it says the next upgrade moves
+
+`src/commands/upgrade.mjs` (`healLegacyUpgradeArtifacts` is called only after the "nothing to apply" returns)
+
+The template's `.gitignore` comment says "the next upgrade moves any left in the tree into
+build/create-cmp-upgrade/<run>/legacy/"; the cmp-upgrade SKILL says every legacy `*.bak-upgrade` / `*.cmp-new`
+"is moved first". Both modes return before the heal when the plan is empty: `upgrade --harness` on "Engine-owned
+files are fully up to date — nothing to apply." and version-set `upgrade` on "Project is fully aligned — nothing
+to apply." Measured (KD-284 review round 2): a stamp of this engine's own template with
+`…/res/xml/debug_network_security_config.xml.bak-upgrade` planted, `upgrade --harness --base-dir template --yes`
+exits 0, prints "nothing to apply", and the file is still in `res/` — KD-284's build failure, with the remedy
+advertised and not performed. The repair: heal on the no-op path too (it already writes engineVersion without
+consent), or say in the prose that the heal rides on an upgrade that writes.
+
+**Fires when:** leftovers exist in an app whose engine files are already current — a tracked leftover restored
+by `git checkout` after a 0.28.10 heal, or a 0.28.9-harness-upgraded app running only the version-set `upgrade`
+on an aligned catalog. Not the population KD-284 is about: every pre-0.28.10 stamp differs from 0.28.10 in
+`.gitignore`, so its first `upgrade --harness` has work and heals (measured from c15113b's template: `.gitignore`
+written, the res/ backup moved).
+*Logged 2026-10-05, KD-284 review round 2.*
+
+### KD-289 — the legacy heal moves tracked files, unpreviewed, into a directory `clean` deletes
+
+`src/commands/upgrade.mjs` (`healLegacyUpgradeArtifacts`), `src/lib/clean.mjs` (`keepUnresolvedUpgradeConflicts`)
+
+Round 1 decided legacy artifacts are moved whatever git says. Three costs of that decision went unstated:
+neither `--dry-run` nor the consent prompt names a single move (measured: a dry run over a tracked res/ sidecar
+and a tracked `docs/notes.bak-upgrade` prints nothing about either; the `--yes` run then moves both and git shows
+`D` for each); any file whose name ends `.bak-upgrade` or `.cmp-new` is moved, the app's own content included;
+and a moved `*.bak-upgrade` lands under the ignored `build/`, which `create-cmp clean` deletes (it keeps
+`build/create-cmp-upgrade/` only while a `*.cmp-new` is there). The "To revert" block does not put a moved file
+back either. Each move IS reported on the run, and a tracked file is in git history.
+
+**Fires when:** an app tracks a file with one of those suffixes. No stamp ships one (`git ls-files template
+overlays`), and a leftover that git tracks was committed by mistake. The repair, if wanted: list the moves in
+the dry run and the consent text.
+*Logged 2026-10-05, KD-284 review round 2.*
