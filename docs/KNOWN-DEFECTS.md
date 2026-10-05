@@ -907,3 +907,22 @@ count work (tokens visited, or a deterministic operation counter) or compare aga
 
 **Fires when:** the suite runs on a loaded machine; the gate itself is unaffected.
 *Logged 2026-09-30, at the close of slice `harness/hooks-never-grant` batch 2 (after the last review round).*
+
+### KD-285 — the lane console prints only the first line of a step's reason
+
+`packages/harness/src/lib/lane-runner.mjs:243` (`String(result.reason).split("\n")[0]`), shipped to every app as
+`qa/lib/lane-runner.mjs`
+
+Every console row is `<mark> <step>: <verdict> — <first line of reason>`. Steps that put their evidence on later
+lines lose it on the console: androidChecks' build-failure reason ends its first line with "This is the build, not
+the device: fix the error below, then re-run:" and the rerun command and Gradle's error lines that follow are
+dropped, so the console promises an error and shows none (create-cmp-showcase, 2026-10-05: `⊘ androidChecks:
+ERROR — the instrumented tests did not build — :composeApp:dexBuilderDebugAndroidTest FAILED …` with nothing
+after it; the D8 error had to be found by re-running Gradle by hand). e2eCoverage's per-feature list is cut the
+same way. The full text is in `qa/evidence/latest.json`, which the console does not point to. The repair: a FAIL
+or ERROR row prints its remaining reason lines indented (bounded, e.g. 12), or names the receipt path when it
+truncates.
+
+**Fires when:** any multi-line FAIL/ERROR reason; the verdict and the receipt are right, only the console hides
+the evidence an adopter needs to act.
+*Logged 2026-10-05, from the showcase live-check session (PATTERN-REVIEW-2026-09-28 item 1).*
