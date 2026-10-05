@@ -9,6 +9,35 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-287 — the sidecar rule protects Android `res/` and no other tree a build tool reads — **CLOSED 2026-10-05**
+
+`src/lib/upgrade.mjs` (`isAndroidResPath`, `upgradeArtifactPath`, `staleBackupPaths`, `staleResSidecarPaths`)
+
+A conflict sidecar lands beside its file everywhere except under `src/**/res/`. Two other trees in the stamp are read
+whole by a build tool: `iosApp/iosApp/` (XcodeGen `sources: - path: iosApp` — an unknown extension like
+`ContentView.swift.cmp-new` is added to the target, by XcodeGen's default as a bundle resource) and
+`composeApp/src/commonMain/composeResources/` (binaries never merge, so an app that replaced a shipped font gets a
+`DMSans_Bold.ttf.cmp-new` beside it, in a directory the Compose resource generator reads whole). Neither has been
+built with a sidecar in it. Separately, the heal only touches UNTRACKED legacy files: an app stamped before v0.14.0
+(ea6ade8, the first stamp to ignore `*.bak-upgrade`/`*.cmp-new`) that committed them with `git add -A` keeps them in
+`res/`, and the build stays broken. Moving a tracked file is a change in the owner's history, so that is a decision,
+not a fix. *Logged 2026-10-05, KD-284 review round 1.*
+
+**Fires when:** a conflict on an `iosApp/iosApp/` or `composeResources/` file, or a pre-0.14 app that committed its
+upgrade leftovers; the decision asked: does the placement rule become "beside the file only outside every source
+set", and may healing move a tracked file out of `res/`?
+
+*Closed 2026-10-05, branch `fix/kd-284-upgrade-backups-outside-source` (fixes efd7eba, 457b0a9), both decisions
+taken by the lead architect: the placement rule is "beside the file only outside everything a build tool reads
+whole", and healing moves a tracked file. 457b0a9: `isBuildReadPath` replaces `isAndroidResPath` — a path with a
+`src/` segment (every Gradle source set: `res/`, `composeResources/`, `resources/`, `assets/`, `kotlin/` …) or under
+`iosApp/` puts its sidecar in `<run>/`; `upgradeArtifactPath`'s unit test pins both sides, and two
+`applyHarnessPlan` cases in `test/an-upgrade-never-writes-into-an-android-resource-directory.test.mjs` put a
+`composeResources/` font conflict's and an `iosApp/iosApp/` conflict's sidecar in the run directory, none beside the
+file. efd7eba: healing walks the tree on disk, not git, and moves every legacy `*.bak-upgrade` / `*.cmp-new` —
+tracked included — to `<run>/legacy/<path>`, reporting each move; git shows a tracked one as deleted and the report
+says where it went. Not proven here: an XcodeGen or Gradle build with a sidecar in the run directory (no L2 run).*
+
 ### KD-284 — an upgrade's backup inside an Android resource directory breaks the build — **CLOSED 2026-10-05**
 
 `src/lib/upgrade.mjs` (`BACKUP_SUFFIX`), written by `create-cmp upgrade --harness --yes` (`src/commands/upgrade.mjs`)
