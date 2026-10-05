@@ -124,6 +124,8 @@ you the same list without opening anything.
 | **KD-280** | `qa/hooks/firebase-consent.mjs` runs `main()` on import — anything that imports it for `decide`/`mutationsIn` blocks on stdin, then exits the process | nothing imports it today (the test spawns it); brief-check carries the entry-module guard this file lacks |
 | **KD-281** | the classifier note costs ~600 ms on every git/gh/npm/pnpm/yarn/npx call (measured 596–605 ms vs 44 ms for `ls`, 2026-09-30) and repeats the same line on each | steering only, inside the 10 s hook budget; the cost is latency per call, not a wrong answer |
 | **KD-282** | the harden/upgrade JSON merge identifies a hook by matcher + command, so an app's own field on a lane hook (a raised `timeout`) is dropped silently when the engine re-spells that hook's command | cannot fire until the engine re-spells a hook an app customised; the result keeps the engine's hook, never loses one |
+| **KD-286** | three surfaces still describe the upgrade's backups as they were before KD-284: the stamp's `.gitignore` comment (`template/gitignore:31-36`) says `*.bak-upgrade` files are where `create-cmp upgrade` keeps its pre-write backups; CHANGELOG 0.28.10 and USAGE say "`clean` removes them with the rest of `build/`", which no run has shown — the root project applies every plugin `apply false`; `harden` names its backup directory only as `<run>` and prints no backup path or revert line | prose only: every backup is written and recoverable; the gitignore comment ships in every stamp, so its fix costs an L2 run and belongs with the next template change |
+| **KD-287** | KD-284's placement rule keeps sidecars out of Android `res/` only: a `.cmp-new` still lands beside its file inside other trees a build tool globs — `iosApp/iosApp/` (XcodeGen `sources: - path: iosApp` adds unknown files to the bundle) and `composeResources/` (a binary conflict on a font); and a legacy `.bak-upgrade`/`.cmp-new` under `res/` that git TRACKS (committed before v0.14.0 ignored them) is never healed | a hazard nobody has hit: iOS never runs (KD-45) and a font conflict needs the app to have replaced a shipped font; whether healing may move a tracked file is a product decision |
 
 ---
 
@@ -926,3 +928,38 @@ truncates.
 **Fires when:** any multi-line FAIL/ERROR reason; the verdict and the receipt are right, only the console hides
 the evidence an adopter needs to act.
 *Logged 2026-10-05, from the showcase live-check session (PATTERN-REVIEW-2026-09-28 item 1).*
+
+### KD-286 — three surfaces still describe the upgrade's backups as they were before KD-284
+
+`template/gitignore:31-36`, `CHANGELOG.md` 0.28.10, `docs/USAGE.md` (`upgrade` row), `src/commands/harden.mjs:248,263-270`
+
+KD-284 moved every backup to `build/create-cmp-upgrade/<run>/`. The stamp's `.gitignore` comment above `*.bak-upgrade`
+still tells every new app that `create-cmp upgrade`'s pre-write backups are those files and to "delete them once you
+have reviewed the upgrade's diff" — no engine writes one any more; the ignore line itself is still right for legacy
+files. CHANGELOG 0.28.10 and USAGE state that "`clean` removes them with the rest of `build/`": the root
+`build.gradle.kts` applies every plugin `apply false`, so whether the root project has a `clean` task that deletes the
+root `build/` is unproven — no Gradle run backs the sentence, and if it is false, run directories accumulate (the old
+stale-backup sweep removed earlier runs' backups; nothing removes earlier run directories). `harden` says backups go to
+`build/create-cmp-upgrade/<run>/` and then never names the run, prints no backup path for a `refreshed` file, and does
+not report `deleted` files at all. *Logged 2026-10-05, KD-284 review round 1.*
+
+**Fires when:** an adopter reads the comment, runs `clean` expecting the backups gone, or looks for what `harden`
+backed up; nothing is lost and every backup is written.
+
+### KD-287 — the sidecar rule protects Android `res/` and no other tree a build tool reads
+
+`src/lib/upgrade.mjs` (`isAndroidResPath`, `upgradeArtifactPath`, `staleBackupPaths`, `staleResSidecarPaths`)
+
+A conflict sidecar lands beside its file everywhere except under `src/**/res/`. Two other trees in the stamp are read
+whole by a build tool: `iosApp/iosApp/` (XcodeGen `sources: - path: iosApp` — an unknown extension like
+`ContentView.swift.cmp-new` is added to the target, by XcodeGen's default as a bundle resource) and
+`composeApp/src/commonMain/composeResources/` (binaries never merge, so an app that replaced a shipped font gets a
+`DMSans_Bold.ttf.cmp-new` beside it, in a directory the Compose resource generator reads whole). Neither has been
+built with a sidecar in it. Separately, the heal only touches UNTRACKED legacy files: an app stamped before v0.14.0
+(ea6ade8, the first stamp to ignore `*.bak-upgrade`/`*.cmp-new`) that committed them with `git add -A` keeps them in
+`res/`, and the build stays broken. Moving a tracked file is a change in the owner's history, so that is a decision,
+not a fix. *Logged 2026-10-05, KD-284 review round 1.*
+
+**Fires when:** a conflict on an `iosApp/iosApp/` or `composeResources/` file, or a pre-0.14 app that committed its
+upgrade leftovers; the decision asked: does the placement rule become "beside the file only outside every source
+set", and may healing move a tracked file out of `res/`?
