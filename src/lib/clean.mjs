@@ -8,7 +8,10 @@
 //     Shared dirs (dependencies/, cache/, kotlin-native-prebuilt-<current>)
 //     are never selected. No known project kotlin version → nothing is stale.
 //   - project: only `build/` dirs that sit next to a build.gradle(.kts) (i.e.
-//     real Gradle module outputs) plus the root `.gradle/` dir.
+//     real Gradle module outputs) plus the root `.gradle/` dir — EXCEPT a
+//     `build/create-cmp-upgrade/` that holds a `*.cmp-new` (an unresolved
+//     upgrade conflict, KD-286): that directory stays, the rest of its
+//     `build/` goes.
 //   - ~/.gradle/caches: REPORT ONLY, never auto-deleted.
 
 /** kotlin-native toolchain dir with a trailing version, e.g.
@@ -69,4 +72,32 @@ export function selectProjectCleanDirs({ dirs, files }) {
     }
   }
   return out;
+}
+
+/** Where an upgrade run writes its backups and build-read sidecars (src/lib/upgrade.mjs UPGRADE_RUNS_DIR, under a build/). */
+export const UPGRADE_RUNS_CHILD = "create-cmp-upgrade";
+
+/**
+ * Keep every unresolved upgrade conflict out of a clean (KD-286). A build dir
+ * whose `create-cmp-upgrade/` holds any `*.cmp-new` is not deleted whole: its
+ * other children are, and `<dir>/create-cmp-upgrade` is kept and named.
+ * @param {string[]} cleanDirs  from selectProjectCleanDirs (relative, "/" separators)
+ * @param {object} probe
+ * @param {(dir: string) => string[]} probe.conflictsUnder  `*.cmp-new` paths under `<dir>/create-cmp-upgrade/` (relative)
+ * @param {(dir: string) => string[]} probe.childrenOf      entry names directly inside `<dir>`
+ * @returns {{remove: string[], kept: Array<{path: string, conflicts: string[]}>}}
+ */
+export function keepUnresolvedUpgradeConflicts(cleanDirs, { conflictsUnder, childrenOf }) {
+  const remove = [];
+  const kept = [];
+  for (const dir of cleanDirs) {
+    const conflicts = dir === ".gradle" ? [] : conflictsUnder(dir);
+    if (conflicts.length === 0) {
+      remove.push(dir);
+      continue;
+    }
+    for (const name of childrenOf(dir)) if (name !== UPGRADE_RUNS_CHILD) remove.push(`${dir}/${name}`);
+    kept.push({ path: `${dir}/${UPGRADE_RUNS_CHILD}`, conflicts });
+  }
+  return { remove, kept };
 }
