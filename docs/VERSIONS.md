@@ -79,7 +79,7 @@ create-cmp upgrade --target-dir .           # dry-run diff; add --yes to apply, 
 create-cmp upgrade --set 2026.07r --target-dir . --yes --verify
 ```
 
-`upgrade` shows a diff (catalog + compileSdk/targetSdk + gradle.properties + wrapper), writes
-`*.bak-upgrade` backups, guards the kotlin↔ksp lockstep, and leaves anything not in the set
+`upgrade` shows a diff (catalog + compileSdk/targetSdk + gradle.properties + wrapper), backs up
+every file it writes into `build/create-cmp-upgrade/<timestamp>/` (never beside the file), guards the kotlin↔ksp lockstep, and leaves anything not in the set
 untouched. Works on **any** Gradle project with a version catalog — not just create-cmp-stamped
 ones. `create-cmp doctor` reports a project's drift against the nearest proven-green set.
