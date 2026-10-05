@@ -74,6 +74,19 @@ test("upgradeArtifactPath: backups always go to the run directory; a sidecar goe
   assert.throws(() => place(RES_XML, "other", run), /kind/);
 });
 
+test("a legacy artifact's destination (<run>/legacy/<rel>) is never a path this run writes a backup or sidecar to", () => {
+  const run = `${RUNS}/2026-10-05T10-00-00-000Z`;
+  const rels = [RES_XML, "AGENTS.md", "composeApp/build.gradle.kts", "composeApp/src/commonMain/composeResources/font/a.ttf", "legacy/x.md", "iosApp/iosApp/Info.plist"];
+  const ours = new Set(rels.flatMap((r) => ["backup", "sidecar"].map((k) => upgradeLib.upgradeArtifactPath(r, k, run))));
+  for (const r of rels) {
+    for (const legacy of [`${r}.cmp-new`, `${r}.bak-upgrade`]) {
+      const dest = upgradeLib.legacyArtifactDestination(legacy, run);
+      assert.equal(dest, `${run}/legacy/${legacy}`);
+      assert.equal(ours.has(dest), false, `legacy ${legacy} would be moved onto ${dest}, a path this run writes`);
+    }
+  }
+});
+
 // --- applyHarnessPlan: where a conflict's sidecar lands ---------------------------
 
 function writeTree(root, files) {
