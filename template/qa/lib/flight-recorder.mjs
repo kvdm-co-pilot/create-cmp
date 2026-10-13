@@ -15,7 +15,9 @@
 //   - IN-REPO ONLY, NO PHONE-HOME. That is a product constraint, not a
 //     preference: the journal is the app's own artifact, and nothing here
 //     records a machine, a hostname, or a user beyond what git itself
-//     already records (the commit sha).
+//     already records (the commit sha). It records one CLASS of machine —
+//     `ci` or `local` — because a duration measured on a developer's warm
+//     Mac is no bound on a cold CI runner (KD-291), and that is all it says.
 //
 //   - THE RECORDER MUST NEVER BREAK THE LANE. A recorder that fails the
 //     thing it observes is worse than no recorder: every write is wrapped,
@@ -60,6 +62,18 @@ export const FLIGHT_JOURNAL_REL_PATH = "qa/flight-recorder.jsonl";
 // line of it. Nothing reads this field (readFlightJournal accepts any object),
 // so old entries and new ones coexist in one file and both stay readable.
 export const FLIGHT_SCHEMA = "prooflane-flight/1";
+
+/**
+ * The class of machine this run is on: "ci" when the CI convention variable is
+ * set (GitHub Actions, GitLab, CircleCI, Buildkite and the rest all set `CI`),
+ * else "local". A class, never an identity — see the ground rules above.
+ * @param {Record<string, string|undefined>} [env]
+ * @returns {"ci"|"local"}
+ */
+export function machineClass(env = process.env) {
+  const v = typeof env?.CI === "string" ? env.CI.trim().toLowerCase() : "";
+  return v !== "" && v !== "0" && v !== "false" ? "ci" : "local";
+}
 
 // Below this many entries the report carries an explicit shortness note —
 // two entries are two facts, not a trend, and the report must say so rather
@@ -118,7 +132,7 @@ export function describeHighestRung(device) {
  *   (self-heals, fallbacks) — each a short verbatim description
  * @returns {object} one journal entry (JSON-serializable)
  */
-export function buildFlightEntry({ profile, mode, verdict, evidenceLevel, pack, steps, sha, durationMs, onDeviceSteps, degraded }) {
+export function buildFlightEntry({ profile, mode, verdict, evidenceLevel, pack, steps, sha, durationMs, onDeviceSteps, degraded, machine = machineClass() }) {
   const stepList = Array.isArray(steps) ? steps.filter((s) => s && typeof s.name === "string") : [];
   return {
     schema: FLIGHT_SCHEMA,
@@ -133,6 +147,11 @@ export function buildFlightEntry({ profile, mode, verdict, evidenceLevel, pack, 
     // not, and the summary below refuses to compare what it cannot attribute.
     pack: typeof pack?.id === "string" ? pack.id : null,
     durationMs,
+    // Which class of machine measured these durations (additive, schema id
+    // unchanged). expectedDurations bounds a run only by its own class's
+    // numbers; an entry without it predates the field and was written locally,
+    // because CI never commits the journal it appends to.
+    machine,
     // durationMs per step (additive, schema id unchanged — old entries stay
     // readable): the source for the lane's own "usually ~Ns" narration
     // (drive-narration N4). Quoted from the journal, never from memory.
