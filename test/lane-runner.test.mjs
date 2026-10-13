@@ -149,3 +149,51 @@ test("layer: a step function tagged with fn.layer stamps its receipt row; a row 
   });
   assert.deepEqual(lane.steps.map((s) => s.layer), ["backend", "security", undefined]);
 });
+
+// KD-285: a row printed only its reason's first line, so a FAIL/ERROR whose
+// evidence sat on later lines ("fix the error below" — and nothing below) hid
+// it on the console. A red row now carries its remaining non-empty lines,
+// indented, bounded at 12, and names the receipt when it cuts.
+const said = (name, verdict, reason) =>
+  Object.defineProperty(() => ({ name, verdict, durationMs: 1, reason }), "name", { value: `step${name[0].toUpperCase()}${name.slice(1)}` });
+
+test("KD-285: a FAIL row prints every line of a short multi-line reason, indented under the row", () => {
+  const dir = tmp();
+  const lines = [];
+  runLane({
+    steps: [said("androidChecks", "FAIL", "the build failed — fix the error below:\n\ne: Foo.kt:3 unresolved reference\ne: Foo.kt:9 type mismatch")],
+    markerPath: markerIn(dir),
+    print: (l) => lines.push(l),
+    receiptPath: "qa/evidence/latest.json",
+  });
+  assert.equal(lines.length, 1, "one print per finished step");
+  assert.deepEqual(lines[0].split("\n"), [
+    "✗ androidChecks: FAIL — the build failed — fix the error below:",
+    "  e: Foo.kt:3 unresolved reference",
+    "  e: Foo.kt:9 type mismatch",
+  ]);
+});
+
+test("KD-285: a long ERROR reason prints 12 continuation lines and points at the receipt for the rest", () => {
+  const dir = tmp();
+  const lines = [];
+  const reason = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join("\n");
+  runLane({ steps: [said("e2eCoverage", "ERROR", reason)], markerPath: markerIn(dir), print: (l) => lines.push(l), receiptPath: "qa/evidence/latest.json" });
+  const out = lines[0].split("\n");
+  assert.equal(out[0], "⊘ e2eCoverage: ERROR — line 1");
+  assert.deepEqual(out.slice(1, 13), Array.from({ length: 12 }, (_, i) => `  line ${i + 2}`));
+  assert.equal(out[13], "  … 7 more line(s) — full reason in qa/evidence/latest.json");
+  assert.equal(out.length, 14);
+});
+
+test("KD-285: a SKIP (or PASS) row keeps its one line, whatever the reason holds", () => {
+  const dir = tmp();
+  const lines = [];
+  runLane({
+    steps: [said("a11y", "SKIP", "no screens yet\nsecond line\nthird line"), said("unitTests", "PASS", "ok\nmore")],
+    markerPath: markerIn(dir),
+    print: (l) => lines.push(l),
+    receiptPath: "qa/evidence/latest.json",
+  });
+  assert.deepEqual(lines, ["→ a11y: SKIP — no screens yet", "✓ unitTests: PASS — ok"]);
+});
