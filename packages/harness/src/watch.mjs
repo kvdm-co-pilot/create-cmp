@@ -53,6 +53,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { LANE_MARKER_REL, LANE_MARKER_STALE_MS, RENDER_MARKER_FRESH_MS, laneMarkerPath, renderMarkerPath } from "./lib/lane-markers.mjs";
+import { laneVerdict, verdictMark } from "./lib/lane-runner.mjs";
 import { resolveSpecModel } from "./lib/spec-model.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -350,7 +351,8 @@ const secs = (ms) => `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
 /**
  * One run's status block: header (run number, wall-clock time, trigger), the
  * fast lane's step table, a one-line verdict, and the standing footer. Plain
- * lines only. FAILed steps get their reason VERBATIM, indented; SKIPs keep
+ * lines only. A red step — red is laneVerdict's word, FAIL or ERROR, never a
+ * list kept here — gets its reason VERBATIM, indented; PASS/SKIP/CACHED keep
  * their first reason line as the fine print.
  */
 export function formatRunBlock({ n, startedAtIso, trigger, receipt, exitCode, durationMs, rawTail }) {
@@ -358,15 +360,16 @@ export function formatRunBlock({ n, startedAtIso, trigger, receipt, exitCode, du
   lines.push(`── watch run #${n} · ${startedAtIso} · trigger: ${formatTrigger(trigger)}`);
 
   if (receipt && Array.isArray(receipt.steps)) {
+    const isRed = (step) => laneVerdict([step]) === "FAIL";
     for (const step of receipt.steps) {
-      const mark = step.verdict === "PASS" ? "✓" : step.verdict === "SKIP" ? "→" : "✗";
+      const red = isRed(step);
       const first = step.reason ? ` — ${String(step.reason).split("\n")[0]}` : "";
-      lines.push(`  ${mark} ${step.name} ${step.verdict} (${secs(step.durationMs ?? 0)})${step.verdict === "FAIL" ? "" : first}`);
-      if (step.verdict === "FAIL" && step.reason) {
+      lines.push(`  ${verdictMark(step.verdict)} ${step.name} ${step.verdict} (${secs(step.durationMs ?? 0)})${red ? "" : first}`);
+      if (red && step.reason) {
         for (const rl of String(step.reason).split("\n")) lines.push(`      ${rl}`);
       }
     }
-    const failed = receipt.steps.filter((s) => s.verdict === "FAIL").map((s) => s.name);
+    const failed = receipt.steps.filter(isRed).map((s) => s.name);
     const verdictNote =
       failed.length > 0 ? `${failed.length} step${failed.length === 1 ? "" : "s"} failed: ${failed.join(", ")}` : "fast tier green";
     lines.push(`── watch run #${n}: ${receipt.verdict} in ${secs(durationMs)} — ${verdictNote} (fast lane — a signal, not evidence)`);
