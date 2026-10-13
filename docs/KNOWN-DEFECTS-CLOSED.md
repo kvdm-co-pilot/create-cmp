@@ -21,7 +21,9 @@ screen. Measured 2026-10-13 on the showcase's simulator build: placeholder plist
 the same mock with `AIzaSyMOCK_not_a_real_key_createcmp_000` → runs to onboarding. The Android key fails Android's
 `A[\w-]{38}` the same way; no Android crash has been observed (not investigated why).
 **Fixed:** both mocks carry `MOCK_API_KEY` (`src/lib/add-firebase.mjs`); the old key stays a recognised tell
-(`LEGACY_MOCK_TELL`) so an app stamped earlier is not refused as carrying the adopter's own config.
+(`LEGACY_MOCK_TELL`) so an app stamped earlier is not refused as carrying the adopter's own config, and any re-run
+of `add firebase` rewrites a config that is still the old mock (review round 2: the first fix reached only the
+mock it wrote, not the one an app already carried — `test/no-own-mock-the-sdk-rejects-survives-add-firebase.test.mjs`).
 `test/the-firebase-mock-key-has-the-shape-the-sdks-check.test.mjs` walks every mock config file; the legacy case
 is in `test/add-firebase.test.mjs`.
 *Logged and closed 2026-10-13, KD-285 slice fix round.*

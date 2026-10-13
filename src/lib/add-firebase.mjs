@@ -70,6 +70,13 @@ export const LEGACY_MOCK_TELL = "MOCK-written-by-create-cmp-add-firebase";
 /** Is this config text the mock this step writes (now or before 0.28.11)? */
 export const isOwnMock = (text) => text.includes(MOCK_API_KEY) || text.includes(LEGACY_MOCK_TELL);
 
+/**
+ * Is it the pre-0.28.11 mock — ours, and carrying the key the SDKs reject at launch? Such a file is
+ * never "already there": every run rewrites it with the current mock, because an app that ran `add
+ * firebase` before the fix would otherwise keep crashing whatever it ran next (KD-292).
+ */
+const isStaleMock = (text) => text.includes(LEGACY_MOCK_TELL);
+
 export const DEFAULT_REGION = "us-central1";
 export const AUTH_CHOICES = ["email", "phone", "both", "none"];
 /** The same shape options.schema.json held for `region` while it was a stamp option. */
@@ -670,7 +677,9 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
           `the google-services plugin fails the build on that mismatch.`,
       );
     }
-    present.push(GOOGLE_SERVICES_REL);
+    if (isStaleMock(haveConfig)) {
+      planned.set(GOOGLE_SERVICES_REL, replaceTokens(fs.readFileSync(path.join(overlayDir, "mock", GOOGLE_SERVICES_REL), "utf8"), tokens));
+    } else present.push(GOOGLE_SERVICES_REL);
     // Not the mock: the adopter's. Whether the step was handed it (`provided`) or found it already
     // there (`existing`) is not in the tree, so a re-run keeps what the first run recorded.
     config = isOwnMock(haveConfig) ? "mock" : recordedConfig === "provided" ? "provided" : "existing";
@@ -681,11 +690,12 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
     config = "mock";
   }
   if (ios) {
-    if (readText(projectDir, GOOGLE_SERVICE_INFO_REL) !== null) present.push(GOOGLE_SERVICE_INFO_REL);
+    const havePlist = readText(projectDir, GOOGLE_SERVICE_INFO_REL);
+    if (havePlist !== null && !isStaleMock(havePlist)) present.push(GOOGLE_SERVICE_INFO_REL);
     else {
       const mock = replaceTokens(fs.readFileSync(path.join(overlayDir, "mock", GOOGLE_SERVICE_INFO_REL), "utf8"), tokens);
       planned.set(GOOGLE_SERVICE_INFO_REL, mock);
-      created.add(GOOGLE_SERVICE_INFO_REL);
+      if (havePlist === null) created.add(GOOGLE_SERVICE_INFO_REL);
     }
   }
 

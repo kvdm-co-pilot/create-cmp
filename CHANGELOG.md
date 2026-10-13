@@ -34,9 +34,10 @@ Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-r
   `MOCK-written-by-create-cmp-add-firebase-not-a-real-key`, failed FirebaseInstallations' format
   check (`I-FIS008000`), uncaught. `create-cmp add firebase` now writes
   `AIzaSyMOCK_not_a_real_key_createcmp_000` in both `google-services.json` and
-  `GoogleService-Info.plist` — the shape both SDKs check, and still saying mock. An app stamped
-  earlier keeps its old key, which is still recognised as the mock; replace it with
-  `create-cmp add firebase --google-services <path>`, or by hand with the new key.
+  `GoogleService-Info.plist` — the shape both SDKs check, and still saying mock. An app that ran
+  `add firebase` earlier carries the old key: running `create-cmp add firebase` again (with or
+  without `--google-services`) rewrites any config that is still the old mock with the new one, and
+  leaves a real config alone.
 
 ### Changed
 
