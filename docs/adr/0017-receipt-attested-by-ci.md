@@ -1,6 +1,6 @@
 # ADR-0017: The receipt is attested by a party that is not its producer — CI, keylessly
 
-- **Status:** proposed — awaiting Karel's signature (FIX-PLAN 2026-09-28, slice 8)
+- **Status:** accepted — Karel, 2026-10-13 (FIX-PLAN 2026-09-28, slice 8)
 - **Date:** 2026-09-29
 
 ## Context
@@ -34,7 +34,7 @@ the hash answers — without being able to check who produced them.
 
 1. **CI attests the receipt CI itself produced.** The template's `verify.yml` gains job permissions
    `contents: read, id-token: write, attestations: write` and, after the "Verify lane" step,
-   `actions/attest-build-provenance@v2` over `qa/evidence/latest.json` (the path
+   `actions/attest-build-provenance@v4` over `qa/evidence/latest.json` (the path
    `qa/harness-manifest.json` names as the receipt). Signing is keyless: Sigstore issues a
    short-lived certificate bound to the workflow's OIDC identity, so no key exists that the
    receipt's producer could reach. `gh attestation verify <file> --repo <owner>/<repo>` then
@@ -101,9 +101,12 @@ the hash answers — without being able to check who produced them.
   forge-evident only against a re-run" (KD-271).
 - **Cost.** One more step per CI run (seconds) and three job permissions. A fork's pull request is
   unattested by construction.
-- **Pinned major.** `@v2` pins the major, not a digest. **UNVERIFIED**: that `v2` is the current
-  major and that its input is named `subject-path` — check the action's README before this ADR is
-  accepted.
+- **Pinned major.** `@v4` pins the major, not a digest. Verified 2026-10-13: the action's latest
+  release is `v4.2.2` (`gh api repos/actions/attest-build-provenance/releases/latest`), and v4's
+  `action.yml` names the input `subject-path`. The plan's `@v2` was two majors stale; the template
+  moved to `@v4` with this acceptance. The v4 README calls the action "simply a wrapper on top of
+  `actions/attest`" and says new implementations should use `actions/attest` instead; moving to it
+  is not decided here.
 
 ## Sub-proposal (not decided): step rows and an in-toto envelope
 

@@ -98,16 +98,16 @@ jobs:
       # this commit". What it covers is the rungs this run executed: L1 here,
       # because CMP_DEVICE=none above — the L2 verdict stays the author's
       # machine's word until CI runs that tier.
-      # UNVERIFIED: the input name `subject-path` and the major `v2` are taken
-      # from the plan, not yet checked against the action's README. A fork's
-      # pull request gets no id-token, so the step runs only where it can.
+      # `v4` is the action's current major (latest release v4.2.2, checked
+      # 2026-10-13) and `subject-path` is its input name in v4's action.yml.
+      # A fork's pull request gets no id-token, so the step runs only where it can.
       # Attestations are plan-gated: public repositories on every plan, private
       # and internal ones on GitHub Enterprise Cloud only — so the step runs on
       # public repositories, and a private repo's required check never fails for
       # a plan it is not on (ADR-0017). On Enterprise Cloud, widen this `if:`.
       - name: Attest evidence receipt
         if: github.event.repository.visibility == 'public' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: qa/evidence/latest.json
 
