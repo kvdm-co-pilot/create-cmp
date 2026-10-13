@@ -6,19 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.28.11] - 2026-10-13
+## [0.28.12] - 2026-10-13
 
-Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-row evidence, the watch's red rows and the machine-class deadlines, and `@create-cmp/inspector` 0.9.4 is its bundle rebuilt over that harness `lib/`.
+Nothing is published. `prooflane-harness` 0.23.8 carries the watch's red rows and the machine-class deadlines; `@create-cmp/inspector` 0.9.5 is its bundle rebuilt over that harness `lib/`.
 
 ### Fixed
 
-- A FAIL or ERROR row on the lane console carries its evidence (KD-285). Every row printed only the
-  first line of its step's reason, so androidChecks' "fix the error below, then re-run:" had nothing
-  below it, and the full text sat in `qa/evidence/latest.json`, which the console never named. A red
-  row now prints the reason's remaining non-empty lines indented two spaces, at most 12, then
-  `… <n> more line(s) — full reason in qa/evidence/latest.json` when it cuts (`latest-fast.json` on
-  `--fast`). PASS, SKIP and CACHED rows stay one line. `runLane` takes the receipt path as
-  `receiptPath`; `prooflane-harness` and every stamped app's `qa/lib/lane-runner.mjs` carry the change.
 - The watch (`node qa/watch.mjs`) agrees with the lane on what is red. Its run block counted only
   FAIL, so an ERROR row printed its first line only and a fast run whose one red step ERRORed was
   called "fast tier green" on the line that said FAIL. It now asks `laneVerdict` per row, prints every
@@ -38,6 +31,20 @@ Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-r
   `add firebase` earlier carries the old key: running `create-cmp add firebase` again (with or
   without `--google-services`) rewrites any config that is still the old mock with the new one, and
   leaves a real config alone.
+
+## [0.28.11] - 2026-10-13
+
+Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-row evidence, and `@create-cmp/inspector` 0.9.4 is its bundle rebuilt over that harness `lib/`.
+
+### Fixed
+
+- A FAIL or ERROR row on the lane console carries its evidence (KD-285). Every row printed only the
+  first line of its step's reason, so androidChecks' "fix the error below, then re-run:" had nothing
+  below it, and the full text sat in `qa/evidence/latest.json`, which the console never named. A red
+  row now prints the reason's remaining non-empty lines indented two spaces, at most 12, then
+  `… <n> more line(s) — full reason in qa/evidence/latest.json` when it cuts (`latest-fast.json` on
+  `--fast`). PASS, SKIP and CACHED rows stay one line. `runLane` takes the receipt path as
+  `receiptPath`; `prooflane-harness` and every stamped app's `qa/lib/lane-runner.mjs` carry the change.
 
 ### Changed
 

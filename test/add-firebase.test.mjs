@@ -219,7 +219,7 @@ test("--google-services: the adopter's real config is used as given, and one for
   }
 });
 
-test("an app stamped before 0.28.11 carries the old mock key, and it is still recognised as the mock", async () => {
+test("an app stamped before 0.28.12 carries the old mock key, and it is still recognised as the mock", async () => {
   const app = await stampApp({ ios: false });
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-gs-legacy-"));
   try {

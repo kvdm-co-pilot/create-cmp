@@ -64,14 +64,14 @@ export const BLOCK_CLOSE = "<<< create-cmp add firebase";
  */
 export const MOCK_API_KEY = "AIzaSyMOCK_not_a_real_key_createcmp_000";
 
-/** The key every mock carried before 0.28.11 — still the tell of an app stamped then, never written again. */
+/** The key every mock carried before 0.28.12 — still the tell of an app stamped then, never written again. */
 export const LEGACY_MOCK_TELL = "MOCK-written-by-create-cmp-add-firebase";
 
-/** Is this config text the mock this step writes (now or before 0.28.11)? */
+/** Is this config text the mock this step writes (now or before 0.28.12)? */
 export const isOwnMock = (text) => text.includes(MOCK_API_KEY) || text.includes(LEGACY_MOCK_TELL);
 
 /**
- * Is it the pre-0.28.11 mock — ours, and carrying the key the SDKs reject at launch? Such a file is
+ * Is it the pre-0.28.12 mock — ours, and carrying the key the SDKs reject at launch? Such a file is
  * never "already there": every run rewrites it with the current mock, because an app that ran `add
  * firebase` before the fix would otherwise keep crashing whatever it ran next (KD-292).
  */
