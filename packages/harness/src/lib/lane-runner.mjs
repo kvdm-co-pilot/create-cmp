@@ -62,6 +62,28 @@ export function verdictMark(verdict) {
   return verdict === "PASS" ? "✓" : verdict === "CACHED" ? "⚡" : verdict === "SKIP" ? "→" : verdict === "ERROR" ? "⊘" : "✗";
 }
 
+// ── The console row ─────────────────────────────────────────────────────────
+// One print per finished step. A PASS/SKIP/CACHED row is one line: its reason
+// is context, and the receipt has the rest. A FAIL or ERROR row is the one an
+// adopter must ACT on, and steps put that evidence on later lines ("fix the
+// error below:" then the compiler's e: lines). Printing only the first line
+// promised an error and showed none (KD-285). So a red row carries its
+// remaining non-empty lines, indented, bounded — a 400-line Gradle log must not
+// bury the rows after it — and when it cuts, it says how much and where the
+// whole reason is.
+export const RED_ROW_MAX_LINES = 12;
+
+export function consoleRow(result, receiptPath = null) {
+  const lines = result.reason ? String(result.reason).split("\n") : [];
+  const head = `${verdictMark(result.verdict)} ${result.name}: ${result.verdict}${result.note ? ` (${result.note})` : ""}${lines.length ? ` — ${lines[0]}` : ""}`;
+  if (result.verdict !== "FAIL" && result.verdict !== "ERROR") return head;
+  const rest = lines.slice(1).filter((l) => l.trim() !== "");
+  const shown = rest.slice(0, RED_ROW_MAX_LINES).map((l) => `  ${l}`);
+  const cut = rest.length - shown.length;
+  if (cut > 0) shown.push(`  … ${cut} more line(s) — full reason in ${receiptPath ?? "the receipt"}`);
+  return [head, ...shown].join("\n");
+}
+
 // ── The compile short-circuit ───────────────────────────────────────────────
 // Once the thing that turns source into a runnable artifact has FAILED, every
 // verdict behind it is meaningless: the tests are testing the last successful
@@ -120,7 +142,8 @@ function compileShortCircuit(ctx) {
  * @param {{byName: Map<string, number>, laneMs: (number|null)}} [ctx.expected] from expectedDurations
  * @param {(ms: number) => void} [ctx.setDeadline] receives each step's deadline before it
  *   runs — the project's subprocess helper reads it (verify.mjs's sh())
- * @param {(line: string) => void|null} [ctx.print] one line per finished step; null = silent
+ * @param {(line: string) => void|null} [ctx.print] one row per finished step (a FAIL/ERROR row may
+ *   carry indented continuation lines — consoleRow); null = silent
  *   (--json). Also gates the narrator: no print, no pulse.
  * @param {{entry: string, root: string}|null} [ctx.narrator] the pulse process to spawn
  *   beside the loop (lane-narrator.mjs) — a separate process because the steps are
@@ -133,6 +156,8 @@ function compileShortCircuit(ctx) {
  *   caller's own word, outranking ctx.compileStepName; default: compileShortCircuit(ctx)
  * @param {() => void} [ctx.onFinally] runs in the finally (the project releases its device lease here)
  * @param {number} [ctx.startedAt] the lane's start, for the marker's `at`
+ * @param {string|null} [ctx.receiptPath] where the caller writes the receipt — a red row
+ *   that cuts its reason short names it (KD-285); absent, the row says "the receipt"
  * @returns {{steps: object[], verdict: "PASS"|"FAIL", durationMs: number}}
  */
 export function runLane(ctx) {
@@ -163,6 +188,7 @@ export function runLane(ctx) {
     stopAfter = compileShortCircuit(ctx),
     onFinally = () => {},
     startedAt = Date.now(),
+    receiptPath = null,
   } = ctx;
 
   // Resolved once per lane, not once per step: the bounds cannot change mid-run
@@ -238,11 +264,7 @@ export function runLane(ctx) {
           /* a reporter may not fail the lane — see the option's note */
         }
       }
-      if (print) {
-        print(
-          `${verdictMark(result.verdict)} ${result.name}: ${result.verdict}${result.note ? ` (${result.note})` : ""}${result.reason ? ` — ${String(result.reason).split("\n")[0]}` : ""}`,
-        );
-      }
+      if (print) print(consoleRow(result, receiptPath));
       if (stopAfter(result)) break;
     }
   } finally {

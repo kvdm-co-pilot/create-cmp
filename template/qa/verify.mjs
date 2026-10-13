@@ -256,6 +256,12 @@ const emitStepEvent = asEvents
     }
   : null;
 const fast = args.includes("--fast");
+// A fast run writes its own file. Before 2026-09-08 it wrote latest.json, so a
+// resident watcher's next pass overwrote the checkpoint's receipt with a fast
+// one the Stop hook refuses — the agent had done everything right and was told
+// it had not. latest-fast.json is never committed (template gitignore) and is
+// read by nothing that grades; latest.json stays the single receipt-of-record.
+const RECEIPT_FILE = fast ? "latest-fast.json" : "latest.json";
 // --no-journal suppresses the flight-recorder append (qa/watch.mjs passes it).
 // See the append site below for why the inner loop must not write here.
 const noJournal = args.includes("--no-journal");
@@ -518,6 +524,8 @@ const lane = runLane({
   // Human runs print a row per step and get the pulse; --json gets neither
   // (a narrator during a machine run is a lane doing something unasked).
   print: asJson ? null : (line) => console.log(line),
+  // A red row that cuts its reason short names where the whole of it is (KD-285).
+  receiptPath: path.relative(ROOT, path.join(EVIDENCE_DIR, RECEIPT_FILE)),
   // One NDJSON line per finished step, on stderr, only when asked. A console
   // can append a row while the lane runs instead of learning the whole story
   // from the receipt after it ends.
@@ -772,12 +780,6 @@ const receipt = {
 };
 
 fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
-// A fast run writes its own file. Before 2026-09-08 it wrote latest.json, so a
-// resident watcher's next pass overwrote the checkpoint's receipt with a fast
-// one the Stop hook refuses — the agent had done everything right and was told
-// it had not. latest-fast.json is never committed (template gitignore) and is
-// read by nothing that grades; latest.json stays the single receipt-of-record.
-const RECEIPT_FILE = fast ? "latest-fast.json" : "latest.json";
 fs.writeFileSync(path.join(EVIDENCE_DIR, RECEIPT_FILE), `${JSON.stringify(receipt, null, 2)}\n`);
 // latest.json is the single receipt-of-record. Commit it with your change: the
 // studio console's Evidence audit trail reconstructs the full history from the
