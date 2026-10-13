@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- A FAIL or ERROR row on the lane console carries its evidence (KD-285). Every row printed only the
+  first line of its step's reason, so androidChecks' "fix the error below, then re-run:" had nothing
+  below it, and the full text sat in `qa/evidence/latest.json`, which the console never named. A red
+  row now prints the reason's remaining non-empty lines indented two spaces, at most 12, then
+  `… <n> more line(s) — full reason in qa/evidence/latest.json` when it cuts (`latest-fast.json` on
+  `--fast`). PASS, SKIP and CACHED rows stay one line. `runLane` takes the receipt path as
+  `receiptPath`; `prooflane-harness` and every stamped app's `qa/lib/lane-runner.mjs` carry the change.
+
+### Changed
+
+- ADR-0017 (CI attests the receipt it produced) is accepted — Karel, 2026-10-13. A stamped app's
+  `verify.yml` now uses `actions/attest-build-provenance@v4`: the plan's `@v2` was two majors stale
+  (latest release `v4.2.2`; v4's input is still `subject-path`, both checked 2026-10-13).
+- `main`'s ruleset `require-pr-main` (18921080) is applied: `tests` and `proof owed` are required,
+  strict, and the admin bypass is gone (read back 2026-10-13). CONTRIBUTING.md says so and carries
+  the revert.
+
 ## [0.28.10] - 2026-10-05
 
 Nothing is published.
