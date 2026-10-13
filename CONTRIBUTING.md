@@ -53,25 +53,36 @@ node bin/create-cmp.mjs --name "Demo App" --package com.example.demo \
 - By contributing you agree your work is licensed under the project's [MIT License](./LICENSE).
 - Be excellent to each other — see the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-## What `main` requires — prepared, not applied
+## What `main` requires — applied 2026-10-13
 
-Two CI checks are meant to gate every merge to `main`: `tests` (one context over the Node 20/22/24
-matrix of `engine unit tests`) and `proof owed` (`node scripts/proof-plan.mjs --ci`, run from the base
-branch's code: what the PR's diff owes, and whether a `review` / `L2 run` check run attests it). Today
-the ruleset requires neither. The payload that would make it so is `.github/ruleset-create-cmp.json`;
-applying it is a repository-settings act for the maintainer, not something a PR does:
+Two CI checks gate every merge to `main`: `tests` (one context over the Node 20/22/24 matrix of
+`engine unit tests`) and `proof owed` (`node scripts/proof-plan.mjs --ci`, run from the base branch's
+code: what the PR's diff owes, and whether a `review` / `L2 run` check run attests it). The ruleset
+`require-pr-main` (id 18921080) requires both, strict — the branch must be up to date with `main`. Its
+payload is `.github/ruleset-create-cmp.json`; it was applied on 2026-10-13 by the maintainer:
 
 ```bash
-gh api repos/kvdm-co-pilot/create-cmp/rulesets            # read first: require-pr-main was id 18921080 on 2026-09-29
 gh api -X PUT repos/kvdm-co-pilot/create-cmp/rulesets/18921080 --input .github/ruleset-create-cmp.json
 ```
 
-What changes: the ruleset gains `required_status_checks` (`tests`, `proof owed`, strict — the branch
-must be up to date with `main`), and its one bypass actor today — `RepositoryRole` 5 (admin),
-`bypass_mode: always` — is removed, so an admin push meets the same checks. The pull-request rule
-(zero approvals, three merge methods) is carried over unchanged, because a PUT replaces the rule list
-whole. `guard-main-force-delete` (id 18921079) is untouched. UNVERIFIED: the payload's shape has not
-been sent to the API; read the PUT's response, then `gh api …/rulesets/18921080`, before trusting it.
-Apply it only after `proof owed` has run green on a recorded PR (GATE-RULES Rule 1) and something
-posts the `review` and `L2 run` check runs: until then a PR that owes one reads MISSING. The job only
-reports until its step passes `--strict`; requiring it refuses nothing before that flag is added.
+Verified by reading it back the same day: `gh api repos/kvdm-co-pilot/create-cmp/rulesets/18921080`
+returns `enforcement: active`, `bypass_actors: []`, the `pull_request` rule, and
+`required_status_checks` with contexts `tests` and `proof owed` and
+`strict_required_status_checks_policy: true`.
+
+What changed: the ruleset gained `required_status_checks`, and its one bypass actor before then —
+`RepositoryRole` 5 (admin), `bypass_mode: always` — was removed, so an admin push meets the same
+checks. The pull-request rule (zero approvals, three merge methods) was carried over unchanged,
+because a PUT replaces the rule list whole. `guard-main-force-delete` (id 18921079) is untouched.
+`proof owed` only reports until its step passes `--strict`; requiring it refuses nothing before that
+flag is added, and until something posts the `review` and `L2 run` check runs a PR that owes one
+reads MISSING.
+
+To revert — restore the admin bypass and drop the required checks, keeping the pull-request rule:
+
+```bash
+jq '.bypass_actors = [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}]
+    | .rules |= map(select(.type != "required_status_checks"))' .github/ruleset-create-cmp.json \
+  | gh api -X PUT repos/kvdm-co-pilot/create-cmp/rulesets/18921080 --input -
+gh api repos/kvdm-co-pilot/create-cmp/rulesets/18921080   # read it back
+```
