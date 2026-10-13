@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs 9582bf3e3d24963527e616e7e57f44ddf0c0ff0b25069126ce617faf525a727d
+// cmp:bundle-inputs 46437af9b6112735680b2a0121a7374c98751f841494c21b235035b8f395fa3f
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -41845,7 +41845,7 @@ async function gitChangedFiles(cwd) {
     return [];
   }
 }
-var SERVER_VERSION = true ? "0.9.3" : JSON.parse(readFileSync4(new URL("../package.json", import.meta.url), "utf8")).version;
+var SERVER_VERSION = true ? "0.9.4" : JSON.parse(readFileSync4(new URL("../package.json", import.meta.url), "utf8")).version;
 var server = new McpServer({
   name: "cmp-inspector",
   version: SERVER_VERSION
