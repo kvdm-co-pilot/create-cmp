@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.11] - 2026-10-13
+
+Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-row evidence.
+
 ### Fixed
 
 - A FAIL or ERROR row on the lane console carries its evidence (KD-285). Every row printed only the
