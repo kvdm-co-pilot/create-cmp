@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format is based on
 
 ## [0.28.11] - 2026-10-13
 
-Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-row evidence.
+Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-row evidence, and `@create-cmp/inspector` 0.9.4 is its bundle rebuilt over that harness `lib/`.
 
 ### Fixed
 
