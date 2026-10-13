@@ -53,8 +53,22 @@ export function overlayBesideTemplate(templateDir) {
 export const BLOCK_OPEN = ">>> create-cmp add firebase";
 export const BLOCK_CLOSE = "<<< create-cmp add firebase";
 
-/** The mock config's tell — how a later run knows the file is its own mock and not the adopter's config. */
-export const MOCK_TELL = "MOCK-written-by-create-cmp-add-firebase";
+/**
+ * The mock config's API key — and its tell, how a later run knows the file is its own mock and not
+ * the adopter's config. It SAYS mock and still has the shape of a Google API key (`AIza` + 35 of
+ * [A-Za-z0-9_-], 39 in all), because the Firebase SDKs check that shape at launch: iOS
+ * FirebaseInstallations throws `I-FIS008000 … APIKey doesn't match the expected format`, uncaught,
+ * and every app carrying the mock died before its first screen (KD-292). Android's check is
+ * `A[\w-]{38}`, which this also meets. Measured 2026-10-13 on the showcase's iOS build: this key →
+ * the app runs to its onboarding screen.
+ */
+export const MOCK_API_KEY = "AIzaSyMOCK_not_a_real_key_createcmp_000";
+
+/** The key every mock carried before 0.28.11 — still the tell of an app stamped then, never written again. */
+export const LEGACY_MOCK_TELL = "MOCK-written-by-create-cmp-add-firebase";
+
+/** Is this config text the mock this step writes (now or before 0.28.11)? */
+export const isOwnMock = (text) => text.includes(MOCK_API_KEY) || text.includes(LEGACY_MOCK_TELL);
 
 export const DEFAULT_REGION = "us-central1";
 export const AUTH_CHOICES = ["email", "phone", "both", "none"];
@@ -638,7 +652,7 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
     // re-downloaded for the same app (after adding a SHA, say) is how cmp-firebase-connect updates
     // it. One this step never recorded being given is the adopter's, and is not replaced.
     if (haveConfig === text) present.push(GOOGLE_SERVICES_REL);
-    else if (haveConfig !== null && !haveConfig.includes(MOCK_TELL) && recordedConfig !== "provided") {
+    else if (haveConfig !== null && !isOwnMock(haveConfig) && recordedConfig !== "provided") {
       refuse(
         `${GOOGLE_SERVICES_REL} already exists and is not the mock this step writes, so it is not replaced by ` +
           `${input.googleServices}. Move one of them aside, then run this again.`,
@@ -659,7 +673,7 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
     present.push(GOOGLE_SERVICES_REL);
     // Not the mock: the adopter's. Whether the step was handed it (`provided`) or found it already
     // there (`existing`) is not in the tree, so a re-run keeps what the first run recorded.
-    config = haveConfig.includes(MOCK_TELL) ? "mock" : recordedConfig === "provided" ? "provided" : "existing";
+    config = isOwnMock(haveConfig) ? "mock" : recordedConfig === "provided" ? "provided" : "existing";
   } else {
     const mock = replaceTokens(fs.readFileSync(path.join(overlayDir, "mock", GOOGLE_SERVICES_REL), "utf8"), tokens);
     planned.set(GOOGLE_SERVICES_REL, mock);
