@@ -2,7 +2,7 @@
 // recognises as ITS OWN mock (`isOwnMock`) still carries an API key the SDKs reject at launch.
 //
 // KD-292 fixed the mock the step WRITES. It did not reach the mock an app already CARRIES: every
-// app that ran `add firebase` before 0.28.11 holds `MOCK-written-by-create-cmp-add-firebase-not-a-
+// app that ran `add firebase` before 0.28.12 holds `MOCK-written-by-create-cmp-add-firebase-not-a-
 // real-key`, which FirebaseInstallations rejects with I-FIS008000, uncaught — the iOS app dies before
 // its first screen. The CHANGELOG tells that adopter to "replace it with `create-cmp add firebase
 // --google-services <path>`", and that run replaces google-services.json only: the plist — the file
@@ -27,7 +27,7 @@ import { offTheRunnerChannel } from "./helpers/runner-channel.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BIN = path.join(ROOT, "bin", "create-cmp.mjs");
 const MOCK_DIR = path.join(ROOT, "overlays", "firebase", "mock");
-const LEGACY_KEY = `${LEGACY_MOCK_TELL}-not-a-real-key`; // what every mock carried before 0.28.11
+const LEGACY_KEY = `${LEGACY_MOCK_TELL}-not-a-real-key`; // what every mock carried before 0.28.12
 const SDK_KEY_SHAPE = /^AIza[0-9A-Za-z_-]{35}$/; // FIRInstallations validateAPIKey (the stricter of the two)
 
 const walk = (dir) =>
@@ -62,7 +62,7 @@ async function stampWithLegacyMock() {
   );
   const first = cli("add", "firebase", app, "--no-verify");
   assert.equal(first.status, 0, first.stderr + first.stdout);
-  // Put the app back where a pre-0.28.11 `add firebase` left it: every mock carries the old key.
+  // Put the app back where a pre-0.28.12 `add firebase` left it: every mock carries the old key.
   for (const rel of MOCK_RELS) {
     const abs = path.join(app, rel);
     assert.ok(fs.existsSync(abs), `${rel}: add firebase wrote no such mock into an iOS-carrying app`);
@@ -97,7 +97,7 @@ test("the overlay ships mock configs to check (not vacuous)", () => {
 });
 
 for (const remedy of REMEDIES) {
-  test(`after ${remedy.name} on an app carrying the pre-0.28.11 mock, no own mock carries a key the SDK rejects at launch`, async () => {
+  test(`after ${remedy.name} on an app carrying the pre-0.28.12 mock, no own mock carries a key the SDK rejects at launch`, async () => {
     const app = await stampWithLegacyMock();
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-legacy-mock-src-"));
     try {
