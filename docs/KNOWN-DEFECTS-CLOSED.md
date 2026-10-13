@@ -9,6 +9,33 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-285 — the lane console prints only the first line of a step's reason — **CLOSED 2026-10-13**
+
+`packages/harness/src/lib/lane-runner.mjs:243` (`String(result.reason).split("\n")[0]`), shipped to every app as
+`qa/lib/lane-runner.mjs`
+
+Every console row is `<mark> <step>: <verdict> — <first line of reason>`. Steps that put their evidence on later
+lines lose it on the console: androidChecks' build-failure reason ends its first line with "This is the build, not
+the device: fix the error below, then re-run:" and the rerun command and Gradle's error lines that follow are
+dropped, so the console promises an error and shows none (create-cmp-showcase, 2026-10-05: `⊘ androidChecks:
+ERROR — the instrumented tests did not build — :composeApp:dexBuilderDebugAndroidTest FAILED …` with nothing
+after it; the D8 error had to be found by re-running Gradle by hand). e2eCoverage's per-feature list is cut the
+same way. The full text is in `qa/evidence/latest.json`, which the console does not point to. The repair: a FAIL
+or ERROR row prints its remaining reason lines indented (bounded, e.g. 12), or names the receipt path when it
+truncates.
+
+**Fires when:** any multi-line FAIL/ERROR reason; the verdict and the receipt are right, only the console hides
+the evidence an adopter needs to act.
+*Logged 2026-10-05, from the showcase live-check session (PATTERN-REVIEW-2026-09-28 item 1).*
+
+*Closed 2026-10-13, branch `fix/kd-285-console-red-evidence` (red 15e798d, fix 285901d). `consoleRow` in
+`packages/harness/src/lib/lane-runner.mjs` (vendored to `template/qa/lib/lane-runner.mjs`) keeps a PASS, SKIP or
+CACHED row to its one line; a FAIL or ERROR row carries the reason's remaining non-empty lines indented two spaces,
+at most 12, then `  … <n> more line(s) — full reason in <receipt>` when it cuts. The receipt is `runLane`'s new
+`receiptPath`, which `verify.mjs` sets to the file it writes (`qa/evidence/latest.json`, `latest-fast.json` on
+`--fast`). Pinned by three cases in `test/lane-runner.test.mjs`: a 3-line FAIL prints all three, a 20-line ERROR
+prints 12 continuation lines and the pointer, a multi-line SKIP stays one line.*
+
 ### KD-286 — three surfaces still describe the upgrade's backups as they were before KD-284 — **CLOSED 2026-10-05**
 
 `template/gitignore:31-36`, `CHANGELOG.md` 0.28.10, `docs/USAGE.md` (`upgrade` row), `src/commands/harden.mjs:248,263-270`
