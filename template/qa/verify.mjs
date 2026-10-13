@@ -40,7 +40,7 @@ import { updateReadmeBadge, README_REL_PATH } from "./lib/evidence-badge.mjs";
 // a verdict, and the second is only ever read.
 import { SNAPSHOT_REL, snapshotHtml } from "./lib/evidence-html.mjs";
 import { readFrameworkRecord } from "./lib/framework-record.mjs";
-import { appendFlightRecord, buildFlightEntry, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
+import { appendFlightRecord, buildFlightEntry, machineClass, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
 import { StepTimeout, spawnTimedOut } from "./lib/step-outcomes.mjs";
 import { expectedDurations, runLane, stepDisplayName } from "./lib/lane-runner.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
@@ -484,7 +484,7 @@ const laneStartedAt = Date.now(); // for the flight-recorder entry's durationMs
 // the steps, the marker path, the subprocess deadline hook, the device lease.
 const expectedByStep = (() => {
   try {
-    return expectedDurations(readFlightJournal(ROOT).entries);
+    return expectedDurations(readFlightJournal(ROOT).entries, { machine: machineClass(process.env) });
   } catch {
     return { byName: new Map(), laneMs: null }; // narration is optional; the lane never depends on its own journal
   }

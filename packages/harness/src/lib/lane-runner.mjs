@@ -20,17 +20,25 @@ import { spawn } from "node:child_process";
 import { stepDeadlineMs, stepErrorResult, resolveStepDeadlines } from "./step-outcomes.mjs";
 
 /**
- * Per-step expected durations from the journal's LAST FULL run — the source
- * of the marker's "usually ~Ns" and of each step's deadline. Measured, never
- * estimated; empty until one new-format full run exists.
+ * Per-step expected durations from the journal's LAST FULL run ON THIS CLASS
+ * OF MACHINE — the source of the marker's "usually ~Ns" and of each step's
+ * deadline. Measured, never estimated; empty until one new-format full run
+ * exists. A duration measured on another machine class never bounds this run
+ * (KD-291): the journal is committed from a developer's warm Mac (a 12 s
+ * build), and a cold CI runner inherited 3× that — the 5-minute floor — and
+ * cut a healthy build short. So CI reads only entries CI wrote, and with none
+ * every step gets the ceiling; locally an entry without `machine` counts, since
+ * CI never commits the journal it appends to.
  * @param {object[]} entries parsed flight-journal entries, oldest first
+ * @param {{machine?: "ci"|"local"}} [opts] this run's class (flight-recorder's machineClass)
  * @returns {{byName: Map<string, number>, laneMs: (number|null)}}
  */
-export function expectedDurations(entries) {
+export function expectedDurations(entries, { machine = "local" } = {}) {
   const list = Array.isArray(entries) ? entries : [];
+  const sameClass = (e) => (machine === "ci" ? e.machine === "ci" : e.machine !== "ci");
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
-    if (!e || e.mode === "fast" || !Array.isArray(e.steps)) continue;
+    if (!e || e.mode === "fast" || !Array.isArray(e.steps) || !sameClass(e)) continue;
     const byName = new Map();
     for (const s of e.steps) {
       if (s && typeof s.name === "string" && typeof s.durationMs === "number" && s.durationMs > 0) byName.set(s.name, s.durationMs);
