@@ -126,6 +126,7 @@ you the same list without opening anything.
 | **KD-282** | the harden/upgrade JSON merge identifies a hook by matcher + command, so an app's own field on a lane hook (a raised `timeout`) is dropped silently when the engine re-spells that hook's command | cannot fire until the engine re-spells a hook an app customised; the result keeps the engine's hook, never loses one |
 | **KD-288** | an upgrade with nothing to apply returns before the legacy heal, so a `*.bak-upgrade` left in `res/` stays there although the prose says the next upgrade moves it | every pre-0.28.10 stamp differs from 0.28.10 in `.gitignore`, so its first `upgrade --harness` has work and heals (measured); fires on a restored leftover or a version-set-only upgrade |
 | **KD-289** | the legacy heal moves tracked files and the app's own `*.bak-upgrade`/`*.cmp-new` with no dry-run or consent preview, into `build/`, which `clean` deletes for a backup | each move is reported on the run and git keeps the tracked bytes; no stamp tracks such a file |
+| **KD-290** | create-cmp's own L2 console (`scripts/fleet-check.mjs:633`) prints a non-PASS step's reason as its first line only — KD-285's shape on the maintainer's printer; and `consoleRow` counts an ANSI-only line (`\x1b[0m`) as non-empty, spending the 12-line budget on a visually blank line, and an ERROR whose first line is empty prints a dangling ` — ` | no adopter is served by fleet-check's printer, and the run record keeps every step's full reason; the cmp profile's Gradle calls pass `--console=plain`, and `stepErrorResult` never opens with an empty line |
 
 ---
 
@@ -947,3 +948,19 @@ back either. Each move IS reported on the run, and a tracked file is in git hist
 overlays`), and a leftover that git tracks was committed by mistake. The repair, if wanted: list the moves in
 the dry run and the consent text.
 *Logged 2026-10-05, KD-284 review round 2.*
+
+### KD-290 — fleet-check's step table prints a red reason's first line only; two `consoleRow` edges
+
+`scripts/fleet-check.mjs:633`, `packages/harness/src/lib/lane-runner.mjs` `consoleRow`
+
+fleet-check prints `  (${first line of reason})` for every non-PASS step of the stamped app's lane, so an L2 run
+that ERRORs on androidChecks shows "fix the error below, then re-run:" and nothing below — the exact defect KD-285
+closed on the lane console. Separately, `consoleRow` filters lines with `trim() === ""`, which keeps a line made of
+only ANSI escapes (measured: `"\x1b[0m"` and `"\x1b[2K"` each printed as a blank-looking continuation line and
+counted toward the 12), and an ERROR whose reason starts with `\n` prints `⊘ s: ERROR — ` with nothing after the dash
+(its evidence still prints on the next lines).
+
+**Fires when:** a maintainer reads a red L2 run's console; a step reason carrying colour codes. Nobody is wrongly
+served: the record carries the full reason, the cmp profile's Gradle calls are `--console=plain`, and no producer
+opens a reason with an empty line.
+*Logged 2026-10-13, KD-285 slice review round 1.*
