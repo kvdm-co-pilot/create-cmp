@@ -9,6 +9,38 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-292 — create-cmp's iOS Firebase mock crashes every iOS app at launch — **CLOSED 2026-10-13**
+
+`overlays/firebase/mock/iosApp/iosApp/GoogleService-Info.plist` (and the Android `google-services.json`), written
+by `create-cmp add firebase` when no real config is given
+
+The mock's `API_KEY` was `MOCK-written-by-create-cmp-add-firebase-not-a-real-key`. FirebaseInstallations checks the
+key's shape at launch (`AIza` + 35 of `[A-Za-z0-9_-]`) and throws `I-FIS008000 … FirebaseOptions.APIKey doesn't
+match the expected format`, uncaught → NSException, so every iOS app carrying the mock died before its first
+screen. Measured 2026-10-13 on the showcase's simulator build: placeholder plist → crash; create-cmp's mock → crash;
+the same mock with `AIzaSyMOCK_not_a_real_key_createcmp_000` → runs to onboarding. The Android key fails Android's
+`A[\w-]{38}` the same way; no Android crash has been observed (not investigated why).
+**Fixed:** both mocks carry `MOCK_API_KEY` (`src/lib/add-firebase.mjs`); the old key stays a recognised tell
+(`LEGACY_MOCK_TELL`) so an app stamped earlier is not refused as carrying the adopter's own config.
+`test/the-firebase-mock-key-has-the-shape-the-sdks-check.test.mjs` walks every mock config file; the legacy case
+is in `test/add-firebase.test.mjs`.
+*Logged and closed 2026-10-13, KD-285 slice fix round.*
+
+### KD-291 — a step's deadline on CI was bounded by a duration measured on a laptop — **CLOSED 2026-10-13**
+
+`packages/harness/src/lib/lane-runner.mjs` `expectedDurations` → `step-outcomes.mjs` `stepDeadlineMs`
+
+A step's deadline is 3× the journal's last measured duration for it, floor 5 min. The journal
+(`qa/flight-recorder.jsonl`) is committed from the developer's machine, so CI inherited a warm Mac's numbers —
+the showcase's `build` ~12 s — and got the 5-minute floor. Showcase CI on main FAILED twice (run 37345438746,
+attempts 1–2): `⊘ build` and `⊘ releaseBuild` "DID NOT COMPLETE — no result within its deadline (5 min)" on
+ubuntu, while the PR run of the same `--profile ci` passed. A red CI cannot attest, so this blocked the goal's
+"CI attested". **Fixed:** each journal entry records `machine: "ci" | "local"` (`flight-recorder.mjs`
+`machineClass`, from `CI`); under CI only CI-measured entries bound a step, none → the ceiling; locally an
+entry without the field counts, since CI never commits the journal it appends to.
+`test/a-duration-from-another-machine-class-never-bounds-a-run.test.mjs`.
+*Logged and closed 2026-10-13, KD-285 slice fix round.*
+
 ### KD-285 — the lane console prints only the first line of a step's reason — **CLOSED 2026-10-13**
 
 `packages/harness/src/lib/lane-runner.mjs:243` (`String(result.reason).split("\n")[0]`), shipped to every app as

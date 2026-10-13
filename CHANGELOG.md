@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format is based on
 
 ## [0.28.11] - 2026-10-13
 
-Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-row evidence, and `@create-cmp/inspector` 0.9.4 is its bundle rebuilt over that harness `lib/`.
+Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-row evidence, the watch's red rows and the machine-class deadlines, and `@create-cmp/inspector` 0.9.4 is its bundle rebuilt over that harness `lib/`.
 
 ### Fixed
 
@@ -19,6 +19,24 @@ Nothing is published. `prooflane-harness` 0.23.7 carries the lane runner's red-r
   `… <n> more line(s) — full reason in qa/evidence/latest.json` when it cuts (`latest-fast.json` on
   `--fast`). PASS, SKIP and CACHED rows stay one line. `runLane` takes the receipt path as
   `receiptPath`; `prooflane-harness` and every stamped app's `qa/lib/lane-runner.mjs` carry the change.
+- The watch (`node qa/watch.mjs`) agrees with the lane on what is red. Its run block counted only
+  FAIL, so an ERROR row printed its first line only and a fast run whose one red step ERRORed was
+  called "fast tier green" on the line that said FAIL. It now asks `laneVerdict` per row, prints every
+  red row's reason, and wears the lane's marks (CACHED is no longer drawn as ✗).
+- CI no longer cuts a healthy build short with a deadline measured on a laptop (KD-291). A step's
+  deadline is 3× its last measured duration from the committed `qa/flight-recorder.jsonl`, floor
+  5 min — measured on the developer's warm machine, so a cold CI runner's `build` and `releaseBuild`
+  were stopped at 5 min ("DID NOT COMPLETE") on main while the PR run passed. Each journal entry now
+  records its machine class (`machine: "ci" | "local"`, from `CI`); under CI only CI-measured
+  durations bound a step, and with none every step gets the ceiling (30 min). Locally an entry
+  without the field still counts.
+- The Firebase mock no longer crashes every iOS app at launch (KD-292). Its API key,
+  `MOCK-written-by-create-cmp-add-firebase-not-a-real-key`, failed FirebaseInstallations' format
+  check (`I-FIS008000`), uncaught. `create-cmp add firebase` now writes
+  `AIzaSyMOCK_not_a_real_key_createcmp_000` in both `google-services.json` and
+  `GoogleService-Info.plist` — the shape both SDKs check, and still saying mock. An app stamped
+  earlier keeps its old key, which is still recognised as the mock; replace it with
+  `create-cmp add firebase --google-services <path>`, or by hand with the new key.
 
 ### Changed
 

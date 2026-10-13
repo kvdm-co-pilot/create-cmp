@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 import { scaffold } from "../src/scaffold.mjs";
 import { listFiles } from "../src/lib/fsutil.mjs";
 import { loadRegistry } from "../src/lib/registry.mjs";
-import { registryVersionsFor, BLOCK_OPEN, MOCK_TELL } from "../src/lib/add-firebase.mjs";
+import { registryVersionsFor, BLOCK_OPEN, MOCK_API_KEY, LEGACY_MOCK_TELL } from "../src/lib/add-firebase.mjs";
 import { offTheRunnerChannel } from "./helpers/runner-channel.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -94,9 +94,10 @@ test("add firebase on a default stamp: every edit where it belongs, a mock that 
     const gs = JSON.parse(read(app, "composeApp/google-services.json"));
     assert.equal(gs.client[0].client_info.android_client_info.package_name, "com.acme.demo");
     assert.match(gs.project_info.project_id, /^demo-mock/);
-    assert.ok(gs.client[0].api_key[0].current_key.includes(MOCK_TELL));
+    assert.equal(gs.client[0].api_key[0].current_key, MOCK_API_KEY);
     const plist = read(app, "iosApp/iosApp/GoogleService-Info.plist");
     assert.match(plist, /MOCK/);
+    assert.match(plist, new RegExp(`<key>API_KEY</key>\\s*<string>${MOCK_API_KEY}</string>`), "the iOS mock carries the same well-formed key");
     assert.match(plist, /<string>com\.acme\.demo\.ios<\/string>/, "the plist carries the app's iOS bundle id");
     assert.doesNotMatch(plist, /REPLACE_ME/, "a mock, never a placeholder that reads as a real config");
 
@@ -212,6 +213,28 @@ test("--google-services: the adopter's real config is used as given, and one for
     assert.equal(read(app, "composeApp/google-services.json"), real("com.acme.demo"), "copied byte for byte");
     assert.doesNotMatch(used.stdout + used.stderr, /MOCK/);
     assert.equal(JSON.parse(read(app, "create-cmp.json")).firebase.config, "provided");
+  } finally {
+    cleanup(app);
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("an app stamped before 0.28.11 carries the old mock key, and it is still recognised as the mock", async () => {
+  const app = await stampApp({ ios: false });
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "cmp-gs-legacy-"));
+  try {
+    assert.equal(cli("add", "firebase", app, "--no-verify").status, 0);
+    const gsPath = path.join(app, "composeApp/google-services.json");
+    fs.writeFileSync(gsPath, fs.readFileSync(gsPath, "utf8").replace(MOCK_API_KEY, `${LEGACY_MOCK_TELL}-not-a-real-key`));
+    const real = JSON.stringify({
+      project_info: { project_number: "123", project_id: "acme-prod" },
+      client: [{ client_info: { mobilesdk_app_id: "1:123:android:abc", android_client_info: { package_name: "com.acme.demo" } } }],
+      configuration_version: "1",
+    });
+    fs.writeFileSync(path.join(scratch, "right.json"), real);
+    const used = cli("add", "firebase", app, "--no-verify", "--google-services", path.join(scratch, "right.json"));
+    assert.equal(used.status, 0, `the old mock was read as the adopter's own config:\n${used.stderr}${used.stdout}`);
+    assert.equal(read(app, "composeApp/google-services.json"), real);
   } finally {
     cleanup(app);
     fs.rmSync(scratch, { recursive: true, force: true });
