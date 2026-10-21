@@ -128,6 +128,7 @@ you the same list without opening anything.
 | **KD-289** | the legacy heal moves tracked files and the app's own `*.bak-upgrade`/`*.cmp-new` with no dry-run or consent preview, into `build/`, which `clean` deletes for a backup | each move is reported on the run and git keeps the tracked bytes; no stamp tracks such a file |
 | **KD-290** | create-cmp's own L2 console (`scripts/fleet-check.mjs:633`) prints a non-PASS step's reason as its first line only — KD-285's shape on the maintainer's printer; and `consoleRow` counts an ANSI-only line (`\x1b[0m`) as non-empty, spending the 12-line budget on a visually blank line, and an ERROR whose first line is empty prints a dangling ` — ` | no adopter is served by fleet-check's printer, and the run record keeps every step's full reason; the cmp profile's Gradle calls pass `--console=plain`, and `stepErrorResult` never opens with an empty line |
 | **KD-294** | `machineClass` (KD-291) reads only `CI`, and its comment says "GitHub Actions, GitLab, CircleCI, Buildkite and the rest all set `CI`" — Jenkins, Azure Pipelines (`TF_BUILD`), TeamCity (`TEAMCITY_VERSION`) and AWS CodeBuild (`CODEBUILD_BUILD_ID`) do not, so on those runners a committed laptop journal still bounds every step's deadline (KD-291's defect, unfixed there) | the only CI the template ships is GitHub Actions, which sets `CI=true`, and no doc claims another runner; the repair is reading the vendor markers too, and a laptop that exports `CI=true` gets the ceiling, the safe direction |
+| **KD-295** | `sync-harness.mjs`'s CONFLICT for a `TEMPLATE_OWNED` file that also has a package source is a refusal only `--check` performs: a real run has already overwritten the template-owned file in stage 2, prints CONFLICT, and exits 0 (planted 2026-10-21); the JSDoc says such a name "is refused below", and `--check`'s remedy line (`run: node scripts/sync-harness.mjs`) names a command that overwrites rather than resolves | no package source for a template-owned file exists, and `test/harness-parity.test.mjs` fails the suite on that state, so a conflicted tree cannot merge; the maintainer script only |
 
 ---
 
@@ -982,3 +983,18 @@ changes `qa/lib/flight-recorder.mjs`, which every stamped app carries, so it reo
 of the KD-285 slice on 2026-10-21 to ride the next batch's one L2 run instead of buying a run of its own.
 *Logged 2026-10-13, KD-285 slice review round 2.*
 
+### KD-295 — sync-harness's CONFLICT does not stop a real run
+
+`scripts/sync-harness.mjs` main (the `TEMPLATE_OWNED` loop after stage 2), KD-293's repair
+
+Stage 2 copies every package `.mjs` to its template home BEFORE the CONFLICT loop runs, and the loop only adds to
+`problems`, which only `--check` acts on. Planted in a scratch copy (a `packages/harness/src/gates-status.mjs`): a
+real run printed `synced … → template/qa/gates-status.mjs`, then `CONFLICT`, and exited 0 with the template-owned
+file overwritten; a second real run exited 0 again. `--check` does refuse, but its remedy line says
+`run: node scripts/sync-harness.mjs`, which is the overwrite. The JSDoc's "is refused below" is honoured by `--check`
+only. Not blocking: no such package source exists, the parity test asserts none does, and only a maintainer runs this.
+The repair is to run the CONFLICT check before stage 2 and exit non-zero on any run, or to skip declared files in
+`harnessFiles()`.
+
+**Fires when:** someone adds a package source under a template-owned name and runs a plain sync.
+*Logged 2026-10-21, KD-285 slice review round 2 re-record.*
