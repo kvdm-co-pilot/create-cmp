@@ -127,8 +127,6 @@ you the same list without opening anything.
 | **KD-288** | an upgrade with nothing to apply returns before the legacy heal, so a `*.bak-upgrade` left in `res/` stays there although the prose says the next upgrade moves it | every pre-0.28.10 stamp differs from 0.28.10 in `.gitignore`, so its first `upgrade --harness` has work and heals (measured); fires on a restored leftover or a version-set-only upgrade |
 | **KD-289** | the legacy heal moves tracked files and the app's own `*.bak-upgrade`/`*.cmp-new` with no dry-run or consent preview, into `build/`, which `clean` deletes for a backup | each move is reported on the run and git keeps the tracked bytes; no stamp tracks such a file |
 | **KD-290** | create-cmp's own L2 console (`scripts/fleet-check.mjs:633`) prints a non-PASS step's reason as its first line only — KD-285's shape on the maintainer's printer; and `consoleRow` counts an ANSI-only line (`\x1b[0m`) as non-empty, spending the 12-line budget on a visually blank line, and an ERROR whose first line is empty prints a dangling ` — ` | no adopter is served by fleet-check's printer, and the run record keeps every step's full reason; the cmp profile's Gradle calls pass `--console=plain`, and `stepErrorResult` never opens with an empty line |
-| **KD-293** | `node scripts/sync-harness.mjs` deletes the tracked `template/qa/gates-status.mjs` as an ORPHAN (it is template-owned — the stamped SessionStart hook's line — and has no source in `packages/harness/src`), and `--check` exits 1 on every tree; `test/harness-parity.test.mjs` imports `orphanFiles` and never calls it | nobody is served wrongly until a maintainer commits the deletion; `git status` shows it, and the template file is otherwise byte-stable |
-| **KD-294** | `machineClass` (KD-291) reads only `CI`, and its comment says "GitHub Actions, GitLab, CircleCI, Buildkite and the rest all set `CI`" — Jenkins, Azure Pipelines (`TF_BUILD`), TeamCity (`TEAMCITY_VERSION`) and AWS CodeBuild (`CODEBUILD_BUILD_ID`) do not, so on those runners a committed laptop journal still bounds every step's deadline (KD-291's defect, unfixed there) | the only CI the template ships is GitHub Actions, which sets `CI=true`, and no doc claims another runner; the repair is reading the vendor markers too, and a laptop that exports `CI=true` gets the ceiling, the safe direction |
 
 ---
 
@@ -752,7 +750,6 @@ the demo would still report a refusal, by the wrong gate. Every template screen 
 **Fires when:** a template screen gains a header above its `package` line.
 *Logged 2026-09-27, round 1 of slice `kd-266-267`.*
 
-
 ### KD-271 — a hand-edited receipt passes every reader: `qa/evidence` is outside the inputs hash and nothing signs it
 
 `packages/receipts/src/inputs-hash.mjs` (the surface excludes `qa/evidence`) · `packages/receipts/src/receipt-validate.mjs` (`evaluateReceipt`) · `packages/harness/src/receipt-check.mjs` · `template/.github/workflows/verify.yml` (Receipt attests HEAD)
@@ -967,30 +964,3 @@ served: the record carries the full reason, the cmp profile's Gradle calls are `
 opens a reason with an empty line.
 *Logged 2026-10-13, KD-285 slice review round 1.*
 
-### KD-293 — sync-harness calls a template-owned lane file an orphan and deletes it
-
-`scripts/sync-harness.mjs` `orphanFiles`; `template/qa/gates-status.mjs` (98d91b9)
-
-The template's `qa/` is declared the harness package's exact image, so any `.mjs` there without a source in
-`packages/harness/src` is an orphan: reported by `--check` (which therefore fails on every tree since 98d91b9) and
-deleted on a real run. `gates-status.mjs` is the stamped app's SessionStart line and was added to the template
-only. Found 2026-10-13: a plain `node scripts/sync-harness.mjs` deleted it. The parity test does not catch it — it
-imports `orphanFiles` and never asserts on it. The repair is one of: move the file into the package, or give the
-region a declared list of template-owned files, then make the parity test call `orphanFiles`.
-
-**Fires when:** a maintainer syncs and commits `-a`; stamps then ship without the hook's script.
-*Logged 2026-10-13, KD-285 slice fix round.*
-
-### KD-294 — machineClass calls a Jenkins, Azure Pipelines, TeamCity or CodeBuild runner "local"
-
-`packages/harness/src/lib/flight-recorder.mjs` `machineClass` (= `template/qa/lib/flight-recorder.mjs`), 2047099
-
-KD-291's fix bounds a CI run only by CI-measured durations, and decides "CI" from the `CI` variable alone. Its doc
-comment claims "GitHub Actions, GitLab, CircleCI, Buildkite and the rest all set `CI`"; the rest do not all —
-Jenkins sets `JENKINS_URL`/`BUILD_ID`, Azure Pipelines `TF_BUILD=True`, TeamCity `TEAMCITY_VERSION`, CodeBuild
-`CODEBUILD_BUILD_ID`, none of them `CI` (per each vendor's documented environment; not executed here — no such runner
-is reachable). On those runners `machineClass` says `local`, `expectedDurations` accepts the laptop's committed
-entries, and a cold build is cut at 3× a warm one, floor 5 min — exactly KD-291. Not blocking: the template's only
-workflow is GitHub Actions (`CI=true`, measured by the showcase run that found KD-291), and nothing claims another
-runner. The repair is the vendor markers beside `CI`, and the comment says only what the code reads.
-*Logged 2026-10-13, KD-285 slice review round 2.*

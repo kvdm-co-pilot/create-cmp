@@ -13,7 +13,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { expectedDurations } from "../packages/harness/src/lib/lane-runner.mjs";
-import { buildFlightEntry, machineClass } from "../packages/harness/src/lib/flight-recorder.mjs";
+import { CI_MARKERS, buildFlightEntry, machineClass } from "../packages/harness/src/lib/flight-recorder.mjs";
 import { DEFAULT_STEP_DEADLINES, stepDeadlineMs } from "../packages/harness/src/lib/step-outcomes.mjs";
 
 const { ceilingMs } = DEFAULT_STEP_DEADLINES;
@@ -54,6 +54,19 @@ test("machineClass reads the CI convention variable; unset, empty, 0 and false a
   for (const v of ["true", "1", "TRUE", "yes"]) assert.equal(machineClass({ CI: v }), "ci", `CI=${v}`);
   for (const v of [undefined, "", "0", "false", "False"]) assert.equal(machineClass({ CI: v }), "local", `CI=${v}`);
   assert.equal(machineClass({}), "local");
+});
+
+// KD-294: Jenkins, Azure Pipelines, TeamCity and CodeBuild never set CI, so
+// reading CI alone called their runners local and KD-291 fired there unfixed.
+test("a runner that never sets CI is still CI, by its vendor's own marker", () => {
+  const runners = {
+    Jenkins: { JENKINS_URL: "https://ci.example/", BUILD_ID: "7" },
+    "Azure Pipelines": { TF_BUILD: "True" },
+    TeamCity: { TEAMCITY_VERSION: "2024.12" },
+    CodeBuild: { CODEBUILD_BUILD_ID: "proj:1234" },
+  };
+  for (const [name, env] of Object.entries(runners)) assert.equal(machineClass(env), "ci", `${name} was called local`);
+  for (const k of CI_MARKERS) assert.equal(machineClass({ [k]: "" }), "local", `${k} set but empty is not a runner`);
 });
 
 test("the journal entry records the class that measured it, so the next run can tell", () => {
