@@ -20,7 +20,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { scaffold } from "../src/scaffold.mjs";
-import { SYNCED_FILES, harnessFiles, orphanFiles } from "../scripts/sync-harness.mjs";
+import { SYNCED_FILES, TEMPLATE_OWNED, harnessFiles, orphanFiles } from "../scripts/sync-harness.mjs";
 import { listHarnessFiles, hashHarnessRegion } from "../packages/harness/src/lib/harness-region.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,6 +34,19 @@ test("every vendored copy is byte-identical to its package source", () => {
       src.equals(dest),
       `${to} drifted from ${from} — run: node scripts/sync-harness.mjs`,
     );
+  }
+});
+
+// KD-293: a plain `node scripts/sync-harness.mjs` deleted the tracked
+// template/qa/gates-status.mjs as an orphan, and this file imported orphanFiles
+// without ever asking it. The region is the package's image plus what the
+// template declares it owns — nothing else.
+test("the template's lane region has no orphan, and every template-owned file exists and has no package source", () => {
+  assert.deepEqual(orphanFiles(), [], "a template lane file with no package source and no TEMPLATE_OWNED entry — a sync would delete it");
+  const sources = new Set(harnessFiles().map((p) => p.to));
+  for (const owned of TEMPLATE_OWNED) {
+    assert.ok(fs.existsSync(path.join(REPO_ROOT, owned)), `${owned} is declared template-owned and does not exist`);
+    assert.ok(!sources.has(owned), `${owned} is declared template-owned and also has a package source — the sync would overwrite it`);
   }
 });
 

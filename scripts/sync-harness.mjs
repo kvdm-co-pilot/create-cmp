@@ -20,7 +20,8 @@
 // Stage 2's file list is DERIVED from what the package contains, never hand-
 // maintained — adding a lane file needs no edit here. A file in the template's
 // region with no package source is an ORPHAN: reported by --check, deleted on
-// a real run, because the region is the package's image exactly.
+// a real run, because the region is the package's image exactly — save the
+// few files TEMPLATE_OWNED declares, which are create-cmp's and not the package's.
 //
 // test/harness-parity.test.mjs pins the byte-equality this script maintains.
 
@@ -114,9 +115,24 @@ export function harnessFiles() {
   return pairs;
 }
 
+/**
+ * Template-region files that are the TEMPLATE's, not the package's: they sit in
+ * `qa/` because a stamped app runs them from there, but they carry create-cmp's
+ * own knowledge, so the stack-free package cannot be their source.
+ *
+ *   qa/gates-status.mjs  the SessionStart gates line (98d91b9) — it names the
+ *                        cmp Verify workflow's `android` job, a stack fact
+ *
+ * Declared, so a sync never deletes one as an orphan (KD-293: a plain run did),
+ * and `--check` stops failing on every tree. A name here that ALSO has a package
+ * source is refused below: the sync would overwrite it, and two owners of one
+ * file is the drift this list exists to prevent.
+ */
+export const TEMPLATE_OWNED = ["template/qa/gates-status.mjs"];
+
 /** Template-region files with no source in the package. */
 export function orphanFiles() {
-  const expected = new Set(harnessFiles().map((p) => p.to));
+  const expected = new Set([...harnessFiles().map((p) => p.to), ...TEMPLATE_OWNED]);
   const found = [];
   for (const { tpl } of REGION_DIRS) {
     for (const name of mjsIn(path.join(REPO_ROOT, "template", tpl))) {
@@ -169,6 +185,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // Re-derive AFTER stage 1, so a file stage 1 just created is carried down.
   console.log("stage 2  prooflane-harness → template/qa");
   problems += syncPairs([...SCHEMA_FILES, ...harnessFiles()], checkOnly);
+
+  for (const owned of TEMPLATE_OWNED) {
+    if (harnessFiles().some((p) => p.to === owned)) {
+      console.error(`  CONFLICT  ${owned} is declared template-owned and also has a package source — remove one`);
+      problems += 1;
+    }
+  }
 
   for (const orphan of orphanFiles()) {
     if (checkOnly) {
