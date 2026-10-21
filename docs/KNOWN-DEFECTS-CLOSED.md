@@ -9,6 +9,41 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-294 — machineClass calls a Jenkins, Azure Pipelines, TeamCity or CodeBuild runner "local" — **CLOSED 2026-10-21**
+
+`packages/harness/src/lib/flight-recorder.mjs` `machineClass` (= `template/qa/lib/flight-recorder.mjs`), 2047099
+
+KD-291's fix bounds a CI run only by CI-measured durations, and decides "CI" from the `CI` variable alone. Its doc
+comment claims "GitHub Actions, GitLab, CircleCI, Buildkite and the rest all set `CI`"; the rest do not all —
+Jenkins sets `JENKINS_URL`/`BUILD_ID`, Azure Pipelines `TF_BUILD=True`, TeamCity `TEAMCITY_VERSION`, CodeBuild
+`CODEBUILD_BUILD_ID`, none of them `CI` (per each vendor's documented environment; not executed here — no such runner
+is reachable). On those runners `machineClass` says `local`, `expectedDurations` accepts the laptop's committed
+entries, and a cold build is cut at 3× a warm one, floor 5 min — exactly KD-291. Not blocking: the template's only
+workflow is GitHub Actions (`CI=true`, measured by the showcase run that found KD-291), and nothing claims another
+runner. The repair is the vendor markers beside `CI`, and the comment says only what the code reads.
+**Fixed:** `machineClass` also reads `CI_MARKERS` — `JENKINS_URL`, `TF_BUILD`, `TEAMCITY_VERSION`,
+`CODEBUILD_BUILD_ID`, for presence — beside `CI`, and its comment says only what it reads. Still per the vendors'
+documentation, not executed on those runners. `test/a-duration-from-another-machine-class-never-bounds-a-run.test.mjs`.
+*Logged 2026-10-13, KD-285 slice review round 2; closed 2026-10-21 in the same slice.*
+
+### KD-293 — sync-harness calls a template-owned lane file an orphan and deletes it — **CLOSED 2026-10-21**
+
+`scripts/sync-harness.mjs` `orphanFiles`; `template/qa/gates-status.mjs` (98d91b9)
+
+The template's `qa/` is declared the harness package's exact image, so any `.mjs` there without a source in
+`packages/harness/src` is an orphan: reported by `--check` (which therefore fails on every tree since 98d91b9) and
+deleted on a real run. `gates-status.mjs` is the stamped app's SessionStart line and was added to the template
+only. Found 2026-10-13: a plain `node scripts/sync-harness.mjs` deleted it. The parity test does not catch it — it
+imports `orphanFiles` and never asserts on it. The repair is one of: move the file into the package, or give the
+region a declared list of template-owned files, then make the parity test call `orphanFiles`.
+
+**Fires when:** a maintainer syncs and commits `-a`; stamps then ship without the hook's script.
+**Fixed:** `scripts/sync-harness.mjs` declares `TEMPLATE_OWNED` (`template/qa/gates-status.mjs` — it names the cmp
+Verify workflow's `android` job, a stack fact the package must not learn, so it cannot move there); orphans exclude it,
+a declared file that also has a package source is a CONFLICT, and `test/harness-parity.test.mjs` now asserts
+`orphanFiles()` is empty. `--check` passes; a plain sync deletes nothing.
+*Logged 2026-10-13, KD-285 slice fix round; closed 2026-10-21 in the same slice.*
+
 ### KD-292 — create-cmp's iOS Firebase mock crashes every iOS app at launch — **CLOSED 2026-10-13**
 
 `overlays/firebase/mock/iosApp/iosApp/GoogleService-Info.plist` (and the Android `google-services.json`), written

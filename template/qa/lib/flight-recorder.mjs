@@ -64,15 +64,29 @@ export const FLIGHT_JOURNAL_REL_PATH = "qa/flight-recorder.jsonl";
 export const FLIGHT_SCHEMA = "prooflane-flight/1";
 
 /**
- * The class of machine this run is on: "ci" when the CI convention variable is
- * set (GitHub Actions, GitLab, CircleCI, Buildkite and the rest all set `CI`),
- * else "local". A class, never an identity — see the ground rules above.
+ * Runners that never set `CI`, each by the variable its vendor documents as
+ * always present on a build (KD-294). GitHub Actions, GitLab, CircleCI,
+ * Buildkite, Travis and Bitbucket set `CI` itself and need no entry. Read for
+ * PRESENCE only — only `CI` is a convention whose value can say "no".
+ */
+export const CI_MARKERS = Object.freeze([
+  "JENKINS_URL", // Jenkins
+  "TF_BUILD", // Azure Pipelines
+  "TEAMCITY_VERSION", // TeamCity
+  "CODEBUILD_BUILD_ID", // AWS CodeBuild
+]);
+
+/**
+ * The class of machine this run is on: "ci" when `CI` is set to anything but
+ * empty / 0 / false, or one of CI_MARKERS is set; else "local". A class, never
+ * an identity — see the ground rules above.
  * @param {Record<string, string|undefined>} [env]
  * @returns {"ci"|"local"}
  */
 export function machineClass(env = process.env) {
   const v = typeof env?.CI === "string" ? env.CI.trim().toLowerCase() : "";
-  return v !== "" && v !== "0" && v !== "false" ? "ci" : "local";
+  if (v !== "" && v !== "0" && v !== "false") return "ci";
+  return CI_MARKERS.some((k) => typeof env?.[k] === "string" && env[k].trim() !== "") ? "ci" : "local";
 }
 
 // Below this many entries the report carries an explicit shortness note —
