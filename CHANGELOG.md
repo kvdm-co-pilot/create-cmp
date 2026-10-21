@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.13] - 2026-10-21
+
+Nothing is published. `prooflane-harness` 0.23.9 carries the wider CI detection; `@create-cmp/inspector` 0.9.6 is its bundle rebuilt over that harness `lib/`.
+
+### Fixed
+
+- Jenkins, Azure Pipelines, TeamCity and AWS CodeBuild runners count as CI for 0.28.12's deadline rule
+  (KD-291) — KD-294. None of them sets `CI`, so they were treated as local. The machine class now also
+  reads `JENKINS_URL`, `TF_BUILD`, `TEAMCITY_VERSION` and `CODEBUILD_BUILD_ID`, checking only that
+  each is set.
+- `node scripts/sync-harness.mjs` no longer deletes `template/qa/gates-status.mjs` (KD-293). The
+  file belongs to the template, not the harness package, and is now declared as such; `--check`
+  passes again. This touches the maintainer script only and changes nothing a stamped app carries.
+
 ## [0.28.12] - 2026-10-13
 
 Nothing is published. `prooflane-harness` 0.23.8 carries the watch's red rows and the machine-class deadlines; `@create-cmp/inspector` 0.9.5 is its bundle rebuilt over that harness `lib/`.
