@@ -85,12 +85,38 @@ export function validateConfig(config, opts = {}) {
   // segments are legal Java identifiers. Merged into one list so a config with
   // both problems reports both at once.
   errors.push(...validatePackageName(config?.package).errors);
+  // A pairing the schema cannot express (draft-07 subset, no `if`/`then`): Room
+  // 2.8.4 and sqlite-bundled publish no wasmJs variant, so a web target with Room
+  // on is a tree that cannot build. Refused here so every front door — the CLI,
+  // the interview, a hand-written config — is refused the same way
+  // (docs/features/web-platform.md W3).
+  errors.push(...webRoomConflict(config));
   if (errors.length > 0) {
     const err = new Error(`Invalid config:\n${formatErrors(errors)}`);
     err.validationErrors = errors;
     throw err;
   }
   return true;
+}
+
+/**
+ * The one config pairing that cannot build: the web target with Room on. Room
+ * 2.8.4 (the frozen set) has no wasmJs target; Room's web support is in the 2.9
+ * line, which only `create-cmp upgrade` can bring in.
+ * @param {object} config
+ * @returns {{path: string, message: string}[]}
+ */
+export function webRoomConflict(config) {
+  if (!config || typeof config !== "object") return [];
+  if (config.platforms?.web === true && config.room === true) {
+    return [{
+      path: "room",
+      message:
+        "must be false when platforms.web is true — Room 2.8.4 has no wasmJs (browser) target. " +
+        "Stamp with --no-room, or without --web (docs/features/web-platform.md W3)",
+    }];
+  }
+  return [];
 }
 
 /**

@@ -28,6 +28,11 @@ Deterministic (stamps a frozen, CI-verified template), non-interactive with flag
 on failure — and it **builds the app to prove it's green** before reporting success.
 Agent-readable: [llms.txt](./llms.txt) · [AGENTS.md](./AGENTS.md) · [options.schema.json](./options.schema.json).
 
+**Need a web app too?** Add `--web`. The same scaffold then also builds a browser app from the
+same Compose UI (Kotlin/Wasm), and Android and iOS stay as they are. A web app has no Room,
+because Room 2.8.4 has no browser target. Size and load numbers:
+[docs/features/web-platform.md](./docs/features/web-platform.md).
+
 **Claude Code users:** `/plugin marketplace add kvdm-co-pilot/create-cmp` →
 `/plugin install create-cmp` — [11 skills + the cmp-inspector MCP server](#the-claude-code-plugin-11-skills).
 

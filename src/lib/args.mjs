@@ -27,7 +27,7 @@ export const BOOLEAN_FLAGS = new Set([
   // anything reads the flag.
   "yes", "y", "force", "fix", "harness", "adherence",
   // every name `flagBool`/`flagBoolWithAlias` reads
-  "minimal", "verify", "ios", "firebase", "firestore", "storage", "functions",
+  "minimal", "verify", "ios", "web", "firebase", "firestore", "storage", "functions",
   "fcm", "room", "e2e", "appium", "inspector", "dev-client",
   // the installer's own, so both front doors into it classify alike
   "dry-run", "dry-run-verify", "no-install", "new-profile", "no-interview",
@@ -61,7 +61,7 @@ export const KNOWN_FLAGS = new Set([
   "preset",
   // the feature toggles `flagBool`/`flagBoolWithAlias` read (their `no-` twins
   // are known by construction, not by being listed twice)
-  "ios", "firebase", "firestore", "storage", "functions", "fcm", "room",
+  "ios", "web", "firebase", "firestore", "storage", "functions", "fcm", "room",
   "e2e", "appium", "inspector", "dev-client",
   // `add firebase` — the path to the adopter's real config. `--firebase`, `--region`,
   // `--auth` and the four service flags STAY KNOWN after Firebase left stamp-time: the

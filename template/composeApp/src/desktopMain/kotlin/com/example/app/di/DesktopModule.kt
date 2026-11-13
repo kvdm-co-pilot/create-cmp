@@ -1,6 +1,7 @@
 package __PACKAGE__.di
 
 import __PACKAGE__.core.connectivity.NetworkMonitor
+import __PACKAGE__.core.platform.KeyValueStore
 // >>> cmp:feature room
 import __PACKAGE__.data.local.AppDatabase
 import __PACKAGE__.data.local.buildDatabase
@@ -22,6 +23,7 @@ val desktopModule = module {
     single<AppDatabase> { buildDatabase() }
     // <<< cmp:feature room
     single { NetworkMonitor(null) }
+    single { KeyValueStore(null) }
 }
 
 // Mirrors AppApplication (Android) / KoinHelper (iOS) — Koin start for the desktop entry point.

@@ -30,7 +30,8 @@
     "composeApp/src/androidRelease/kotlin",
     "composeApp/src/androidInstrumentedTest/kotlin",
     "composeApp/src/iosMain/kotlin",
-    "composeApp/src/desktopMain/kotlin"
+    "composeApp/src/desktopMain/kotlin",
+    "composeApp/src/webMain/kotlin"
   ],
   "renameDirs": {
     "literalSegment": "com/example/app",
@@ -78,6 +79,14 @@
       ],
       "notes": "When off: delete the listed paths AND strip the `ios` marker blocks from composeApp/build.gradle.kts (iosX64/iosArm64/iosSimulatorArm64 targets, iosMain deps, ios KSP room.compiler rows, ExperimentalForeignApi optIn). Also drop iosApp from the build/verify."
     },
+    "web": {
+      "enabledByDefault": false,
+      "paths": [
+        "composeApp/src/webMain",
+        "docs/web.md"
+      ],
+      "notes": "Browser app (docs/features/web-platform.md in create-cmp): a Kotlin/Wasm wasmJs target running the same commonMain UI. Its sources live in webMain, Kotlin 2.2.20's shared web source set: main.kt (ComposeViewport + initWebKoin), resources/index.html, and the web actuals of every seam (NetworkMonitor on navigator.onLine, TestTagAutomation no-op, KeyValueStore on localStorage with an in-memory fallback where the browser refuses it, DocumentPrinter through a hidden iframe and the browser's print window, PhotoPicker on <input type=file accept=image/*>, with no capture attribute, so a phone offers camera or library). When off: delete the listed paths and strip the `web` marker blocks in composeApp/build.gradle.kts (the wasmJs target, webMain deps) and gradle/libs.versions.toml (ktor-client-js). Refused with room on: Room 2.8.4 has no wasmJs target. Run: ./gradlew :composeApp:wasmJsBrowserDevelopmentRun; release build: ./gradlew :composeApp:wasmJsBrowserDistribution (composeApp/build/dist/wasmJs/productionExecutable)."
+    },
     "room": {
       "enabledByDefault": true,
       "paths": [
@@ -124,6 +133,7 @@
     "androidSmoke": "./gradlew :composeApp:installDebug && maestro test qa/e2e/smoke.yaml",
     "iosLink": "./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64",
     "ios": "cd iosApp && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && xcodegen generate && pod install && SIM_UDID=$(xcrun simctl list devices available | grep -Eo '[0-9A-F-]{36}' | head -1) && xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64 -destination \"id=$SIM_UDID\" build",
+    "web": "./gradlew :composeApp:wasmJsBrowserDistribution",
     "iosNote": "On Apple Silicon, the KMP embedAndSignAppleFrameworkForXcode prebuild phase produces ONLY the active-arch (arm64) slice of ComposeApp.framework. A `-destination generic/platform=iOS Simulator` build demands a universal arm64+x86_64 binary and FAILS at CreateUniversalBinary. Constrain to arm64 (ARCHS=arm64 EXCLUDED_ARCHS=x86_64) and target a concrete arm64 simulator UDID — matching the linkDebugFrameworkIosSimulatorArm64 gate."
   },
   "stampPipeline": [

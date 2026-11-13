@@ -271,7 +271,7 @@ async function main() {
 
 function printHelp() {
   process.stdout.write(
-    `create-cmp — the AI delivery harness for Kotlin/Compose Multiplatform (Android + iOS)\n` +
+    `create-cmp — the AI delivery harness for Kotlin/Compose Multiplatform (Android + iOS, optionally web)\n` +
       `Scaffolds a green-building app in minutes; every generated project carries a spec-driven\n` +
       `verify lane, evidence receipts, and mechanical enforcement of "done".\n\n` +
       `Usage:\n` +
@@ -295,6 +295,8 @@ function printHelp() {
       `               the first build; the harness is full in both, and a stated --room wins)\n` +
       `  --ios/--no-ios  --room/--no-room  --e2e/--no-e2e  --inspector/--no-inspector\n` +
       `  --dev-client/--no-dev-client   (desktop JVM window + Compose Hot Reload)\n` +
+      `  --web/--no-web   (browser app: Kotlin/Wasm, same UI; default off; implies --no-room —\n` +
+      `               Room 2.8.4 has no browser target, and --web --room is refused)\n` +
       `  (--appium/--no-appium accepted as deprecated aliases for --e2e/--no-e2e)\n` +
       `  --tabs Home:home,Profile:person\n` +
       `  --target-dir  --verify/--no-verify  --yes  --force  --dry-run-verify\n` +

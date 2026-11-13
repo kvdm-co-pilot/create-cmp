@@ -135,11 +135,11 @@ a Compose/KMP repo create-cmp never touched.
 
 | Command | Purpose | Key flags |
 |---|---|---|
-| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --theme-prefix --target-dir <dir>` · `--minimal` (light mode — see "The two modes" below) · `--preset full\|lean` (the app's shape — see "The two app shapes" below) · `--ios/--no-ios` · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
+| `create [dir]` | Stamp a new app from the frozen template; `--verify` proves a green build before returning. | `--name --package --bundle-id --theme-prefix --target-dir <dir>` · `--minimal` (light mode — see "The two modes" below) · `--preset full\|lean` (the app's shape — see "The two app shapes" below) · `--ios/--no-ios` · `--web/--no-web` (the browser app — see "The web app" below) · `--room/--no-room` · `--e2e/--no-e2e` (the Maestro E2E harness; feature key renamed from `appium` in 0.3.0 — `--appium/--no-appium` still works as a deprecated alias) · `--inspector/--no-inspector` · `--dev-client/--no-dev-client` · `--tabs Home:home,Profile:person` · `--verify/--no-verify` · `--yes` · `--force` |
 | `doctor` | Toolchain preflight **+** project diagnosis (kotlin↔ksp lockstep, drift vs the proven set, the KSP2/iOS catch-22, `sdk.dir`, `~/.konan` bloat, disk, an inspector-stays-debug-only check, the walk's wiring, and hook commands that resolve only from the project root — including the two every app stamped through 0.26.2 carries, which `--fix` rewrites to the form the current template ships after asking). See also [docs/errors/](errors/README.md) — one page per build failure `doctor` diagnoses, with the exact error text and the manual fix. `--adherence` prints the adherence report card instead (below). | `--fix` (safe heals) · `--adherence` (report card; with `--fix`, asks per user-scope entry) · `--yes --no-install --no-ios --target-dir <dir>` |
 | `upgrade` | Migrate `gradle/libs.versions.toml` to the next **proven-green** version set: diff table → surgical in-place edits (comments/format preserved) with backups in `build/create-cmp-upgrade/<timestamp>/` (never beside the file — a backup inside an Android `res/` directory breaks the build; `./gradlew clean` does not remove them — a stamped app's root project has no `clean` task (`./gradlew :clean --dry-run` fails, create-cmp-showcase, 2026-10-05) — but `create-cmp clean` does, with the rest of `build/`, and keeps `build/create-cmp-upgrade/` while it holds an unresolved `*.cmp-new`) → optional verify. Lockstep guardrail refuses a broken kotlin↔ksp pairing. | `--target-dir <dir> --set <id> --dry-run --yes --verify` |
 | `clean` | Cache & build-output hygiene: stale `~/.konan` toolchains + project `build/`/`.gradle/` (sizes shown, consent-gated) — the root `build/` included, so upgrade backups go too, except a `build/create-cmp-upgrade/` holding an unresolved `*.cmp-new`, which is kept and named; global Gradle caches are size-reported only. | `--target-dir <dir> --dry-run --yes` |
-| `verify` | Run the green-build gate (Android; iOS on macOS when `iosApp/` exists) against an existing project. | `--target-dir <dir> --no-ios --dry-run` |
+| `verify` | Run the green-build gate (Android; iOS on macOS when `iosApp/` exists; the browser release build when `composeApp/src/webMain/` exists) against an existing project. | `--target-dir <dir> --no-ios --no-web --dry-run` |
 | `add firebase [dir]` | Add Firebase to a stamped app — it is not a stamp option (`create --firebase`, `--region`, `--auth` and the service flags are refused and name this command). GitLive SDK at the registry's version for the app's Kotlin, the google-services plugin, a debug-build emulator redirect per platform with the ports declared once, and your real `google-services.json` — or a mock whose values say it is one. Plans every edit first and writes all or none; refuses by name on a shape it does not recognise; a second run writes nothing. The region is set when Firebase is added and a later run refuses to change it; `--google-services` replaces the mock, or a config an earlier run was given (a re-download after adding a SHA), never one it found in place. The iOS half is applied when `iosApp/` exists and is **unproven** (it says so). Ends with the verify lane. | `--region <r> --auth <email\|phone\|both\|none> --no-firestore --no-storage --no-functions --no-fcm` (recorded in `create-cmp.json` for the console work) · `--google-services <path>` · `--target-dir <dir> --dry-run --no-verify` |
 | `harden` | Install the full harness into a `--minimal` scaffold, in place: the verify lane, `specs/`, approvals + comments ledgers, generators + skills, the Stop hook, the pre-push gate, and the lane CI workflow. The same three-way walk as `upgrade --harness` (base = the minimal stamp, new = the full stamp), so it is additive, idempotent, and never clobbers — a file you edited keeps your bytes and the full-mode content lands beside it as `*.cmp-new` (for a file a build tool reads whole — any path with a `src/` segment, or under `iosApp/` — in `build/create-cmp-upgrade/<timestamp>/` instead). App-state seeds (`qa/approvals.json`, `qa/evidence/`) are copied only if absent. Ends by pointing at the proof: `node qa/verify.mjs --profile scaffold`. | `--target-dir <dir> --dry-run --yes --verify` (run the lane after installing) |
 | `attach` | Wire the agent contract into an **existing, non-create-cmp** Compose/KMP repo: the AGENTS.md symptom table and advisory session hooks — and an honest report of what it can NOT wire mechanically (previews, the lane). Never clobbers: an existing file gets a `*.cmp-new` sidecar. See `docs/features/attach-mode.md` for the staging. | `--target-dir <dir> --dry-run --yes` |
@@ -182,6 +182,20 @@ backend sync and no offline storage (a todo list) gets `lean`; one that syncs or
 gets `full` — and does not put it to the user as a question. CI builds both shapes on every PR;
 the L2 run, which runs the stamped app, proves the default (`full`) shape only.
 
+**The web app.** `--web` adds a browser app to the same scaffold: a Kotlin/Wasm (`wasmJs`)
+target that runs the shared `commonMain` UI in the page, with its own sources in
+`composeApp/src/webMain/` (the entry point, `index.html`, and the web side of every platform
+seam). It is off by default, and Android and iOS stay as they are. A web app is stamped without
+Room, because Room 2.8.4 has no browser target: `--web` implies `--no-room`, `--web --room` is
+refused before anything is written, and the engine refuses a config with both. Run it with
+`./gradlew :composeApp:wasmJsBrowserDevelopmentRun`; the release build is
+`./gradlew :composeApp:wasmJsBrowserDistribution`, which `create-cmp --verify` runs at stamp time
+and the lane's `webBuild` step runs in `local`, `ci` and `release`. Every stamp, web or not,
+carries three seams under `core/platform/`: `KeyValueStore`, `DocumentPrinter` (HTML through
+the platform's print UI) and `PhotoPicker`. The app's `docs/web.md` has the details and the
+measured size and load time: 3.3 MiB brotli and a first frame in 1.6 s on wifi, 3.7 s on good
+4G (docs/features/web-platform.md).
+
 **Determinism rule for agents:** never hand-author Gradle files / the iOS shell / navigation / DI —
 that's exactly what makes CMP flaky. Stamp with the engine, then author only per-app screens.
 
@@ -199,11 +213,11 @@ never a fixed number. Bare `node qa/verify.mjs` (no `--profile`) defaults to `lo
 | Profile | Steps | What it adds over the previous tier |
 |---|---|---|
 | `scaffold` | 10 | What `create-cmp --verify` proves at stamp time: harness integrity, specCoverage, approvals, componentStories, reachability, e2eCoverage, archDoc, schemaHistory, build, unitTests. |
-| `local` | 17 | The full JVM tier (conformance, goldenTrees, tokenDrift, a11y), the release-build compile check, `androidChecks`, and (device attached) `e2eSmoke` — device-dependent steps SKIP honestly with no device. |
-| `ci` | 18 | `local` plus the determinism probe's row (the probe itself stays opt-in behind `--determinism`; the row records whether it ran, so a SKIP is visible rather than absent). |
+| `local` | 18 | The full JVM tier (conformance, goldenTrees, tokenDrift, a11y), the release-build compile check, the browser release build (`webBuild`, which SKIPs in an app without the web target), `androidChecks`, and (device attached) `e2eSmoke` — device-dependent steps SKIP honestly with no device. |
+| `ci` | 19 | `local` plus the determinism probe's row (the probe itself stays opt-in behind `--determinism`; the row records whether it ran, so a SKIP is visible rather than absent). |
 | `smoke` | 8 | Every pure-Node gate and **no Gradle** — the smallest end-to-end lane through the real runner, receipt and journal. Seconds. Proves the *framework* returns, both ways; never the change — its receipt is refused as done-evidence. Driven by `node qa/framework-check.mjs` (GATE-RULES Rule 0). |
 | `nightly` | = `ci` | `ci` with the determinism probe **forced on** (it doubles the JVM test tier — the budget a scheduled run has and a per-change run does not). Proves the harness and the tree's invariants, never a change: its receipt carries `stage: "nightly"` and is refused as done-evidence by `qa/receipt-check.mjs`. The stage where any future suite-scaled proof (load, chaos) lands. |
-| `release` | 20 | `ci` plus the audit-cadence report and the release-APK behavior smoke (`releaseSmoke`) — the ship-time profile, run before cutting a release, never per-change. |
+| `release` | 21 | `ci` plus the audit-cadence report and the release-APK behavior smoke (`releaseSmoke`) — the ship-time profile, run before cutting a release, never per-change. |
 
 Every receipt names its **stage** — `scaffold` / `change` (local) / `merge` (ci) / `nightly` / `release` — so an evidence rung can never be read as more than its stage allows.
 
@@ -222,7 +236,7 @@ intent — the descriptions carry rich triggers.
 
 | Skill | Use it to… | Under the hood |
 |---|---|---|
-| **cmp-new** | Start a new mobile app (Android + iOS) by interview — fires on framework-undecided "create a mobile app" requests (honest CMP-vs-RN/Flutter fit check first) as well as explicit CMP/KMP asks and comparisons like "React Native vs KMP". | Interviews (incl. intent) → `create --verify` → the genesis walk: express-approve or shape design/architecture/components/exemplar together (§6). |
+| **cmp-new** | Start a new mobile app (Android + iOS, plus a browser app with `--web`) by interview — fires on framework-undecided "create a mobile app" requests (honest CMP-vs-RN/Flutter fit check first) as well as explicit CMP/KMP asks and comparisons like "React Native vs KMP". | Interviews (incl. intent) → `create --verify` → the genesis walk: express-approve or shape design/architecture/components/exemplar together (§6). |
 | **cmp-doctor** | Set up or fix the toolchain / diagnose any KMP build — and tell whether your installed copy of this plugin is behind its marketplace source. | `doctor` (+ `--fix`). Its **Marketplace copy staleness** check fetches the installed marketplace clone (it never auto-updates) and FAILs with "plugin copy is N commits behind its source", naming the remediation. |
 | **cmp-upgrade** | Bump Kotlin/CMP/KSP/Room/AGP safely. | `upgrade` (diff → apply → verify). |
 | **cmp-firebase-connect** | Add Firebase to an app and wire it to its **own** Firebase project. | `create-cmp add firebase` (if the app has none yet) → Firebase CLI: login → project create/reuse → app register → real `google-services.json` replaces the mock → green build proves it. Consent-gated per cloud write. |
@@ -567,7 +581,7 @@ Code session can extend it correctly — **the create-cmp plugin is not required
    which shells to `qa/scaffold-feature.mjs`, a deterministic stamper (whole-word rename map,
    anchor injection) that clones the `home` exemplar: Screen + ViewModel + UseCase + Repository +
    DI + navigation, with tests at every layer and a golden-tree baseline, spec-linked from birth.
-3. Claude runs `node qa/verify.mjs` — the profile-tiered lane (§3: 17 steps at `local`, from
+3. Claude runs `node qa/verify.mjs` — the profile-tiered lane (§3: 18 steps at `local`, from
    `harnessIntegrity` first through build, the full JVM test tier, and the device steps when one
    is attached) — into one typed PASS/FAIL/SKIP/ERROR verdict (ERROR = the step could not run: a deadline, zero tests executed, a throw — it fails the lane but never accuses the change) + a schema-validated evidence-pack JSON
    (`qa/evidence/latest.json`).

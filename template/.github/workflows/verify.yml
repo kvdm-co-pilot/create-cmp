@@ -58,6 +58,10 @@ jobs:
       # >>> cmp:feature !harness
       - name: Tests (JVM tier) + debug build
         run: ./gradlew :composeApp:desktopTest :composeApp:assembleDebug
+      # >>> cmp:feature web
+      - name: Browser app release build
+        run: ./gradlew :composeApp:wasmJsBrowserDistribution
+      # <<< cmp:feature web
       # <<< cmp:feature !harness
 
       # >>> cmp:feature harness

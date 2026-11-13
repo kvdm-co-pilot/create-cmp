@@ -147,6 +147,7 @@ function buildConfigFromFlags(flags, positional, preset) {
   const name = typeof flags.name === "string" ? flags.name : "MyApp";
   const pkg = typeof flags.package === "string" ? flags.package : `com.${slugFromName(name)}.app`;
   const ios = flagBool(flags, "ios", true);
+  const web = flagBool(flags, "web", false);
   const targetDir =
     (typeof flags["target-dir"] === "string" && flags["target-dir"]) ||
     positional ||
@@ -162,9 +163,12 @@ function buildConfigFromFlags(flags, positional, preset) {
     // advisory hooks, without the verify lane / receipts / governance.
     // `create-cmp harden` installs the subtraction back.
     harness: !flagBool(flags, "minimal", false),
-    platforms: { android: true, ios },
+    platforms: { android: true, ios, web },
     // The preset moves a default; a flag the line states still answers first.
-    room: flagBool(flags, "room", presetDefault(preset, "room", true)),
+    // Web moves it too: Room 2.8.4 has no browser target, so a web app's Room
+    // default is off. A stated `--room` beside `--web` is kept as stated and
+    // refused by runCreate (docs/features/web-platform.md W3).
+    room: flagBool(flags, "room", web ? false : presetDefault(preset, "room", true)),
     e2e: flagBoolWithAlias(flags, "e2e", "appium", presetDefault(preset, "e2e", true)),
     inspector: flagBool(flags, "inspector", presetDefault(preset, "inspector", true)),
     devClient: flagBool(flags, "dev-client", presetDefault(preset, "devClient", true)),
@@ -224,11 +228,18 @@ async function interactiveConfig(positional, flags = {}, preset = resolvePreset(
       { type: "confirm", name: "ios", message: "Enable iOS target?", initial: line.platforms.ios },
       {
         type: "confirm",
+        name: "web",
+        message: "Web app too (Kotlin/Wasm in the browser, same UI)?",
+        initial: line.platforms.web,
+      },
+      {
+        type: "confirm",
         name: "harness",
         message: "Verification harness (verify lane, evidence receipts, machine-checked done)?",
         initial: line.harness,
       },
-      { type: "confirm", name: "room", message: "Room local cache?", initial: line.room },
+      // Not asked for a web app: Room 2.8.4 has no browser target (web-platform.md W3).
+      { type: (_prev, values) => (values.web ? null : "confirm"), name: "room", message: "Room local cache?", initial: line.room },
       { type: "confirm", name: "e2e", message: "E2E test harness (Maestro)?", initial: line.e2e },
       {
         type: "confirm",
@@ -256,8 +267,8 @@ async function interactiveConfig(positional, flags = {}, preset = resolvePreset(
   return {
     ...line,
     harness: answers.harness,
-    platforms: { android: true, ios: answers.ios },
-    room: answers.room,
+    platforms: { android: true, ios: answers.ios, web: answers.web },
+    room: answers.web ? false : answers.room,
     e2e: answers.e2e,
     inspector: answers.inspector,
     devClient: answers.devClient,
@@ -313,6 +324,26 @@ export async function runCreate(flags, positional) {
   const config = nonInteractive
     ? buildConfigFromFlags(flags, positional, preset)
     : await interactiveConfig(positional, flags, preset);
+
+  // Web and Room cannot share a tree (Room 2.8.4 has no browser target). Asked of the
+  // RESOLVED config, so the flag line and the interview answer alike (KD-297): a stated
+  // --room beside a web app is refused before anything is written, whether web came from
+  // --web or from the interview; a web app whose line said nothing about Room is told
+  // that it has none (web-platform.md W3).
+  if (config.platforms.web === true) {
+    const room = flagBool(flags, "room", undefined);
+    if (room === true) {
+      process.stderr.write(
+        `create-cmp: --web and --room cannot be stamped together — Room 2.8.4 has no wasmJs (browser) target.\n` +
+          `  Stamp with --web --no-room (key-value storage goes through the KeyValueStore seam), or drop --web.\n` +
+          `  Nothing was written.\n`
+      );
+      process.exit(2);
+    }
+    if (room === undefined) {
+      process.stdout.write(`note: --web stamps without Room (Room 2.8.4 has no browser target); --no-room is implied.\n`);
+    }
+  }
 
   const verify = flagBool(flags, "verify", true);
 

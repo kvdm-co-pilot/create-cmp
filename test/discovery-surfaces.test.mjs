@@ -83,7 +83,9 @@ test("cmp-new carries the scope guards found by cold-start simulation", () => {
   // Live agent simulation (2026-07) found: over-firing on non-mobile apps, comparison
   // questions routed into a scaffold, and no existing-project check. Pinned here.
   const skill = read("skills/cmp-new/SKILL.md");
-  assert.match(skill, /never web,\s+desktop-only, backend, or CLI/i, "mobile-only scope guard");
+  // A web app BESIDE the phone apps is in scope since `--web` (docs/features/web-platform.md);
+  // a web-only app is still not.
+  assert.match(skill, /never a web-only,\s+desktop-only, backend, or CLI/i, "mobile-only scope guard");
   assert.match(skill, /comparison question/i, "comparison-only guard (answer, don't scaffold)");
   assert.match(skill, /new-vs-existing/, "existing-project guard");
 });

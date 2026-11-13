@@ -145,6 +145,14 @@ if the dev-client feature is enabled, an interactive hot-reload window. It is no
 release target. See project ADR
 [`0003-jvm-desktop-target-is-harness-infrastructure.md`](./adr/0003-jvm-desktop-target-is-harness-infrastructure.md).
 
+<!-- >>> cmp:feature web -->
+**Web's role:** the `wasmJs` target is a shipped app — the browser version of the same
+`commonMain` UI, mounted by `webMain/.../main.kt` (`ComposeViewport`) into
+`webMain/resources/index.html`. Its seam actuals live in `webMain` (Kotlin's shared web source
+set). It has no Room (Room 2.8.4 has no wasmJs target); small on-device values go through
+`core/platform/KeyValueStore`. See [`web.md`](./web.md).
+<!-- <<< cmp:feature web -->
+
 ## 5. Building blocks — the layer model
 
 ```

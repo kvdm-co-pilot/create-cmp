@@ -44,7 +44,7 @@ test("the profiles, by name and in order — the cheap tier before releaseBuild,
   assert.ok(!names("smoke").includes("build") && !names("smoke").includes("unitTests"), "smoke never touches Gradle");
   assert.deepEqual(names("local"), [
     "harnessIntegrity", "specCoverage", "approvals", "componentStories", "reachability", "e2eCoverage", "archDoc", "schemaHistory",
-    "build", "unitTests", "conformance", "goldenTrees", "tokenDrift", "a11y", "releaseBuild", "e2eSmoke", "androidChecks",
+    "build", "unitTests", "conformance", "goldenTrees", "tokenDrift", "a11y", "releaseBuild", "webBuild", "e2eSmoke", "androidChecks",
   ]);
   assert.deepEqual(names("ci"), [...names("local"), "determinism"]);
   assert.deepEqual(names("nightly"), names("ci"));
@@ -54,7 +54,7 @@ test("the profiles, by name and in order — the cheap tier before releaseBuild,
 test("the device/slow tier is one list, and every fast-excluded name maps to a function", () => {
   const pack = createCmpSteps(ctx());
   assert.deepEqual(pack.DEVICE_STEPS, ["e2eSmoke", "tokenDrift", "androidChecks", "releaseSmoke"]);
-  assert.deepEqual(pack.FAST_EXCLUDED_NAMES, [...pack.DEVICE_STEPS, "releaseBuild"]);
+  assert.deepEqual(pack.FAST_EXCLUDED_NAMES, [...pack.DEVICE_STEPS, "releaseBuild", "webBuild"]);
   for (const n of pack.FAST_EXCLUDED_NAMES) assert.equal(typeof pack.STEP_FN_BY_NAME[n], "function", n);
 });
 

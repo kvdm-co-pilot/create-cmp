@@ -387,10 +387,10 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
 
     await t.test("--fast is the inner loop: exclusion derived from DEVICE_STEPS, mode stamped, banner loud, docs honest", () => {
       const verify = laneSrc(out);
-      // The slow-tier list is DERIVED from DEVICE_STEPS (+ releaseBuild) — one
+      // The slow-tier list is DERIVED from DEVICE_STEPS (+ the two release builds) — one
       // source of truth with the receipt-strength/lease feature, never a
       // second hand-maintained list that can drift.
-      assert.match(verify, /\[\.\.\.DEVICE_STEPS, "releaseBuild"\]/, "fast exclusion reuses DEVICE_STEPS as source of truth");
+      assert.match(verify, /\[\.\.\.DEVICE_STEPS, "releaseBuild", "webBuild"\]/, "fast exclusion reuses DEVICE_STEPS as source of truth");
       assert.match(verify, /--fast/, "verify.mjs recognizes --fast");
       assert.match(verify, /mode: fast \? "fast" : "full"|const mode = fast \? "fast" : "full"/, "the receipt records mode fast/full distinctly");
       assert.match(verify, /INNER LOOP ONLY, NOT THE DONE-GATE/, "the start banner is loud and unambiguous");
