@@ -138,7 +138,15 @@ test("disabledFeaturesFromConfig maps config to feature names", () => {
     devClient: true,
   };
   const d = disabledFeaturesFromConfig(cfg);
-  assert.deepEqual([...d].sort(), ["ios", "room"]);
+  // No `platforms.web` key is web off — every config written before the target existed.
+  assert.deepEqual([...d].sort(), ["ios", "room", "web"]);
+});
+
+test("disabledFeaturesFromConfig: web is on only when platforms.web is true", () => {
+  const base = { platforms: { android: true, ios: true }, room: false, e2e: true, inspector: true, devClient: true };
+  assert.ok(disabledFeaturesFromConfig(base).has("web"), "absent → off");
+  assert.ok(disabledFeaturesFromConfig({ ...base, platforms: { ...base.platforms, web: false } }).has("web"), "false → off");
+  assert.ok(!disabledFeaturesFromConfig({ ...base, platforms: { ...base.platforms, web: true } }).has("web"), "true → on");
 });
 
 test("disabledFeaturesFromConfig: devClient off (or absent) disables the dev-client feature", () => {

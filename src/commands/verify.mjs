@@ -70,6 +70,9 @@ export async function runVerifyCommand(flags, positional) {
   // didn't opt out); runVerify additionally gates on macOS.
   const hasIosShell = fs.existsSync(path.join(projectDir, "iosApp"));
   const ios = flagBool(flags, "ios", true) && hasIosShell;
+  // The web leg runs when the project has the web target's sources, the same
+  // structural test the lane's webBuild step uses.
+  const web = flagBool(flags, "web", true) && fs.existsSync(path.join(projectDir, "composeApp", "src", "webMain"));
 
   process.stdout.write(
     `${colors.bold("create-cmp verify")} — green-build gate\n` +
@@ -81,7 +84,7 @@ export async function runVerifyCommand(flags, positional) {
   const verdict = await runVerify({
     projectDir,
     manifest: { verify },
-    config: { platforms: { ios } },
+    config: { platforms: { ios, web } },
     dryRun,
   });
   // The printer says a dry run is a dry run and claims no verdict for it; the

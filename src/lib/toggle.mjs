@@ -86,7 +86,7 @@ export function stripFeatureBlocks(content, disabledFeatures) {
 
 /**
  * Map an engine config object to the set of DISABLED feature names that the
- * manifest understands: harness, ios, room, e2e, inspector, dev-client.
+ * manifest understands: harness, ios, web, room, e2e, inspector, dev-client.
  * `harness` is the mode split (LADDER §R3): absent means full — only an
  * explicit `harness: false` (`--minimal`) subtracts it.
  *
@@ -101,6 +101,8 @@ export function disabledFeaturesFromConfig(config) {
   const disabled = new Set();
   if (config.harness === false) disabled.add("harness");
   if (!config.platforms?.ios) disabled.add("ios");
+  // Web is opt-in: absent (every config written before it existed) means off.
+  if (config.platforms?.web !== true) disabled.add("web");
   if (config.firebase && !config.firebase.enabled) disabled.add("firebase");
   if (!config.room) disabled.add("room");
   if (!config.e2e) disabled.add("e2e");

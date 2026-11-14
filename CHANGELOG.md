@@ -6,6 +6,49 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-13
+
+Nothing is published. Numbered after `feat/shared-device-pin` (0.29.x, opened first and still open),
+so neither slice has to renumber whichever merges first. `prooflane-harness` 0.25.0 carries the `webBuild` lane step and the
+`webMain` column in the architecture document; `@create-cmp/inspector` 0.11.0 is its bundle
+rebuilt over that harness `lib/`.
+
+### Added
+
+- **A browser app from the same scaffold: `--web`** (`platforms.web` in `options.schema.json`,
+  default off; `docs/features/web-platform.md`). The stamp adds a Kotlin/Wasm (`wasmJs`) target
+  that runs the shared `commonMain` UI in the page. Its sources are in `composeApp/src/webMain`:
+  the entry point (`ComposeViewport`), `index.html`, and the web side of every platform seam.
+  Run it with `./gradlew :composeApp:wasmJsBrowserDevelopmentRun`. The release build is
+  `:composeApp:wasmJsBrowserDistribution`, which `create-cmp --verify` and `create-cmp verify`
+  run when the app has the target. The interview asks the question, and the `cmp-new` skill
+  reads it from the ask: a web app beside the phone apps is now in its scope, but a web-only
+  app is not.
+- **Room and the web target are exclusive.** Room 2.8.4 has no wasmJs target. `--web` implies
+  `--no-room` and says so, `--web --room` is refused before anything is written, and the
+  engine refuses a config that has both. `create-cmp add firebase` refuses a web app for the same
+  reason (GitLive has no wasmJs variant) and writes nothing.
+- **Three platform seams in every stamp**, under `core/platform/`: `KeyValueStore`
+  (SharedPreferences, NSUserDefaults, `localStorage` with an in-memory fallback where the browser
+  refuses it, in memory on the JVM tier),
+  `DocumentPrinter` (HTML through the platform's print UI: Android PrintManager, iOS
+  UIPrintInteractionController, the browser's print window, and a "not on desktop" result on
+  the JVM tier) and `PhotoPicker` (the Android photo picker, PHPicker, a browser file input that
+  offers a phone's camera, an AWT file dialog). `KeyValueStore` is bound in every platform's
+  Koin start.
+- **The lane's `webBuild` step** (`local`, `ci`, `release`) runs the browser release build. It
+  SKIPs structurally in an app without `composeApp/src/webMain`, and `--fast` leaves it out, as it
+  leaves out `releaseBuild`. `docs/ARCHITECTURE.md`'s expect/actual table and layer inventory
+  gain a `webMain` column and group in a web app, and only there.
+- **CI: a `stamp-web` job** stamps `--web --no-ios` and builds the browser distribution and the
+  Android debug APK from that one tree.
+- **An eval case**, `cmp-new--web-and-phones`: a web-plus-phones request loads `cmp-new`.
+- **`scripts/web-load.mjs`** measures a release web build's bytes and its time to first frame in
+  headless Chromium under phone throttling. The template app, measured 2026-11-13: 3.3 MiB
+  brotli (`skiko.wasm` is 76% of it), first frame 1.6 s on wifi, 3.7 s on good 4G and 17.4 s
+  on Slow 4G, against a 2-second phone target. That target is met on wifi and missed on
+  mobile data. The stamped app's `docs/web.md` carries the numbers and what helps.
+
 ## [0.28.12] - 2026-10-13
 
 Nothing is published. `prooflane-harness` 0.23.8 carries the watch's red rows and the machine-class deadlines; `@create-cmp/inspector` 0.9.5 is its bundle rebuilt over that harness `lib/`.

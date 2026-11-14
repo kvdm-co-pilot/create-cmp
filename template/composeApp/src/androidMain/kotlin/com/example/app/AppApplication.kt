@@ -7,6 +7,7 @@ import __PACKAGE__.data.local.appContext
 import __PACKAGE__.data.local.buildDatabase
 // <<< cmp:feature room
 import __PACKAGE__.core.connectivity.NetworkMonitor
+import __PACKAGE__.core.platform.KeyValueStore
 import __PACKAGE__.di.androidModule
 // >>> cmp:feature inspector
 import __PACKAGE__.inspector.startInspector
@@ -37,6 +38,7 @@ class AppApplication : Application() {
                     single<AppDatabase> { buildDatabase() }
                     // <<< cmp:feature room
                     single { NetworkMonitor(androidContext()) }
+                    single { KeyValueStore(androidContext()) }
                 },
                 androidModule,
                 *appModules.toTypedArray()

@@ -1,6 +1,7 @@
 package __PACKAGE__
 
 import __PACKAGE__.core.connectivity.NetworkMonitor
+import __PACKAGE__.core.platform.KeyValueStore
 // >>> cmp:feature room
 import __PACKAGE__.data.local.AppDatabase
 import __PACKAGE__.data.local.buildDatabase
@@ -18,6 +19,7 @@ fun initKoin() {
                 single<AppDatabase> { buildDatabase() }
                 // <<< cmp:feature room
                 single { NetworkMonitor(null) }
+                single { KeyValueStore(null) }
             },
             *appModules.toTypedArray()
         )

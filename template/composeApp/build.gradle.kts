@@ -59,6 +59,25 @@ kotlin {
         }
     }
 
+    // >>> cmp:feature web
+    // The browser app: Kotlin/Wasm running the same commonMain UI. Its sources live in
+    // src/webMain (Kotlin's shared web source set), so a js() target for older browsers
+    // would be one more line here with nothing moved. See docs/web.md.
+    //
+    //   ./gradlew :composeApp:wasmJsBrowserDevelopmentRun     # dev server, opens the browser
+    //   ./gradlew :composeApp:wasmJsBrowserDistribution       # release build -> build/dist/wasmJs/productionExecutable
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        outputModuleName.set("composeApp")
+        browser {
+            commonWebpackConfig {
+                outputFileName = "composeApp.js"
+            }
+        }
+        binaries.executable()
+    }
+    // <<< cmp:feature web
+
     sourceSets {
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -117,6 +136,13 @@ kotlin {
             implementation(libs.ktor.client.darwin)
         }
         // <<< cmp:feature ios
+
+        // >>> cmp:feature web
+        webMain.dependencies {
+            // Ktor's browser engine (fetch), picked up by HttpClient() and Coil on the web.
+            implementation(libs.ktor.client.js)
+        }
+        // <<< cmp:feature web
 
         // JVM tier deps (harness infrastructure — see the jvm("desktop") target note).
         val desktopMain by getting {

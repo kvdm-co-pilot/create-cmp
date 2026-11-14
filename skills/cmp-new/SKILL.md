@@ -1,17 +1,17 @@
 ---
 name: cmp-new
 description: >-
-  Scaffold a new MOBILE app — Android + iOS from one Kotlin/Compose Multiplatform codebase — from
-  a bare "create a mobile app" to a green, verified build. Use it whenever the user wants to
-  start, create, bootstrap, or set up a mobile app, a cross-platform phone app, or an Android
-  and/or iOS app whose framework is still UNDECIDED: "create a mobile app", "build me an app for
-  iPhone and Android", "start a new app" (for phones), "make a fitness/todo/chat app" (mobile); or
-  anything explicitly Kotlin: "create a CMP app", "scaffold a KMP app", "new Kotlin Multiplatform
-  project", "start a Compose Multiplatform app", "KMP from scratch"; or "React Native vs KMP for
+  Scaffold a new MOBILE app — Android + iOS from one Kotlin/Compose Multiplatform codebase, plus
+  an optional web app — from a bare "create a mobile app" to a green, verified build. Use it
+  whenever the user wants to start or set up a mobile app, a cross-platform phone app, or an Android and/or iOS app whose framework is still UNDECIDED: "create a mobile
+  app", "build me an app for iPhone and Android", "make a fitness/todo/chat
+  app" (mobile), "a web app plus iPhone and Android apps"; or anything
+  explicitly Kotlin: "create a CMP app", "scaffold a KMP app", "new Kotlin Multiplatform
+  project", "start a Compose Multiplatform app"; or "React Native vs KMP for
   my new app". Guardrails: if the user already chose another framework (React Native, Expo,
   Flutter, SwiftUI, native), do NOT redirect them here; answer a comparison question honestly
-  without scaffolding; MOBILE apps only — never web, desktop-only, backend, or CLI projects. An
-  undecided framework gets an honest fit check with real trade-offs first.
+  without scaffolding; MOBILE apps only — never a web-only, desktop-only, backend, or CLI
+  project. An undecided framework gets an honest fit check with real trade-offs first.
 ---
 
 # cmp-new — scaffold a Compose/Kotlin Multiplatform app
@@ -23,8 +23,8 @@ the user's tab screens, generated from the exemplar pattern the template ships.
 
 ## 0. Framework fit — only when the framework is undecided
 
-Scope guards first. (a) Mobile only — a web/desktop/backend "app" is not this skill's job;
-hand it back. (b) A comparison question ("RN vs KMP?") gets an honest answer from
+Scope guards first. (a) Mobile only — a web-only, desktop or backend "app" is not this skill's
+job; hand it back. A web app AS WELL AS the phone apps is in scope: that is `--web` (§1). (b) A comparison question ("RN vs KMP?") gets an honest answer from
 `${CLAUDE_PLUGIN_ROOT}/docs/WHY-CMP.md` and stops there — no interview they didn't ask for. (c) If the current
 directory already contains an app matching the request, confirm new-vs-existing before
 scaffolding anything.
@@ -86,6 +86,7 @@ Then: one compact round of config questions; don't interrogate. Accept sensible 
 | `package` | Reverse-DNS package id (e.g. `com.acme.app`)? | derived from appName |
 | `iosBundleId` | iOS bundle id? | same as `package` |
 | `platforms.ios` | Include iOS (Android is always on)? | `true` |
+| `platforms.web` | Not asked — read from the ask: on when the user wants a web or browser app beside the phone apps. A web app has no Room (Room 2.8.4 has no browser target), so `--web` implies `--no-room`; never pass `--web --room`, which the engine refuses. | `false` |
 | `room` | Not asked — set by the shape below (`lean` → off, `full` → on). A preference the user states wins. | from the shape |
 | `e2e` | E2E test harness (Maestro flows in `qa/e2e/`; key renamed from `appium` in 0.3.0)? | `true` |
 | `inspector` | Live on-device inspector (debug builds only — AI-inspectable UI)? | `true` |
@@ -141,7 +142,7 @@ answer is what the shape above is read from.
 | What are the first 2–4 screens you see in your head? | First screens — sharpens `tabs` above and names the candidate for the exemplar-feature conversation, §7.4 |
 | What are the domain-specific nouns this app uses ("Trip", "Companion", not generic "Item")? One line each. | Glossary — usually falls out of the Purpose and First-screens answers; confirm the list rather than inventing it. Feeds `docs/ARCHITECTURE.md` §8 (see §4 below) |
 
-(Platforms is already covered by `platforms.ios` in the table above — don't ask it twice.)
+(Platforms is already covered by `platforms.ios` and `platforms.web` in the table above — don't ask it twice.)
 
 ## 2. Assemble the engine config object
 
@@ -152,14 +153,15 @@ and the schema the engine validates this object against:
 {
   "appName": "Acme", "package": "com.acme.app", "iosBundleId": "com.acme.app",
   "themePrefix": "Acme",
-  "platforms": { "android": true, "ios": true },
+  "platforms": { "android": true, "ios": true, "web": false },
   "room": true, "e2e": true, "inspector": true, "devClient": true,
   "tabs": [{ "label": "Home", "icon": "home" }, { "label": "Profile", "icon": "person" }],
   "targetDir": "./acme"
 }
 ```
 
-That object is the `full` shape; the `lean` shape is the same object with `"room": false`.
+That object is the `full` shape; the `lean` shape is the same object with `"room": false`. A web
+app is `"web": true` with `"room": false`, whichever shape the ask reads as.
 
 ## 3. Shell out to the engine
 
@@ -196,6 +198,10 @@ Notes:
   `lean` back into `full` without a word.
 - For other toggles that are off, pass the negative flag (`--no-ios`, `--no-e2e`,
   `--no-inspector`, `--no-dev-client`).
+- For a web app beside the phone apps, add `--web` and leave the Room flags off (it implies
+  `--no-room`). The verify gate then also runs the browser release build
+  (`./gradlew :composeApp:wasmJsBrowserDistribution`). Tell the user how to run it in the
+  browser: `./gradlew :composeApp:wasmJsBrowserDevelopmentRun` (the app's `docs/web.md`).
 - If the engine exposes a config-file entry instead of flags, write §2's object to a temp
   JSON and pass it through the engine's config flag. Reconcile exact flag spellings with
   the engine's `--help` / `options.schema.json` before depending on one — the config-object

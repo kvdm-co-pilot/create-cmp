@@ -9,6 +9,46 @@
 *An entry moves here when the thing is fixed or the decision is taken, with the commit that did
 it.*
 
+### KD-296 — the web KeyValueStore throws where every other actual cannot — **CLOSED 2026-11-13**
+
+Found in the `feat/web-platform` review, round 1 (2026-11-13). `kotlinx.browser.localStorage` is
+read on every call; a browser that blocks site storage throws on the read, and a full origin
+throws on `setItem`. In Kotlin/Wasm that is an uncaught `JsException` on the caller's stack. The
+seam's `getString`/`putString` signatures cannot report it. Handed up as the decision it is:
+degrade to an in-memory map (silent data loss across reloads) or add a result type to the seam.
+
+**Fixed (decision taken: degrade to memory):** `KeyValueStore.web.kt` wraps every `localStorage` call in `runCatching`;
+a refused write is kept in an in-memory map for the page load, a read prefers that map, and nothing throws into the
+caller. That matches the desktop store and needs no result type on a seam the other three targets cannot fail. The
+commonMain doc, the app's `docs/web.md` and the manifest note say so. `test/web-platform.test.mjs` "KD-296" holds that
+every `localStorage` touch is guarded. Compile-proven on wasmJs; the throw paths were not exercised in a browser.
+*Logged and closed 2026-11-13 in the web-platform slice.*
+
+### KD-297 — the interview drops a stated --room for a web app without a word — **CLOSED 2026-11-13**
+
+Found in the `feat/web-platform` review, round 1 (2026-11-13). The CLI refuses `--web --room`
+(exit 2, nothing written); the interview, given `--room` on the line and "yes" to the web
+question, skips the Room question and stamps `room: false`, printing nothing. Not blocking: the
+tree builds and the record is honest; the user was simply not told.
+
+**Fixed:** the web/Room check in `src/commands/create.mjs` runs on the RESOLVED config, after the interview, so a
+stated `--room` beside a web answer is refused (exit 2, nothing written) exactly as on the flag line, and the "--no-room
+is implied" note prints only once web is decided. Untested at the TTY: `interactiveConfig` still has no seam; the flag
+path's refusal and note are held by `test/web-platform.test.mjs`.
+*Logged and closed 2026-11-13 in the web-platform slice.*
+
+### KD-298 — web prose the stamp does not honour — **CLOSED 2026-11-13**
+
+Found in the `feat/web-platform` review, round 1 (2026-11-13). `template/docs/web.md` names the
+lane's `webBuild` step unconditionally, so a `--minimal` stamp ships it; the fix is a `harness`
+marker around that paragraph. `template/manifest.json`'s `web.notes` describes the picker as
+`<input type=file accept=image/* capture=environment>`; the code (and W4) has no `capture`.
+
+**Fixed:** `template/docs/web.md` puts the `webBuild` sentence in a `harness` block with a `!harness` twin naming the
+CI workflow step that does build the browser app in a minimal stamp; `template/manifest.json`'s note now says the
+picker has no `capture` attribute. `test/web-platform.test.mjs` "KD-298" stamps `--web --minimal` and reads both.
+*Logged and closed 2026-11-13 in the web-platform slice.*
+
 ### KD-293 — sync-harness calls a template-owned lane file an orphan and deletes it — **CLOSED 2026-10-21**
 
 `scripts/sync-harness.mjs` `orphanFiles`; `template/qa/gates-status.mjs` (98d91b9)

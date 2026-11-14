@@ -163,7 +163,16 @@ export async function runAdd(flags, what, positional) {
   const verdict = await runVerify({
     projectDir,
     manifest: { verify },
-    config: { platforms: { ios: plan.ios && flagBool(flags, "ios", true) }, harness: plan.record.harness !== false },
+    config: {
+      platforms: {
+        ios: plan.ios && flagBool(flags, "ios", true),
+        // The same structural answer `create-cmp verify` gives. planAddFirebase refuses a web
+        // app today, so this is false whenever the gate runs — it is here so the day that
+        // refusal lifts, the gate cannot call a broken browser build GREEN.
+        web: fs.existsSync(path.join(projectDir, "composeApp", "src", "webMain")),
+      },
+      harness: plan.record.harness !== false,
+    },
     dryRun: flagBool(flags, "dry-run-verify", false),
   });
   printVerifyVerdict(verdict);

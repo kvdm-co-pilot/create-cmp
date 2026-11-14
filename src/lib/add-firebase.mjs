@@ -481,6 +481,17 @@ export function planAddFirebase(projectDir, input = {}, opts = {}) {
     refuse(`${SPEC_REL} is not valid JSON (${e.message}).`);
   }
   if (typeof record?.package !== "string" || !record.package) refuse(`${SPEC_REL} records no package.`);
+  // The GitLive SDK publishes no wasmJs variant (android, ios, jvm and js only), and the
+  // overlay puts it in commonMain, which the browser target compiles. Refused for the same
+  // reason the stamp refuses Room beside --web (docs/features/web-platform.md W3). The tree
+  // is asked as well as the record, so a hand-added web target is refused too.
+  if (record.platforms?.web === true || fs.existsSync(path.join(projectDir, "composeApp", "src", "webMain"))) {
+    refuse(
+      `this app has the web target (composeApp/src/webMain), and the GitLive Firebase SDK has no wasmJs ` +
+        `(browser) variant — adding it to commonMain would break \`:composeApp:wasmJsBrowserDistribution\`. ` +
+        `Use Firebase's REST API or the Firebase JS SDK from the web side instead (docs/features/web-platform.md W3).`,
+    );
+  }
 
   const appBuild = readText(projectDir, APP_BUILD_REL);
   if (appBuild === null) refuse(`${APP_BUILD_REL} is not there — this is not the shape create-cmp stamps.`);

@@ -1,7 +1,7 @@
 // North-star gate: run manifest.verify commands and return GREEN/FAIL.
 //
 // verify.android runs always; verify.ios runs only on macOS when iOS is
-// enabled. Success is PROVEN by a build, not assumed — the CLI refuses to
+// enabled; verify.web runs when the web target is enabled. Success is PROVEN by a build, not assumed — the CLI refuses to
 // claim success without this (unless --no-verify).
 
 import { spawn } from "node:child_process";
@@ -51,6 +51,11 @@ export async function runVerify({ projectDir, manifest, config, dryRun = false }
   if (verify.ios) {
     const eligible = isMacOS() && !!config?.platforms?.ios;
     plan.push({ platform: "ios", command: verify.ios, eligible });
+  }
+  // Web joins the plan only when the app has it: a row for every other app would
+  // be a "skip" line about a target nobody asked for. Any host can build it.
+  if (verify.web && config?.platforms?.web === true) {
+    plan.push({ platform: "web", command: verify.web, eligible: true });
   }
 
   if (plan.length === 0) {

@@ -58,6 +58,13 @@ only — release builds contain no inspector code.
 `iosApp.xcworkspace` in Xcode and run. (First time: `brew install xcodegen`.)
 <!-- <<< cmp:feature ios -->
 
+<!-- >>> cmp:feature web -->
+**Web:** `./gradlew :composeApp:wasmJsBrowserDevelopmentRun` serves the same UI in your browser
+(Kotlin/Wasm). `./gradlew :composeApp:wasmJsBrowserDistribution` is the release build, in
+`composeApp/build/dist/wasmJs/productionExecutable/` — static files for any host. See
+[docs/web.md](docs/web.md) for the seams on the web and the size and load numbers.
+<!-- <<< cmp:feature web -->
+
 **Firebase:** not part of this scaffold. `npx create-cmp-cli add firebase` adds it — the GitLive SDK,
 the debug-build emulator redirect, and your real `google-services.json` (or a mock config that
 says it is one). From Claude Code, the `cmp-firebase-connect` skill drives it end to end.
@@ -78,6 +85,9 @@ composeApp/src/iosMain/      iOS actuals · iosApp/ is the Xcode shell
 <!-- >>> cmp:feature dev-client -->
 composeApp/src/desktopMain/  desktop dev-client (see docs/dev-client.md)
 <!-- <<< cmp:feature dev-client -->
+<!-- >>> cmp:feature web -->
+composeApp/src/webMain/      browser entry point, index.html + web actuals (see docs/web.md)
+<!-- <<< cmp:feature web -->
 <!-- >>> cmp:feature harness -->
 qa/verify.mjs                the verify lane — this repo's definition of done
 qa/evidence/latest.json      the committed evidence receipt (see CONTRIBUTING.md)

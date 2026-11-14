@@ -50,7 +50,11 @@
           "const": true,
           "description": "Android is always enabled."
         },
-        "ios": { "type": "boolean" }
+        "ios": { "type": "boolean" },
+        "web": {
+          "type": "boolean",
+          "description": "Browser app: a Kotlin/Wasm (wasmJs) target running the same commonMain UI, with its sources in composeApp/src/webMain (./gradlew :composeApp:wasmJsBrowserDevelopmentRun, :composeApp:wasmJsBrowserDistribution). Absent means false. Refused together with `room: true`: Room 2.8.4 has no wasmJs target (docs/features/web-platform.md W3)."
+        }
       }
     },
     "harness": {

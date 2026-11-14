@@ -722,6 +722,32 @@ function stepReleaseBuild() {
   };
 }
 
+// The browser app's release build (docs/features/web-platform.md W5). Structural like
+// tokenDrift's SKIP: an app without the web target has no composeApp/src/webMain, and a
+// row that ran Gradle to discover that would cost every phone-only app a configuration
+// pass. `wasmJsBrowserDistribution` is the build a deploy ships — webpack in production
+// mode over the optimized wasm — so a PASS here is the web counterpart of releaseBuild:
+// compile evidence, never runtime evidence (nothing here opens a browser).
+function stepWebBuild() {
+  const started = Date.now();
+  if (!fs.existsSync(path.join(ROOT, "composeApp", "src", "webMain"))) {
+    return { name: "webBuild", verdict: "SKIP", skipKind: "structure", reason: "no web target in this project (composeApp/src/webMain absent) — nothing to build", durationMs: Date.now() - started };
+  }
+  const res = shGradle(`${GRADLEW} :composeApp:wasmJsBrowserDistribution --console=plain`);
+  return {
+    name: "webBuild",
+    verdict: res.ok ? "PASS" : "FAIL",
+    reason: res.ok
+      ? undefined
+      : `wasmJsBrowserDistribution failed — the browser app does not build:\n${res.out
+          .split("\n")
+          .filter((l) => /^e: |error|FAILURE|Unresolved/i.test(l))
+          .slice(0, 12)
+          .join("\n")}`,
+    durationMs: res.durationMs,
+  };
+}
+
 // Runs a filtered slice of the JVM test tier and names the verdict after the gate it proves.
 // The full suite already ran in unitTests; the filtered slices stay cheap (compilation is
 // cached) while `--rerun` forces the tests themselves to EXECUTE — see stepUnitTests.
@@ -1441,6 +1467,9 @@ const stepsForProfile = {
     // which on a real change is minutes of waiting to be told something the JVM
     // knew in seconds. Cheap high-signal checks report first.
     stepReleaseBuild,
+    // The web release build sits beside the Android one, for the same reasons: compile
+    // evidence, minutes long, after the cheap tier. It SKIPs structurally without webMain.
+    stepWebBuild,
     stepE2eSmoke,
     // androidChecks joins local BY the file's own convention, not despite it: local's
     // contract (see USAGE) is "everything; device-dependent steps SKIP when no device is
@@ -1504,19 +1533,20 @@ for (const fn of new Set(Object.values(stepsForProfile).flat())) {
   if (name) fn.layer = layerForStep(name);
 }
 
-const FAST_EXCLUDED_NAMES = [...DEVICE_STEPS, "releaseBuild"];
+const FAST_EXCLUDED_NAMES = [...DEVICE_STEPS, "releaseBuild", "webBuild"];
 const STEP_FN_BY_NAME = {
   e2eSmoke: stepE2eSmoke,
   tokenDrift: stepTokenDrift,
   androidChecks: stepAndroidChecks,
   releaseSmoke: stepReleaseSmoke,
   releaseBuild: stepReleaseBuild,
+  webBuild: stepWebBuild,
 };
 // Where to look when one of THIS pack's steps blows its deadline. The spine
 // prints it verbatim and knows nothing about Gradle or adb (Stage 0 PR 6b.2);
 // marked on the step function, like `fn.layer`.
 const GRADLE_TIMEOUT_HINT = "A wedged Gradle daemon or a device that stopped answering are the usual causes; check `./gradlew --status` and `adb devices`.";
-for (const fn of [stepBuild, stepReleaseBuild, stepUnitTests, stepConformance, stepGoldenTrees, stepA11y, ...Object.values(STEP_FN_BY_NAME)]) {
+for (const fn of [stepBuild, stepReleaseBuild, stepWebBuild, stepUnitTests, stepConformance, stepGoldenTrees, stepA11y, ...Object.values(STEP_FN_BY_NAME)]) {
   if (typeof fn === "function") fn.timeoutHint = GRADLE_TIMEOUT_HINT;
 }
 

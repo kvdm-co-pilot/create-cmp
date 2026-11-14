@@ -56,12 +56,25 @@ export const INTENT_REL_PATH = "specs/intent.md";
 // those are QA/dev-time source sets, not part of the documented layer model
 // (§4/§5 of the doc describe the app's shipped shape).
 const PLATFORM_SOURCE_SETS = ["androidMain", "iosMain", "desktopMain"];
+// Opt-in targets: a column (and an inventory group) only in a tree that has the
+// source set, so an app without the web target reads exactly as it did before
+// the target existed (create-cmp docs/features/web-platform.md).
+const OPTIONAL_PLATFORM_SOURCE_SETS = ["webMain"];
 const SOURCE_SET_KOTLIN_ROOT = {
   commonMain: "composeApp/src/commonMain/kotlin",
   androidMain: "composeApp/src/androidMain/kotlin",
   iosMain: "composeApp/src/iosMain/kotlin",
   desktopMain: "composeApp/src/desktopMain/kotlin",
+  webMain: "composeApp/src/webMain/kotlin",
 };
+
+/** The platform source sets this tree documents: the fixed three, then each opt-in one it has. */
+function platformSourceSets(root) {
+  return [
+    ...PLATFORM_SOURCE_SETS,
+    ...OPTIONAL_PLATFORM_SOURCE_SETS.filter((s) => fs.existsSync(path.join(root, SOURCE_SET_KOTLIN_ROOT[s]))),
+  ];
+}
 
 // The five documented layers (§5 — `core` promoted to an official layer by
 // Wave A / ARCH-10), in the order the doc's layer-model diagram lists them.
@@ -180,8 +193,9 @@ export function generateExpectActualTable(root) {
     return "_No top-level `expect` declarations found in `commonMain`._";
   }
 
+  const platforms = platformSourceSets(root);
   const actualsByPlatform = {};
-  for (const platform of PLATFORM_SOURCE_SETS) {
+  for (const platform of platforms) {
     const platformDir = path.join(root, SOURCE_SET_KOTLIN_ROOT[platform], pkg.packageRel);
     const actuals = fs.existsSync(platformDir) ? scanDeclarations(platformDir).filter((d) => d.keyword === "actual") : [];
     const byName = new Map();
@@ -191,11 +205,11 @@ export function generateExpectActualTable(root) {
 
   const rows = [...expects].sort((a, b) => a.name.localeCompare(b.name));
 
-  const header = `| Declaration | commonMain (expect) | ${PLATFORM_SOURCE_SETS.map((p) => `${p} (actual)`).join(" | ")} |`;
-  const divider = `|${"---|".repeat(2 + PLATFORM_SOURCE_SETS.length)}`;
+  const header = `| Declaration | commonMain (expect) | ${platforms.map((p) => `${p} (actual)`).join(" | ")} |`;
+  const divider = `|${"---|".repeat(2 + platforms.length)}`;
   const lines = [header, divider];
   for (const decl of rows) {
-    const cells = PLATFORM_SOURCE_SETS.map((platform) => {
+    const cells = platforms.map((platform) => {
       const file = actualsByPlatform[platform].get(decl.name);
       if (file) return `\`${file}\``;
       if (/RoomDatabaseConstructor/.test(decl.rawLine)) return "_(Room KSP-generated — no actual in source)_";
@@ -224,7 +238,7 @@ export function generateLayerFileInventory(root) {
     return "_No `presentation/` package directory found under `composeApp/src/commonMain/kotlin` — nothing to derive a layer inventory from._";
   }
 
-  const sourceSets = ["commonMain", ...PLATFORM_SOURCE_SETS];
+  const sourceSets = ["commonMain", ...platformSourceSets(root)];
   const lines = [];
   for (const layer of LAYERS) {
     const groups = [];
