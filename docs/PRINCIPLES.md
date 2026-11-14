@@ -88,11 +88,15 @@ could no longer approve anything. A citation rule passed a 1,244-test suite and 
 fresh scaffold, because the suite never stamps one. The reviewer had run the full suite and
 still missed it the first time.
 
-*Requires.* Before "done": name what consumes what you changed and run it. Touching `template/`
-or `packages/` means stamping a scratch app. The check that catches this class costs 294 ms.
+*Requires.* Before "done": name what consumes what you changed, and make sure something runs it.
+When a required CI check already runs the consumers (create-cmp's PR CI stamps fresh Android and
+web apps and runs the full suite; an app's pre-merge check runs the feature's tests), that check is
+the proof: locally, run only the tests for what you touched, then push. Never repeat locally what a
+required check proves — that is waiting, not proving (Principle 4). Stamp a scratch app locally only
+when no required check covers the consumer.
 
-*Enforced by.* `scripts/fleet-check.mjs` at release (mechanical). `prove-change` tiers 1–2 on
-every finish (mechanical, planned). Independent review by a fresh agent, not self-review.
+*Enforced by.* The repo's required PR checks (create-cmp: `tests`, `proof owed`, the stamp jobs).
+`scripts/fleet-check.mjs` at release. Independent review by a fresh agent, not self-review.
 
 ## 4. Proof costs what the change costs, and never runs silent
 
