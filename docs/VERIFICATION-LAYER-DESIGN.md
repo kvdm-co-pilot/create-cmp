@@ -187,7 +187,7 @@ the seam they pin). All work on one branch, PR to main at the end.
    via `runtime_crashes` (fixture-level test acceptable pre-device);
    `db_schema`/`db_query` answer against the template's Room DB; tools appear in
    server.mjs with schemas + tests.
-3. **Approvals:** fresh scaffold → all `unreviewed` → lane SKIP-warns; approve
+3. **Approvals:** fresh scaffold → all `unreviewed` → lane SKIP-warns (once anything is signed, the step PASSes over the verified signatures and only notes the unreviewed — 2026-11-14); approve
    via CLI → PASS; edit a governed file → FAIL → re-approve → PASS; Stop hook
    refuses over the FAIL (existing mechanism, test proves composition).
 4. **Console:** approvals visible + clickable in the browser; `POST /api/approve`

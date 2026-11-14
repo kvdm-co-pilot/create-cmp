@@ -269,7 +269,7 @@ there). The express lane skips it.
 Design work is not always done at first approval. `node qa/approve.mjs --reopen <artifact>`
 moves an **approved** artifact (shaped or defaults-accepted) back to `reopened` — a
 deliberate, recorded redesign (`reopenedAt`), never a silent edit. While reopened, the
-verify lane's `approvals` gate SKIP-warns exactly like `unreviewed` — sanctioned redesign
+verify lane's `approvals` gate treats it exactly like `unreviewed` (non-blocking; noted, never FAILed) — sanctioned redesign
 never fails the lane; re-approve when the redesign lands. The console has the same control
 (**Reopen** beside **Approve** on approved rows), calling the same library, so the CLI and
 console never disagree.

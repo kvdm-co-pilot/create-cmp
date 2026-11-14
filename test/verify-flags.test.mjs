@@ -127,7 +127,7 @@ test("S8b: verify.mjs defines no step; the pack defines them all and is composed
   // Stage 0 PR 6a: the ctx carries no build tool. GRADLEW, the --rerun flag and
   // the KSP/render coexistence wrapper were the spine knowing what Gradle is;
   // they are the pack's now, built from `fast` and the profile's own buildDir.
-  assert.match(verifySrc, /const pack = loaded\.profile\.steps\(\{ ROOT, HERE, fast, determinism, profile, mode, sh, tryGit, tryGitLines, DEGRADED_PATHS \}\)/, "the borrowing is visible in one line");
+  assert.match(verifySrc, /const pack = loaded\.profile\.steps\(\{ ROOT, HERE, fast, determinism, profile, mode, base, sh, tryGit, tryGitLines, DEGRADED_PATHS \}\)/, "the borrowing is visible in one line — `base` is the feature profile's comparison ref");
   for (const gradleism of [/\bGRADLEW\b/, /\bshGradle\b/, /const RERUN =/, /kspCaches/]) {
     assert.doesNotMatch(verifySrc.replace(/^\s*\/\/.*$/gm, ""), gradleism, `the spine carries no build-tool knowledge: ${gradleism}`);
   }

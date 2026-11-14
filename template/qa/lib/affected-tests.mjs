@@ -119,6 +119,140 @@ export function deriveAffectedFilter(changedPaths, mapping = null) {
 }
 
 /**
+ * The FEATURE SCOPE of a branch's change: what the pre-merge check runs
+ * (`verify --profile feature --base <ref>`, the stamped CI's `android` job).
+ *
+ * The same honesty contract as deriveAffectedFilter, applied to a whole
+ * branch's diff instead of the working tree, with ONE widened licence that
+ * the full lane pays for: FALSE NEGATIVES ARE ACCEPTABLE HERE TOO, because the
+ * nightly runs the full lane — every test, every flow, the release builds —
+ * over main (the app owner's CI policy, decided 2026-11-14). Fail open, never
+ * fail silent, stays absolute: every case that is not a clean feature edit
+ * runs the WHOLE unit suite and says why.
+ *
+ * Three answers, each carrying its reason:
+ *   - `run`   false ONLY when every changed path is declared unable to affect
+ *             a test (docs, the approvals/comments ledgers, agent config) —
+ *             the docs-only change that runs no CI at all.
+ *   - `unit`  the Gradle test filter, exactly deriveAffectedFilter's shape:
+ *             filtered to the feature's patterns, or "all" with the reason.
+ *   - `flows` the e2e flows to drive: the flow named after each feature this
+ *             change touches, plus any flow file it edits. A change that
+ *             names no feature with a flow drives the smoke flow only — the
+ *             app still launches — never every flow: a broad change already
+ *             runs every unit test, and every flow is the nightly's.
+ *
+ * The profile's `testIrrelevant(p)`, `featureNames(paths)`, `isFlow(p)` and
+ * `perFeature(p)` supply the stack's facts (beside the fast filter's
+ * `broadImpact` and `patternsFor`); a profile without them gets the fail-open
+ * answer.
+ *
+ * @param {string[]|null} changedPaths relpaths of the branch's diff, or null when git could not say
+ * @param {object|null} mapping the profile's affected mapping (profiles/<id>/affected.mjs)
+ * @param {{flows?: string[], smokeFlow?: string}} [opts] the flow files that EXIST (relpaths) and the smoke flow's relpath
+ * @returns {{run: boolean, reason: string, features: string[], unit: {mode: "filtered"|"all", patterns: string[], reason?: string}, flows: string[], flowsReason: string, ignored: string[]}}
+ */
+export function deriveFeatureScope(changedPaths, mapping = null, { flows = [], smokeFlow = null } = {}) {
+  const existingFlows = [...new Set((flows ?? []).filter((f) => typeof f === "string"))].sort();
+  const smoke = smokeFlow && existingFlows.includes(smokeFlow) ? [smokeFlow] : [];
+  const everything = (reason) => ({
+    run: true,
+    reason,
+    features: [],
+    unit: { mode: "all", reason, patterns: [] },
+    flows: existingFlows,
+    flowsReason: `every flow — ${reason}`,
+    ignored: [],
+  });
+  if (!Array.isArray(changedPaths)) return everything("git could not name the branch's change (fail open)");
+
+  const paths = [...new Set(changedPaths
+    .filter((p) => typeof p === "string" && p.length > 0)
+    .map((p) => p.split(path.sep).join("/")))]
+    .filter((p) => !isLaneOutput(p))
+    .sort();
+  if (paths.length === 0) {
+    return { run: false, reason: "the branch changes nothing a test can see (only lane outputs, or nothing)", features: [], unit: { mode: "all", reason: "nothing to scope", patterns: [] }, flows: [], flowsReason: "no change", ignored: [] };
+  }
+  const complete = mapping
+    && ["broadImpact", "patternsFor", "testIrrelevant", "featureNames", "isFlow", "perFeature"].every((k) => typeof mapping[k] === "function");
+  if (!complete) return everything("this profile declares no feature-scope mapping");
+
+  const ignored = paths.filter((p) => mapping.testIrrelevant(p));
+  const relevant = paths.filter((p) => !mapping.testIrrelevant(p));
+  if (relevant.length === 0) {
+    return {
+      run: false,
+      reason: `every changed path is declared unable to affect a test (${ignored.length} path${ignored.length === 1 ? "" : "s"}: ${ignored.slice(0, 3).join(", ")}${ignored.length > 3 ? ", …" : ""})`,
+      features: [],
+      unit: { mode: "all", reason: "nothing to scope", patterns: [] },
+      flows: [],
+      flowsReason: "docs-only change",
+      ignored,
+    };
+  }
+
+  // The feature is named by EVERY changed path, ignored ones included: a
+  // spec or a brief names its feature even though no test reads its prose.
+  const features = [...new Set(mapping.featureNames(paths))].filter((n) => typeof n === "string" && n).sort();
+
+  // Flows: a changed flow file runs itself; a feature runs the flow named after it.
+  const changedFlows = relevant.filter((p) => mapping.isFlow(p) && existingFlows.includes(p));
+  const named = existingFlows.filter((f) => features.includes(path.posix.basename(f).replace(/\.[^.]+$/, "")));
+  let scopedFlows = [...new Set([...changedFlows, ...named])].sort();
+  let flowsReason = scopedFlows.length ? `the feature's flow${scopedFlows.length === 1 ? "" : "s"}: ${scopedFlows.join(", ")}` : "";
+  if (scopedFlows.length === 0) {
+    scopedFlows = smoke;
+    flowsReason = smoke.length
+      ? `no flow is named after a feature this change touches — the smoke flow proves the app still launches (${smoke[0]})`
+      : "no flow is named after a feature this change touches, and there is no smoke flow";
+  }
+
+  // Unit tests: a PER-FEATURE file — a flow, a golden baseline — is named
+  // after its feature, so it scopes to that feature's tests and is never
+  // broad impact (even under qa/); everything else goes through the fast
+  // filter's rules, the core's qa/ rule first.
+  const code = relevant.filter((p) => !mapping.perFeature(p));
+  let unit;
+  const broad = code.map((p) => ({ p, why: coreBroadImpactReason(p) ?? mapping.broadImpact(p) })).find((x) => x.why);
+  if (broad) {
+    unit = { mode: "all", reason: `broad-impact change — ${broad.why} (${broad.p})`, patterns: [] };
+  } else {
+    const { patterns } = code.length ? mapping.patternsFor(code) : { patterns: [] };
+    const all = [...new Set([...(Array.isArray(patterns) ? patterns : []), ...features.map((f) => `*${f}*`)])].sort();
+    unit = all.length
+      ? { mode: "filtered", patterns: all }
+      : { mode: "all", reason: "changed files map to no test filter", patterns: [] };
+  }
+
+  return {
+    run: true,
+    reason: features.length ? `feature${features.length === 1 ? "" : "s"}: ${features.join(", ")}` : "a change that names no feature",
+    features,
+    unit,
+    flows: scopedFlows,
+    flowsReason,
+    ignored,
+  };
+}
+
+/**
+ * The branch's change: every path that differs between the merge base of
+ * `base` and HEAD (`git diff base...HEAD`). Null when git cannot answer — an
+ * unknown ref, a shallow clone without the base — and the caller fails open.
+ * @param {string} root
+ * @param {string} base a git ref
+ * @param {(args: string, root: string) => string|null} [runGit]
+ * @returns {string[]|null}
+ */
+export function changedSinceBase(root, base, runGit = defaultRunGit) {
+  if (typeof base !== "string" || !/^[A-Za-z0-9._\/^~@-]+$/.test(base)) return null;
+  const out = runGit(`diff --name-only ${base}...HEAD`, root);
+  if (out === null) return null;
+  return out.replace(/\n+$/, "").split("\n").filter(Boolean);
+}
+
+/**
  * Must the expensive tier run for this change?
  *
  * The most costly thing an agent does is run a device or journey tier — minutes

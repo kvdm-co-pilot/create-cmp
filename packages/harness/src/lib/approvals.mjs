@@ -41,7 +41,7 @@
 //   3. The GATE (`evaluateApprovalsGate`) — combines registry + state into one
 //      per-artifact status (unreviewed / approved / changed-since-approval /
 //      reopened) and one aggregate verdict (PASS/FAIL/SKIP) for the verify-lane step
-//      to report. `reopened` behaves like `unreviewed` for the gate (SKIP-warn,
+//      to report. `reopened` behaves like `unreviewed` for the gate (noted,
 //      non-blocking) — sanctioned redesign is never drift.
 //
 // Consumers: qa/approve.mjs (the CLI — thin shell over this file), qa/verify.mjs
@@ -976,10 +976,22 @@ export function reopenFeature(root, name, options = {}) {
  * compareTokenDrift/qa/lib/token-drift.mjs).
  *
  * Aggregate verdict:
- *   - any artifact "changed-since-approval"       -> FAIL (names each + the
+ *   - any approved row with no signer               -> FAIL
+ *   - any artifact "changed-since-approval"         -> FAIL (names each + the
  *     re-approval command — NEVER names a merely-reopened artifact; see below)
- *   - else any artifact "unreviewed"/"reopened"   -> SKIP (warns, non-blocking)
- *   - else (all approved + matching)              -> PASS
+ *   - else at least one artifact approved + matching -> PASS. Every signature
+ *     that exists was re-hashed and holds; unreviewed/reopened artifacts ride
+ *     along as a NOTE (non-blocking, named in `reason`)
+ *   - else nothing is signed yet, only pending work -> SKIP (warns, non-blocking)
+ *
+ * WHY PASS WITH PENDING (2026-11-14). The gate used to SKIP whenever ANY
+ * artifact was still unreviewed. The stale-signature check above always ran
+ * first, so a drifted signature was never missed — but the row said SKIP, and a
+ * SKIP reads, everywhere a receipt is read, as "not checked". In Consignly 3 of
+ * 35 artifacts were signed, and every receipt said their signatures had not
+ * been verified when they had. The verdict now says what the step did: it
+ * verified the signatures there are. A tree where nothing is signed still
+ * SKIPs, because there was nothing to verify.
  *
  * The sanctioned-redesign-vs-drift asymmetry (GENESIS-FLOW-DESIGN.md §2) lives
  * right here: `reopened` is grouped with `unreviewed` as non-blocking pending
@@ -987,7 +999,7 @@ export function reopenFeature(root, name, options = {}) {
  * run with one reopened artifact and one genuinely drifted (changed-since-
  * approval) artifact FAILs, and the FAIL reason names only the drifted one.
  * @param {string} root
- * @returns {{verdict: "PASS"|"FAIL"|"SKIP", reason: (string|undefined), statuses: Array<object>}}
+ * @returns {{verdict: "PASS"|"FAIL"|"SKIP", reason: (string|undefined), note?: string, statuses: Array<object>}}
  */
 export function evaluateApprovalsGate(root) {
   const statuses = getApprovalStatuses(root);
@@ -1026,7 +1038,12 @@ export function evaluateApprovalsGate(root) {
   }
 
   if (pending.length > 0) {
-    const lines = ["Governed artifacts awaiting human approval (non-blocking — approve when ready):"];
+    const approved = statuses.filter((s) => s.status === "approved");
+    const lines = [
+      approved.length > 0
+        ? `${approved.length} signature(s) verified — every approved artifact still matches its signed hash. Awaiting human approval (non-blocking — approve when ready):`
+        : "Governed artifacts awaiting human approval (non-blocking — approve when ready):",
+    ];
     for (const s of pending) {
       if (s.status === "reopened") {
         lines.push(
@@ -1037,6 +1054,14 @@ export function evaluateApprovalsGate(root) {
       } else {
         lines.push(`  [${s.id}] ${s.label} — unreviewed. Approve: node qa/approve.mjs ${s.id}`);
       }
+    }
+    if (approved.length > 0) {
+      return {
+        verdict: "PASS",
+        note: `${approved.length} signature(s) verified; ${pending.length} artifact(s) awaiting approval (non-blocking)`,
+        reason: lines.join("\n"),
+        statuses,
+      };
     }
     return { verdict: "SKIP", reason: lines.join("\n"), statuses };
   }

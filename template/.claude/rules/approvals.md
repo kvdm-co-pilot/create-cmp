@@ -36,3 +36,12 @@ feature: stamp it (`add-feature`), shape it, then set `exemplarFeature` — from
 stamper clones your pattern in your domain language, and `home` demotes to an ordinary
 feature spec. If the configured exemplar has grown files beyond the canonical 11-file
 shape, the stamper clones the canonical set and warns, listing exactly what it skipped.
+
+### After a signature — re-attest, don't re-run the lane
+
+A signature rewrites `qa/approvals.json`, so the receipt no longer matches the tree. When the
+ledger is the only attested change since a full PASS receipt, run
+`node qa/verify.mjs --reattest-approvals` (seconds): it re-checks every signature, carries the rest
+of the last full run forward (marked on the receipt), and never raises the evidence rung. It
+refuses by name on any other change — then run the full lane. `qa/approve.mjs` and the Stop hook
+print the command when it applies; CI never re-attests — it runs its own checks.

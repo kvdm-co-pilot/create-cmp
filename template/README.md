@@ -130,23 +130,39 @@ npx create-cmp-cli harden
 ## Verification
 
 Every change must pass the verify lane (`node qa/verify.mjs`) and commit its updated receipt
-(`qa/evidence/latest.json`). CI re-runs the same lane on every push — see
-[`.github/workflows/verify.yml`](./.github/workflows/verify.yml).
+(`qa/evidence/latest.json`). CI ([`.github/workflows/verify.yml`](./.github/workflows/verify.yml))
+spends runner time only where it buys something:
+
+- **Ordinary pushes run nothing** — a branch, or a draft pull request, starts no job, and a
+  docs-only change never builds. A newer run of the same PR cancels the older one.
+- **Before a feature merges**, the `android` job runs only that feature's proof:
+  `node qa/verify.mjs --profile feature --base HEAD^1` — its unit and Compose UI tests and its
+  Maestro flow `qa/e2e/<feature>.yaml` on an Android emulator, scoped from the PR's own diff by
+  the same rules as `verify --fast`. It runs when the PR is opened ready for review, marked ready
+  (`gh pr ready`), or pushed to while ready. Add `--dry-run` locally to see what it would run.
+- **Every night**, and on demand from the Actions tab, the `nightly` job runs the full lane
+  (`--profile nightly`) over main on an emulator — every test and flow, the release and web
+  builds — and is the only run that writes the Gradle cache the pull requests read.
 
 The committed receipt is written on your machine, so it is your machine's word. CI's own receipt
 is signed by GitHub for the run that produced it (an artifact attestation, keyless — on public
 repositories only, since private ones need GitHub Enterprise Cloud; the step is skipped there), and
 `gh attestation verify <file> --repo <owner>/<repo>` checks it, where `<file>` is the `latest.json`
 inside a run's downloaded `verify-evidence` artifact — not the committed file, whose timestamps
-differ from CI's. The L1 check is
-CI-attested; the L2 verdict is the machine's word until CI runs that tier.
-`node qa/receipt-check.mjs` prints which rungs are which.
+differ from CI's. The nightly's full-lane receipt is attested this way; a pull request's
+`feature-evidence` artifact (`latest-feature.json`) is attested too, and says it proves one
+feature. `node qa/receipt-check.mjs` prints which rungs of the committed receipt are which.
 
-To make the check binding, require it on your default branch with no bypass:
+**Must pass before merge.** On a public repository, or a paid plan, make the check binding on
+your default branch with no bypass:
 `gh api -X POST repos/{owner}/{repo}/rulesets --input qa/ruleset.json`. The ruleset requires the
 status check `android`, the job name in `verify.yml`; rename one and you must rename the other.
-The JSON's shape has not been checked against GitHub's rulesets API yet, so read the response:
-a 422 names the field it refused.
+A draft or docs-only PR reports `android` as skipped, which the ruleset accepts. The JSON's shape
+has not been checked against GitHub's rulesets API yet, so read the response: a 422 names the
+field it refused. On a **private repository on GitHub Free** there are no rulesets or branch
+protection, so GitHub cannot block the merge button; the rule lives in how you merge —
+`gh pr checks <pr> --watch --fail-fast && gh pr merge <pr>` waits for `android` and stops
+when it failed.
 
 ## Verification enforcement
 
@@ -180,7 +196,7 @@ enforcement, not a hostile one.
 
 **Escape hatch:** this is your project. If you don't want the hook, delete the `Stop` block
 in [`.claude/settings.json`](./.claude/settings.json) — nothing else depends on it locally.
-CI independently enforces the same "receipt attests HEAD" check on every push
+CI independently enforces the same "receipt attests HEAD" check before a pull request merges
 (`.github/workflows/verify.yml`), so disabling the local hook only trades an immediate
 signal for a later one.
 <!-- <<< cmp:feature harness -->

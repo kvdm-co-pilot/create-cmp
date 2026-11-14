@@ -218,7 +218,13 @@ export const DEFAULT_POLICY = {
  * @returns {{ok: boolean, detail: string, ageMs?: number}}
  */
 export function checkFreshness(receipt, { now = Date.now(), maxAgeMs = DEFAULT_POLICY.maxAgeMs } = {}) {
-  const generatedAt = Date.parse(receipt?.generatedAt ?? "");
+  // A RE-ATTESTED receipt is as old as the oldest evidence on it. Its own
+  // `generatedAt` is the minute the approvals step re-ran; every carried row is
+  // the full run's, and that is the age that has to be fresh. Re-attesting
+  // must never be a way to make month-old build evidence look new.
+  const carriedAt = Date.parse(receipt?.reattest?.from?.generatedAt ?? "");
+  const ownAt = Date.parse(receipt?.generatedAt ?? "");
+  const generatedAt = Number.isNaN(carriedAt) ? ownAt : Number.isNaN(ownAt) ? ownAt : Math.min(ownAt, carriedAt);
   if (Number.isNaN(generatedAt)) {
     return { ok: false, detail: "receipt has no parsable generatedAt timestamp" };
   }
@@ -331,12 +337,78 @@ export function attestationStanding(receipt, { attestedThrough = null } = {}) {
   return { claimed, attested, selfAttested, line };
 }
 
+const HEX64 = /^[a-f0-9]{64}$/;
+
+/**
+ * Is a RE-ATTESTED receipt's own account of itself coherent? (2026-11-14)
+ *
+ * `node qa/verify.mjs --reattest-approvals` writes a receipt whose rows are of
+ * two kinds: the few it re-ran just now (the approvals step and the lane's
+ * self-vouching row) and the rest, CARRIED FORWARD from an earlier full run,
+ * each wearing `carriedForward: true`. The receipt says which is which in a
+ * `reattest` block and names the run it carried from. This predicate holds the
+ * receipt to what that block says — never to the ledger or the tree, which is
+ * evaluateReceipt's job:
+ *
+ *   - `kind` is "approvals-only" — the only re-attest there is;
+ *   - every step row is named exactly once, in `rerun` or in `carriedForward`,
+ *     never both, and a carried row is marked carried while a re-run one is not
+ *     (a carried row passed off as fresh is the forgery this exists to stop);
+ *   - `from` names the full run: its inputs hash, its hash without the ledger,
+ *     and when it ran;
+ *   - the receipt's own `inputs.hashWithoutApprovals` EQUALS the one in `from`
+ *     — the whole claim of a re-attest is "nothing but qa/approvals.json moved",
+ *     and these two digests are where that claim is written down.
+ *
+ * A receipt with no `reattest` block passes untouched: it is a full run.
+ * @param {object} receipt
+ * @returns {{ok: boolean, detail: string}}
+ */
+export function checkReattest(receipt) {
+  const r = receipt?.reattest;
+  if (r === undefined || r === null) return { ok: true, detail: "not a re-attested receipt" };
+  const bad = (why) => ({ ok: false, detail: `re-attested receipt is malformed: ${why} — run the full lane` });
+  if (typeof r !== "object") return bad("`reattest` is not an object");
+  if (r.kind !== "approvals-only") return bad(`unknown re-attest kind ${JSON.stringify(r.kind)}`);
+  const rerun = Array.isArray(r.rerun) ? r.rerun : null;
+  const carried = Array.isArray(r.carriedForward) ? r.carriedForward : null;
+  if (!rerun || rerun.length === 0) return bad("it names no step it re-ran");
+  if (!carried) return bad("it does not list the steps it carried forward");
+  const steps = Array.isArray(receipt.steps) ? receipt.steps : [];
+  const names = steps.map((s) => s?.name);
+  if (new Set(names).size !== names.length) return bad("a step name appears twice on the receipt");
+  const both = rerun.filter((n) => carried.includes(n));
+  if (both.length) return bad(`${both.join(", ")} listed as both re-run and carried forward`);
+  const listed = new Set([...rerun, ...carried]);
+  const unlisted = names.filter((n) => !listed.has(n));
+  if (unlisted.length) return bad(`step(s) ${unlisted.join(", ")} are on the receipt but neither re-run nor carried forward`);
+  const phantom = [...listed].filter((n) => !names.includes(n));
+  if (phantom.length) return bad(`step(s) ${phantom.join(", ")} are listed but have no row`);
+  for (const s of steps) {
+    const isCarried = carried.includes(s.name);
+    if (isCarried && s.carriedForward !== true) return bad(`${s.name} is listed as carried forward but its row is not marked so`);
+    if (!isCarried && s.carriedForward) return bad(`${s.name} is marked carried forward but listed as re-run`);
+  }
+  const from = r.from;
+  if (!from || typeof from !== "object") return bad("it does not name the run it carried from");
+  if (!HEX64.test(String(from.inputsHash ?? ""))) return bad("`from.inputsHash` is not a sha256");
+  if (!HEX64.test(String(from.hashWithoutApprovals ?? ""))) return bad("`from.hashWithoutApprovals` is not a sha256");
+  if (Number.isNaN(Date.parse(from.generatedAt ?? ""))) return bad("`from.generatedAt` is not a timestamp");
+  if (receipt.inputs?.hashWithoutApprovals !== from.hashWithoutApprovals) {
+    return bad("its tree outside qa/approvals.json differs from the run it carried from (`inputs.hashWithoutApprovals` ≠ `reattest.from.hashWithoutApprovals`)");
+  }
+  return {
+    ok: true,
+    detail: `re-attested — re-ran ${rerun.join(", ")}; carried ${carried.length} step(s) from the full run of ${from.generatedAt}`,
+  };
+}
+
 /** How a refusal names the lane when its caller does not spell it. */
 export const DEFAULT_LANE_COMMAND = "node qa/verify.mjs";
 
 /**
  * THE DONE-EVIDENCE REFUSALS — a receipt that binds to its tree and says PASS
- * can still be no proof that a change is done, and says so about itself. Four
+ * can still be no proof that a change is done, and says so about itself. Five
  * shapes, each refused with a named reason:
  *
  *   - `mode: "fast"` — verify --fast is an inner-loop signal, never done evidence;
@@ -344,9 +416,14 @@ export const DEFAULT_LANE_COMMAND = "node qa/verify.mjs";
  *     double-run, never a change;
  *   - `stage` or `profile` `smoke` — the framework check (GATE-RULES Rule 0)
  *     runs no build and no tests: it proves the instrument, not the change;
+ *   - `stage` or `profile` `feature` — the pre-merge check runs one feature's
+ *     tests and flow, scoped to a branch's diff: it proves that feature, never
+ *     the tree (its file is latest-feature.json, so this is belt and braces);
  *   - any step SKIPped with `skipKind: "environment"` — a tier that COULD have
  *     run and did not is a gap a human can close (2026-09-03). A `structure`
  *     SKIP — this project has no such tier at all — is honest and allowed.
+ *   - a re-attested receipt (`reattest` block) whose account of what it re-ran
+ *     and what it carried forward does not hold together — checkReattest.
  *
  * ONE SOURCE OF TRUTH (KD-266). These lived only in the harness's
  * qa/receipt-check.mjs, before it called this library, so a hosted validator
@@ -369,7 +446,7 @@ export const DEFAULT_LANE_COMMAND = "node qa/verify.mjs";
  * @param {{names?: string[], reasons?: string[]}|null} [opts.legacySkips] a profile's pre-`skipKind`
  *   fallback: an unlabelled SKIP of a step in `names` whose reason contains any of `reasons` is
  *   environmental. Applied only when both are non-empty.
- * @returns {{ok: boolean, refusal: (null|"fast-mode"|"nightly"|"smoke"|"environment-skip"), detail: string}}
+ * @returns {{ok: boolean, refusal: (null|"fast-mode"|"nightly"|"smoke"|"feature"|"reattest-malformed"|"environment-skip"), detail: string}}
  */
 export function checkDoneEvidence(receipt, { laneCommand = DEFAULT_LANE_COMMAND, legacySkips = null } = {}) {
   const lane = `\`${laneCommand}\``;
@@ -387,12 +464,26 @@ export function checkDoneEvidence(receipt, { laneCommand = DEFAULT_LANE_COMMAND,
       detail: `the last verify run was the nightly stage (it proves the harness, not this change); run the change-stage lane (${lane}) before finishing`,
     };
   }
+  if (receipt?.stage === "feature" || receipt?.profile === "feature") {
+    return {
+      ok: false,
+      refusal: "feature",
+      detail: `the last verify run was the feature profile (the pre-merge check — one feature's tests and flow, scoped to the branch's diff; it proves that feature, not this tree); run the change-stage lane (${lane}) before finishing`,
+    };
+  }
   if (receipt?.stage === "smoke" || receipt?.profile === "smoke") {
     return {
       ok: false,
       refusal: "smoke",
       detail: `the last verify run was the smoke profile (the framework check — no build, no tests; it proves the instrument, not this change); run the change-stage lane (${lane}) before finishing`,
     };
+  }
+  // A re-attested receipt is done-evidence exactly when the full run it carries
+  // is — the environment-SKIP check below reads the carried rows like any
+  // others — AND when its account of what it carried is coherent.
+  const reattest = checkReattest(receipt);
+  if (!reattest.ok) {
+    return { ok: false, refusal: "reattest-malformed", detail: reattest.detail.replace("run the full lane", `run the full lane (${lane})`) };
   }
   const names = Array.isArray(legacySkips?.names) ? legacySkips.names : [];
   const reasons = Array.isArray(legacySkips?.reasons) ? legacySkips.reasons.map(String) : [];

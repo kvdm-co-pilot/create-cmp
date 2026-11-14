@@ -66,7 +66,7 @@ test("--help never refuses: no manifest still prints the full flag reference, ex
     fs.rmSync(path.join(dir, "qa", "harness-manifest.json"));
     const { status, out } = help(dir);
     assert.equal(status, 0, "a question is not a failure");
-    assert.match(out, /--profile <smoke\|scaffold\|local\|ci\|nightly\|release>/, "the flag reference still prints in full");
+    assert.match(out, /--profile <smoke\|scaffold\|local\|ci\|nightly\|release\|feature>/, "the flag reference still prints in full");
     assert.match(out, /This project:\n {2}qa\/harness-manifest\.json is missing/);
     // A STAMPED app is told to upgrade (the manifest is derivable from what the
     // stamper already knows); a foreign repo is told to attach and be interviewed.

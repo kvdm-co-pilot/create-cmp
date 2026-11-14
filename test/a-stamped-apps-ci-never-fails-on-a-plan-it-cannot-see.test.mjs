@@ -14,7 +14,10 @@
 // The invariant, for the class and not the one action: every step that uses a
 // plan-gated GitHub attestation action is either restricted to repositories
 // that have the feature (its `if:` reads the repository's visibility) or cannot
-// fail the job (`continue-on-error: true`).
+// fail the job (`continue-on-error: true`). A scheduled run's event carries no
+// repository object, so the nightly job asks the API for the visibility in a
+// step whose id is `repository` — `steps.repository.outputs.visibility` reads
+// the same fact and counts as the same guard.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -54,7 +57,7 @@ test("every plan-gated attestation step in the stamped Verify job is guarded to 
   const yml = fs.readFileSync(path.join(ROOT, "template", ".github", "workflows", "verify.yml"), "utf8");
   const gated = steps(yml).filter((s) => PLAN_GATED.test(s));
   assert.ok(gated.length > 0, "the template's Verify job attests its receipt (slice 8A) — this test reads that step");
-  const unguarded = gated.filter((s) => !/continue-on-error:\s*true/.test(s) && !/if:[^\n]*(?:repository\.visibility|repository\.private)/.test(s));
+  const unguarded = gated.filter((s) => !/continue-on-error:\s*true/.test(s) && !/if:[^\n]*(?:repository\.(?:outputs\.)?visibility|repository\.private)/.test(s));
   assert.deepEqual(
     unguarded.map((s) => s.split("\n")[0].trim()),
     [],

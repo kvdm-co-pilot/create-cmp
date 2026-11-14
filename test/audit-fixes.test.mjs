@@ -41,7 +41,8 @@ test("tokenDrift asks whether the inspector shipped BEFORE it touches a device",
 
 test("a fast run writes latest-fast.json — the receipt of record cannot be overwritten by a watcher", () => {
   const verify = read("packages/harness/src/verify.mjs");
-  assert.match(verify, /const RECEIPT_FILE = fast \? "latest-fast\.json" : "latest\.json";/);
+  // The feature profile (the CI's pre-merge check) writes its own file for the same reason.
+  assert.match(verify, /const RECEIPT_FILE = fast \? "latest-fast\.json" : profile === "feature" \? "latest-feature\.json" : "latest\.json";/);
   assert.match(verify, /writeFileSync\(path\.join\(EVIDENCE_DIR, RECEIPT_FILE\)/);
   assert.match(read("template/gitignore"), /^qa\/evidence\/latest-fast\.json$/m, "never committed");
 });

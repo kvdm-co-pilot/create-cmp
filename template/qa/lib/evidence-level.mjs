@@ -232,6 +232,7 @@ function rungMet(rung, passed) {
 export function gradeEvidence(stepResults, profile, { mode, ladder, plants } = {}) { // eslint-disable-line no-unused-vars
   const none = (why) => ({ level: null, why });
   if (mode === "fast") return none("no evidence rung: this run was `--fast`, the inner loop — a signal, never evidence");
+  if (profile === "feature") return none("no evidence rung: this run was the feature profile — one feature's tests and flow, the pre-merge check; the nightly's full lane is the tree's evidence");
 
   // THE BADGE FLOOR IS ASKED FIRST, before the ladder, because it decides
   // whether this profile may be graded AT ALL: a ladder over uncalibrated

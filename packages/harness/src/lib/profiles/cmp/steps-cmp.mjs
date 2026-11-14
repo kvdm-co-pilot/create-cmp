@@ -39,7 +39,7 @@ import { evaluateComponentStoryParity } from "./component-stories.mjs";
 import { evaluateReachability } from "./reachability.mjs";
 import { evaluateE2eCoverage } from "./e2e-coverage.mjs";
 import { memoizeStep } from "../../step-cache.mjs";
-import { changedWorkingTreePaths, deriveAffectedFilter } from "../../affected-tests.mjs";
+import { changedSinceBase, changedWorkingTreePaths, deriveAffectedFilter, deriveFeatureScope } from "../../affected-tests.mjs";
 import { affected as cmpAffected } from "./affected.mjs";
 import { acquireDeviceLease, releaseDeviceLease, formatHolder } from "./device-lease.mjs";
 import { ARCH_DOC_REL_PATH, SECTION_IDS, regenerateArchDoc } from "../../arch-doc.mjs";
@@ -94,6 +94,8 @@ export function inspectorShipped(root) {
 
 export function createCmpSteps(ctx) {
   const { ROOT, HERE, fast, determinism, profile, mode, sh, tryGit, tryGitLines, DEGRADED_PATHS } = ctx;
+  // The ref the feature profile scopes against (`--base`, default origin/main).
+  const base = typeof ctx.base === "string" && ctx.base ? ctx.base : "origin/main";
 
   // ── Gradle is THIS profile's build tool ───────────────────────────────────
   // The wrapper invocation, the integrity flag and the coexistence dance used
@@ -516,13 +518,21 @@ function stepSpecCoverage() {
 // name/duration bookkeeping every step in this file carries.
 function stepApprovals() {
   const started = Date.now();
-  const { verdict, reason, statuses } = evaluateApprovalsGate(ROOT);
+  const { verdict, reason, note, statuses } = evaluateApprovalsGate(ROOT);
   return {
     name: "approvals",
     verdict,
+    // A PASS with artifacts still awaiting approval names the count here (the
+    // console row prints it) and the list in `reason`.
+    ...(note ? { note } : {}),
     reason,
     durationMs: Date.now() - started,
-    details: { artifacts: statuses.map((s) => ({ id: s.id, status: s.status, hash: s.hash })) },
+    details: {
+      // WHICH signatures this run verified — re-hashed and matching. Recorded so
+      // a reader of the receipt never has to infer it from `artifacts`.
+      verified: statuses.filter((s) => s.status === "approved").map((s) => s.id),
+      artifacts: statuses.map((s) => ({ id: s.id, status: s.status, hash: s.hash })),
+    },
   };
 }
 
@@ -685,6 +695,26 @@ function stepSchemaHistory() {
   };
 }
 
+// ── The feature scope (profile `feature`, the stamped CI's pre-merge check) ──
+// Derived ONCE per run from the branch's diff against `base`, by the same
+// rules as --fast's filter (qa/lib/affected-tests.mjs deriveFeatureScope,
+// this profile's mapping in affected.mjs), so the unit-test filter, the flows
+// and the CI's docs-only skip all read one answer. Null outside that profile.
+let featureScopeMemo;
+function featureScope() {
+  if (profile !== "feature") return null;
+  if (featureScopeMemo === undefined) {
+    featureScopeMemo = {
+      base,
+      ...deriveFeatureScope(changedSinceBase(ROOT, base), cmpAffected, {
+        flows: listFlowFiles(ROOT, SPEC_MODEL),
+        smokeFlow: `${E2E_FLOW_DIR}/smoke.yaml`,
+      }),
+    };
+  }
+  return featureScopeMemo;
+}
+
 function stepBuild() {
   const res = shGradle(`${GRADLEW} :composeApp:assembleDebug --console=plain`);
   return {
@@ -794,7 +824,19 @@ function stepUnitTests() {
   let note;
   let testsArgs = "";
   let affected = null;
-  if (fast) {
+  const scope = featureScope();
+  if (scope) {
+    if (!scope.run) {
+      return { name: "unitTests", verdict: "SKIP", skipKind: "structure", reason: `nothing a test can see changed since ${base} — ${scope.reason}`, durationMs: 0 };
+    }
+    if (scope.unit.mode === "filtered") {
+      testsArgs = scope.unit.patterns.map((p) => ` --tests "${p}"`).join("");
+      note = `feature scope (since ${base}): ${scope.unit.patterns.join(", ")}`;
+      affected = { patterns: scope.unit.patterns, features: scope.features, base };
+    } else {
+      note = `full suite — ${scope.unit.reason}`;
+    }
+  } else if (fast) {
     const changed = changedWorkingTreePaths(ROOT);
     if (changed === null) {
       note = "full suite — git unavailable, cannot derive the change (fail open)";
@@ -810,11 +852,11 @@ function stepUnitTests() {
     }
   }
   let res = shGradle(`${GRADLEW} :composeApp:desktopTest${RERUN}${testsArgs} --console=plain`);
-  if (fast && testsArgs && !res.ok && /No tests found for given includes/.test(res.out)) {
+  if ((fast || scope) && testsArgs && !res.ok && /No tests found for given includes/.test(res.out)) {
     // The heuristic filter matched no test class at all (e.g. a feature with no tests
     // yet). That is the harness's guess being wrong, not the app — fall back to the
     // full suite in-lane rather than false-redding on our own filter. (RERUN is empty
-    // here by construction — this branch only exists in fast mode.)
+    // here in fast mode and " --rerun" in the feature profile, as on the first try.)
     const retry = shGradle(`${GRADLEW} :composeApp:desktopTest${RERUN} --console=plain`);
     retry.durationMs += res.durationMs;
     res = retry;
@@ -1134,8 +1176,11 @@ function maestroGuards(name) {
 /** Driver start-up plus three minutes per flow: the Maestro run's own bound, whatever the journal says. */
 const E2E_RUN_BOUND_MS = (flowCount) => 120_000 + 180_000 * Math.max(1, flowCount);
 
-function runMaestroSmoke(name, priorDurationMs) {
-  const flows = listFlowFiles(ROOT, SPEC_MODEL);
+function runMaestroSmoke(name, priorDurationMs, only = null) {
+  // `only`: the feature profile's scoped flows. Otherwise the whole directory,
+  // in one Maestro session (and Maestro's own read of it).
+  const flows = Array.isArray(only) ? only : listFlowFiles(ROOT, SPEC_MODEL);
+  const target = Array.isArray(only) ? only.map((f) => `"${f}"`).join(" ") : E2E_FLOW_DIR;
   const report = path.join(ROOT, "qa-artifacts", `maestro-${name}.xml`);
   fs.mkdirSync(path.dirname(report), { recursive: true });
   fs.rmSync(report, { force: true });
@@ -1151,7 +1196,7 @@ function runMaestroSmoke(name, priorDurationMs) {
     // healthy device; past it the run is killed and the row reads ERROR
     // (StepTimeout), which is what "did not get to check" should say.
     const runBoundMs = E2E_RUN_BOUND_MS(flows.length);
-    const res = sh(`maestro test ${E2E_FLOW_DIR} --format junit --output "${report}"`, { env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "120000" }, timeout: runBoundMs });
+    const res = sh(`maestro test ${target} --format junit --output "${report}"`, { env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "120000" }, timeout: runBoundMs });
     let xml = null;
     try {
       xml = fs.readFileSync(report, "utf8");
@@ -1188,17 +1233,31 @@ function runMaestroSmoke(name, priorDurationMs) {
 }
 
 function stepE2eSmoke() {
-  const guard = maestroGuards("e2eSmoke");
+  const scope = featureScope();
+  if (scope && scope.flows.length === 0) {
+    return { name: "e2eSmoke", verdict: "SKIP", skipKind: "structure", reason: `no flow to drive for this change — ${scope.flowsReason}`, durationMs: 0 };
+  }
+  // In the feature profile the flow is the reason the check exists, and its
+  // verdict is a REQUIRED status check: a tier that could have run and did not
+  // (no Maestro, no device, a held lease) is a FAIL there, never a green SKIP.
+  // Everywhere else it stays the honest SKIP the done-gate refuses.
+  const mustRun = (skip) =>
+    scope && skip && skip.verdict === "SKIP" && skip.skipKind !== "structure"
+      ? { ...skip, verdict: "FAIL", reason: `the feature check could not drive its flow (${scope.flows.join(", ")}) — ${skip.reason}` }
+      : skip;
+  const guard = mustRun(maestroGuards("e2eSmoke"));
   if (guard) return guard;
   // Machine-global lease before the first device touch (contention = SKIP).
-  const leaseSkip = leaseDeviceForStep("e2eSmoke");
+  const leaseSkip = mustRun(leaseDeviceForStep("e2eSmoke"));
   if (leaseSkip) return leaseSkip;
   const install = shGradle(`${GRADLEW} :composeApp:installDebug --console=plain`);
   if (!install.ok) {
     return { name: "e2eSmoke", verdict: "FAIL", reason: "installDebug failed — the APK could not be installed on the attached device", durationMs: install.durationMs };
   }
   settleAdb();
-  return runMaestroSmoke("e2eSmoke", install.durationMs);
+  if (!scope) return runMaestroSmoke("e2eSmoke", install.durationMs);
+  const ran = runMaestroSmoke("e2eSmoke", install.durationMs, scope.flows);
+  return { ...ran, note: `${ran.note ? `${ran.note} — ` : ""}${scope.flowsReason}` };
 }
 
 // Instrumented behavior tier (composeApp/src/androidInstrumentedTest) — the one step
@@ -1510,6 +1569,16 @@ stepsForProfile.release = [...stepsForProfile.ci, stepAuditCadence, stepReleaseS
 // done-evidence, exactly as it refuses --fast. Same step set as ci on purpose —
 // what differs is what is forced, and what the receipt is allowed to mean.
 stepsForProfile.nightly = [...stepsForProfile.ci];
+// feature (the stamped CI's pre-merge check, the app owner's CI policy of
+// 2026-11-14): before a feature merges, ONLY that feature's proof — its unit
+// and Compose UI tests (the desktopTest tier, filtered to the feature by the
+// branch's diff) and its own Maestro flow on a device — behind the lane's
+// self-check and the compile it cannot run without. Everything else — the
+// other features' tests and flows, the pure-Node gates, the release and web
+// builds, the instrumented tier — is the nightly's, over main. Its receipt
+// says which feature it scoped to, earns no evidence rung, and is refused as
+// done-evidence: it proves one feature, never the tree.
+stepsForProfile.feature = [stepHarnessIntegrity, stepBuild, stepUnitTests, stepE2eSmoke];
 
 // Which layer of the stack each step proves — stamped onto the receipt row by
 // the runner (lane-runner.mjs) so the Evidence pane can group by it and a
@@ -1577,6 +1646,10 @@ for (const name of FAST_EXCLUDED_NAMES) {
     strengthLabel: (onDeviceSteps) => (onDeviceSteps.length ? `on-device: ${onDeviceSteps.join("+")}` : "desktop-only"),
     FAST_EXCLUDED_NAMES,
     STEP_FN_BY_NAME,
+    // What the feature profile scopes to (null in every other profile) — read
+    // by `verify --dry-run`, which the stamped CI uses to skip a docs-only PR
+    // before it pays for a runner's emulator.
+    describeScope: () => featureScope(),
     stepDeterminism,
     // The step whose failure makes every verdict behind it meaningless — for
     // this stack, `./gradlew :composeApp:assembleDebug`. The spine stops the
@@ -1586,6 +1659,18 @@ for (const name of FAST_EXCLUDED_NAMES) {
     // Declared here so the spine reads a name instead of assuming one; the
     // value is unchanged, so this lane stops exactly where it always did.
     compileStepName: "build",
+    // Which steps' verdicts can move when ONLY qa/approvals.json changes — the
+    // set `node qa/verify.mjs --reattest-approvals` re-runs after a signature
+    // while carrying every other row forward (qa/lib/reattest.mjs). The pack's
+    // to declare because only the pack knows what its steps read; a pack that
+    // declares nothing gets a refusal, never a guess. For this pack it is one
+    // step. DERIVED from MEMOIZED_STEP_INPUTS — the read surface each pure-Node
+    // step already declares for the step cache, where qa/approvals.json is an
+    // input of `approvals` and of nothing else — so the two declarations cannot
+    // disagree. No Gradle or device step reads the ledger.
+    approvalsLedgerReaders: Object.entries(MEMOIZED_STEP_INPUTS)
+      .filter(([, inputs]) => inputs.includes("qa/approvals.json"))
+      .map(([name]) => name),
     // The bounds on a step's derived deadline. These are the spine's historical
     // fallback to the millisecond, so this lane does not move — but they are a
     // judgement about how long a cold Gradle daemon plus an Android build can

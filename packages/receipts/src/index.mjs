@@ -3,7 +3,7 @@
 // predicate; vendored byte-identical into every generated project's qa/lib/
 // and consumed by hosted validators. Dependency-free ESM.
 
-export { computeInputsHash, defaultSurface } from "./inputs-hash.mjs";
+export { computeInputsHash, defaultSurface, APPROVALS_LEDGER_PATH } from "./inputs-hash.mjs";
 export {
   RECEIPT_REL_PATH,
   readReceipt,
@@ -16,5 +16,6 @@ export {
   validateReceiptForTree,
   checkLaneVouching,
   checkDoneEvidence,
+  checkReattest,
   DEFAULT_LANE_COMMAND,
 } from "./receipt-validate.mjs";

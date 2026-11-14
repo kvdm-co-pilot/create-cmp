@@ -89,6 +89,11 @@
             "type": "string"
           },
           "description": "Top-level entries git would commit that no verified-surface entry covers \u2014 unattested by this receipt. A report, never a gate; absent when the surface covers everything."
+        },
+        "hashWithoutApprovals": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "The same digest as `hash` with qa/approvals.json left out. A signature changes only the ledger, so a later run whose digest here is IDENTICAL has proven that nothing else changed \u2014 the ground `node qa/verify.mjs --reattest-approvals` stands on. Absent on receipts written before 2026-11-14; such a receipt cannot be re-attested and needs one full run."
         }
       }
     },
@@ -142,7 +147,80 @@
           "harness": {
             "type": "object",
             "description": "The integrity check's own findings, on the harnessIntegrity row only."
+          },
+          "carriedForward": {
+            "type": "boolean",
+            "description": "true on a re-attested receipt's rows that did NOT run now: copied verbatim from the full run named in `reattest.from`, valid because every attested file except qa/approvals.json is byte-identical to that run's. Absent on rows that ran in this lane."
           }
+        }
+      }
+    },
+    "reattest": {
+      "type": "object",
+      "description": "Present only on a receipt written by `node qa/verify.mjs --reattest-approvals` (qa/lib/reattest.mjs): after a signature, the steps that read qa/approvals.json (plus the lane's self-check) re-ran and every other row was carried forward from a full run. The rung is never higher than the carried run's, freshness is judged by `from.generatedAt`, and checkReattest (receipt-validate) refuses a block whose account of itself does not hold together. CI never writes one \u2014 it runs its own checks.",
+      "required": [
+        "kind",
+        "rerun",
+        "carriedForward",
+        "from"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "approvals-only"
+          ]
+        },
+        "rerun": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Steps that ran now."
+        },
+        "carriedForward": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Steps whose rows were copied from the full run in `from`."
+        },
+        "from": {
+          "type": "object",
+          "required": [
+            "inputsHash",
+            "hashWithoutApprovals",
+            "generatedAt"
+          ],
+          "properties": {
+            "inputsHash": {
+              "type": "string"
+            },
+            "hashWithoutApprovals": {
+              "type": "string"
+            },
+            "generatedAt": {
+              "type": "string"
+            },
+            "commit": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "description": "The ORIGINAL full run every carried row was earned in \u2014 kept across a chain of re-attests."
+        },
+        "replaced": {
+          "type": "object",
+          "properties": {
+            "inputsHash": {
+              "type": "string"
+            },
+            "generatedAt": {
+              "type": "string"
+            }
+          },
+          "description": "The receipt this one replaced."
         }
       }
     },

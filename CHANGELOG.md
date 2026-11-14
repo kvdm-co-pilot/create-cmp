@@ -6,6 +6,89 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-14
+
+Nothing is published. Numbered after `fix/no-local-proof-ritual` (0.30.1, opened first and still
+open), so neither slice renumbers whichever merges first. `prooflane-harness` 0.26.0 carries the
+re-attest, the approvals step change, the Stop rule for in-progress work, the `feature` profile,
+`--base` and `--dry-run`; `prooflane-receipts` 0.2.0 carries `inputs.hashWithoutApprovals`,
+`checkReattest` and the `feature` refusal; `@create-cmp/inspector` 0.12.0 is its bundle rebuilt
+over that harness `lib/`. An app picks it up with `npx create-cmp-cli upgrade --harness --yes`,
+then one full `node qa/verify.mjs`.
+
+### Added
+
+- **A signature no longer costs a whole lane run: `node qa/verify.mjs --reattest-approvals`**
+  (`docs/features/approvals-reattest.md`). Signing rewrites `qa/approvals.json`, which made the
+  receipt INVALID and forced the full lane (247 s cold, 96 s warm in Consignly). When the ledger is
+  the only attested file that changed since a full, PASSing, done-evidence receipt — proven by
+  recomputing every other file's hash (`inputs.hashWithoutApprovals`, new on every receipt) — the
+  flag re-runs the `approvals` step and the lane's self-check and carries every other row forward,
+  each marked `carriedForward`, with a `reattest` block naming the full run they came from. The
+  rung is never higher than the carried run's; freshness is judged by that run's time. Refused by
+  name on any other change, a receipt that is not done-evidence, changed lane code, a different
+  `--profile`, and under CI, which never re-attests. `qa/approve.mjs` and the Stop hook
+  print the command when — and only when — it applies. `qa/receipt-check.mjs`, the Stop hook, the
+  pre-push hook and the hosted notary accept a coherent re-attested receipt and refuse an
+  incoherent one (`checkReattest`). The step pack declares which steps read the ledger
+  (`approvalsLedgerReaders`); a pack that declares none gets a refusal.
+- **The lane's `feature` profile and `--base <ref>`**: `node qa/verify.mjs --profile feature
+  --base origin/main` scopes a branch's diff (`git diff <base>...HEAD`) to its feature with the
+  `--fast` filter's own rules (`deriveFeatureScope` in `qa/lib/affected-tests.mjs`; the Compose
+  layout's facts — what no test can see, which feature a path names, which files are per-feature
+  — in `profiles/cmp/affected.mjs`). Steps: `harnessIntegrity`, `build`, `unitTests` filtered to
+  the feature, `e2eSmoke` driving only the feature's flow (the smoke flow when the change names
+  no feature with one). A broad change (DI, build files, the harness) runs the whole unit suite
+  and says why. Its receipt is `qa/evidence/latest-feature.json` (gitignored, never the
+  receipt-of-record), earns no rung, and is refused as done-evidence (`checkDoneEvidence`'s fifth
+  refusal, `feature`).
+- **`verify --profile nightly` no longer refuses itself.** The profile forces the determinism
+  probe on, and the probe's guard refused every profile but `ci` and `release`, so the documented
+  nightly command exited 2 before running a step — on every run since it shipped. A stamped app's
+  scheduled CI was the first thing ever to run it (2026-11-14).
+- **`verify --dry-run`**: prints the steps a profile would run — and the feature profile's scope
+  — and exits having run nothing and written nothing. The CI's `scope` job is this flag.
+
+### Changed
+
+- **During a feature, a quick check lets a session stop; the full lane runs once per feature**
+  (the app owner's rule of 2026-11-14, Consignly LOOP-23/LOOP-30; `docs/features/quick-check-stop.md`).
+  The Stop hook now accepts a PASS `node qa/verify.mjs --fast` (or `--profile feature`) receipt that
+  attests the tree and ends the turn saying plainly it is NOT done-evidence; with none, it asks for
+  `--fast` (seconds), not the lane. Once a feature is complete end to end — derived by the walk
+  (signed brief and contract, every clause cited: stage Prove), or a closed `qa/plan.mjs` chain
+  naming it, never from a claim — the hook demands the full receipt, and fails closed when the
+  walk cannot be derived. The pre-push hook is strict (committed full receipt) only for a push to
+  the default branch; other branches need `receipt-check --quick`. CI on a ready pull request and
+  the bare `receipt-check` are unchanged.
+- **The `approvals` step PASSes over the signatures it verified.** It used to SKIP whenever any
+  governed artifact was still unreviewed, so a receipt said signatures had not been checked when
+  they had (a stale one always FAILed, and still does). Now: every approved artifact still matches
+  its signed hash → PASS, with the unreviewed and reopened ones named in the reason and counted in
+  the note, and `details.verified` listing what was checked. It SKIPs only when nothing is signed.
+  No rung moves: no ladder rung requires the step.
+- **A stamped app's CI runs only where it buys something** (`template/.github/workflows/verify.yml`,
+  the app owner's CI policy of 2026-11-14). The old workflow ran the whole lane — two release
+  builds and a cold compile — on every push to every pull request: 877 s of lane on one green
+  PR of a real app (Consignly: `build` 369 s on a cold cache, `releaseBuild` 313 s, `webBuild`
+  151 s, unit tests 32 s), and an app built spec by spec opens hundreds of PRs. Now:
+  - **Ordinary pushes run nothing.** No `push` trigger; a draft pull request starts no job; a
+    docs-only change builds nothing; `concurrency` cancels a superseded run; every job has a
+    `timeout-minutes` (30 for the pre-merge check).
+  - **Before a feature merges**, the `android` job (still the context `qa/ruleset.json`
+    requires) runs only that feature's proof on an Android emulator: its unit and Compose UI
+    tests and its Maestro flow `qa/e2e/<feature>.yaml`. A seconds-long `scope` job asks the lane
+    first, so a docs-only PR reports `android` as skipped — which a required check accepts,
+    where `paths-ignore` would have left it waiting forever. The minimal scaffold (no lane, no
+    ruleset) uses `paths-ignore`.
+  - **Nightly** (`schedule`, plus `workflow_dispatch`): the full lane, `--profile nightly`, on an
+    emulator — every test and flow, the release and web builds. It is the only job that writes
+    the Gradle cache, so pull requests start warm.
+  - **Must pass before merge**: on a public repository or a paid plan, the shipped ruleset makes
+    GitHub enforce it. On a private repository on GitHub Free, where rulesets and branch
+    protection do not exist, the README says the rule lives in the merge command
+    (`gh pr checks <pr> --watch --fail-fast && gh pr merge <pr>`) — KD-299.
+
 ## [0.30.0] - 2026-11-13
 
 Nothing is published. Numbered after `feat/shared-device-pin` (0.29.x, opened first and still open),

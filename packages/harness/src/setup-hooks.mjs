@@ -26,7 +26,8 @@ function main() {
     // best-effort — on a filesystem without exec bits the hook still runs via core.hooksPath
   }
   console.log("✓ git hooks enabled (core.hooksPath = .githooks).");
-  console.log("  pre-push now blocks a push whose committed receipt doesn't attest HEAD.");
+  console.log("  pre-push now blocks a push to the default branch whose committed receipt doesn't attest HEAD (the full lane),");
+  console.log("  and a push to any other branch that no PASS quick check (node qa/verify.mjs --fast) attests.");
   console.log("  Bypass in a pinch with `git push --no-verify`; CI still enforces the check.");
 }
 

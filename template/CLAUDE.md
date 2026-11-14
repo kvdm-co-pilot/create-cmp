@@ -19,10 +19,12 @@ a failure. SKIPped steps are recorded in the receipt, and a step that SKIPped fo
 device, no bootable AVD) makes the receipt unusable as done-evidence — `qa/receipt-check.mjs` refuses
 it. Never present green-with-gaps as fully verified.
 
-**Verify in two tiers — the full lane is a checkpoint, not an inner loop.** It builds,
-tests, and gates the whole tree to produce the receipt, so it is slow by design; running it
-after every edit wastes the minutes it takes. Iterate on the fast tier, and run the lane
-once — when you believe the change is done.
+**Verify in two tiers — the full lane is a checkpoint, not an inner loop: once per feature.**
+It is slow by design. While a feature is in progress, a stop needs only a PASS
+`node qa/verify.mjs --fast` that attests the tree (the Stop hook says it is not done-evidence; a
+signature alone: `--reattest-approvals`). When a feature reaches **Prove** — derived by the walk:
+brief and contract signed, every clause cited — the full lane is owed, once; before merge (a push
+to the default branch, CI on a ready PR) the full receipt is always checked (`qa/lib/stop-rule.mjs`).
 
 - **Inner loop — run continuously (seconds):** the preview loop (below) for UI;
   `node qa/watch.mjs` for verification — a resident watcher that re-runs the fast tier
@@ -33,14 +35,13 @@ once — when you believe the change is done.
 - **Checkpoint — run once, at done:** `node qa/verify.mjs`. It writes the receipt (a `--fast` run writes
   `qa/evidence/latest-fast.json` instead, so the watcher can keep running); commit
   the receipt with your change. The Stop hook (`qa/receipt-check.mjs`, run through `qa/hooks/fail-closed.sh` so a gate that cannot run refuses) then confirms — with a
-  cheap hash check, not another lane run — that a valid receipt attests this tree, and CI
-  re-runs the full lane on push. After a green checkpoint, do not re-run the lane unless you
+  cheap hash check, not another lane run — that a valid receipt attests this tree; before the PR merges, CI
+  re-checks the receipt and runs this change's feature tests and flow, and the full lane runs nightly. After a green checkpoint, do not re-run the lane unless you
   change the tree again.
 
-Humans get the same gate at push time: run `node qa/setup-hooks.mjs` once (after `git init`)
-to enable the shipped pre-push hook. It blocks a push whose receipt doesn't attest
-the tree — the same cheap check, before code leaves the machine (`git push --no-verify` bypasses
-it; CI still enforces it).
+Humans get the same gate at push time: `node qa/setup-hooks.mjs` once (after `git init`) enables
+the pre-push hook — the full receipt for the default branch, a quick check elsewhere
+(`git push --no-verify` bypasses it; CI still checks before merge).
 
 ## Specifications — behavior starts here
 
@@ -177,6 +178,7 @@ conventions) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (workflow, Conventional C
 |---|---|
 | `node qa/verify.mjs` | The verify lane (profile `local`) — the done checkpoint, run once |
 | `node qa/verify.mjs --fast` | **Inner loop — NOT the done-gate**: skips the device/release tier (`releaseBuild`, `tokenDrift`, `e2eSmoke`, `androidChecks`, `releaseSmoke`), reuses unchanged pure-Node step results (`CACHED`, content-hashed inputs), and scopes unit tests to the working-tree change (broad-impact changes — build files, DI, theme, shared components, `qa/` — run the full suite). Its receipt records `"mode": "fast"`, earns no evidence rung, and the Stop hook refuses it — run the full lane once at done |
+| `node qa/verify.mjs --reattest-approvals` | **After a signature**: when `qa/approvals.json` is the only attested change since a full PASS receipt (proven by hash), re-runs the approvals step + the lane's self-check and carries the other rows forward, marked — seconds, not minutes. Never raises the rung; refused by name on any other change, and under CI |
 | `node qa/watch.mjs` | **Resident inner loop — never a gate**: watches `composeApp/src`, `specs/`, `qa/` and re-runs `node qa/verify.mjs --fast` on save (debounced — a save storm is one run; defers while a verify lane or a preview render holds the project). `--once` for a single pass, `--json` for line-per-run output. The done-gate stays one deliberate full `node qa/verify.mjs` run |
 | `./gradlew :composeApp:desktopTest` | Unit tests only (fast inner loop) |
 | `node qa/setup-hooks.mjs` | Enable the pre-push receipt gate (one-time, after `git init`) |
@@ -185,6 +187,7 @@ conventions) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (workflow, Conventional C
 | `./gradlew :composeApp:connectedDebugAndroidTest` | Instrumented behavior tests on the attached device (the lane's `androidChecks` step) |
 | `node qa/framework-check.mjs` | GATE-RULES Rule 0: proves the lane returns both ways — PASS on the clean tree, FAIL by name on planted violations — in seconds, restoring every byte. Run it first in a repo whose harness is new or freshly upgraded. |
 | `node qa/verify.mjs --profile smoke` | The smallest end-to-end lane: every pure-Node gate, no Gradle, no device — seconds. Proves the framework *returns*, never the change (its receipt is refused as done-evidence). Run it first in any repo whose harness is new or freshly upgraded |
+| `node qa/verify.mjs --profile feature --base origin/main` | The pre-merge check CI runs on a ready pull request: only the branch's feature — its unit and Compose UI tests and its `qa/e2e/<feature>.yaml` flow — scoped from `git diff <base>...HEAD` by the `--fast` filter's rules (a broad change runs the whole unit suite and says why). Add `--dry-run` to see the scope without running it. Writes `qa/evidence/latest-feature.json`, never the receipt-of-record; refused as done-evidence |
 | `node qa/verify.mjs --profile nightly` | Scheduled stage: everything `ci` proves with the determinism probe forced on. Proves the harness, never a change — its receipt (`stage: "nightly"`) is refused as done-evidence, exactly like `--fast`. Schedule it; never wait on it |
 | `node qa/verify.mjs --profile release` | Ship-time lane: everything `ci` proves plus the audit-cadence report (`auditCadence` — which androidMain subsystems changed since their last recorded `cmp-audit`; a nudge, never a gate) and the release-APK Maestro smoke (`releaseSmoke`) |
 | `node qa/verify.mjs --determinism` | Timezone determinism probe, alone: runs the JVM test tier twice under UTC-12 and UTC+14 and FAILs naming any test whose outcome differs — the dynamic net behind ARCH-13's static one. Opt-in inside a lane via `--profile ci --determinism`; never with `--fast`; writes no receipt on its own |

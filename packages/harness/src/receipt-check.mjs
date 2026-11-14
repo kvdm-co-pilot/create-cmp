@@ -2,7 +2,16 @@
 // The evidence-binding predicate — answers one question: does the committed
 // receipt (qa/evidence/latest.json) validly attest THIS tree, right now?
 //
-//   node qa/receipt-check.mjs [--hook] [--json]
+//   node qa/receipt-check.mjs [--hook] [--quick] [--json]
+//
+// TWO STRENGTHS (qa/lib/stop-rule.mjs). Bare, this is the STRICT done-gate:
+// the committed full receipt must attest the tree — what CI runs on a pull
+// request marked ready and what the pre-push hook runs on a push to the
+// default branch. `--hook` (the Stop hook) and `--quick` (pre-push to any
+// other branch) also accept a PASS quick receipt — `verify --fast` or
+// `--profile feature` — that attests the tree, while no feature has reached
+// Prove, and say plainly that it is not done-evidence. A feature at Prove owes
+// the full lane, and the strict answer stands.
 //
 // Both enforcement points reduce to this predicate: the local Stop hook
 // (.claude/settings.json) calls it on every turn-end, and CI calls it before
@@ -27,6 +36,8 @@ import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfileSync } from "./lib/profile-loader.mjs";
 import { evidenceLadderFor } from "./lib/evidence-ladder.mjs";
 import { readLadder } from "./lib/evidence-level.mjs";
+import { REATTEST_HINT, onlyApprovalsChanged } from "./lib/reattest.mjs";
+import { featuresOwingFullLane, quickCheckStanding, quickStopMessage } from "./lib/stop-rule.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -60,6 +71,7 @@ const LANE_COMMAND = laneCommand();
 const args = process.argv.slice(2);
 const asHook = args.includes("--hook");
 const asJson = args.includes("--json");
+const asQuick = args.includes("--quick");
 
 // The lane's own in-flight marker (verify.mjs stamps it, rewriting it at each
 // step start with the step name and index) — qa/lib/lane-markers.mjs, one
@@ -201,6 +213,24 @@ function evaluate() {
       profile: receipt.profile,
     };
   }
+  // A SIGNATURE IS NOT A CODE CHANGE. When the ledger is the only thing that
+  // moved, the refusal says so and names the seconds-long way back
+  // (qa/lib/reattest.mjs) instead of sending the reader to the whole lane. The
+  // verdict is unchanged: INVALID is INVALID until the re-attest writes a
+  // receipt that binds this tree.
+  if (!result.valid && result.recomputed && onlyApprovalsChanged(receipt, result.recomputed)) {
+    result.reason = `${result.reason} — ${REATTEST_HINT}`;
+    result.reattestable = true;
+  }
+  // A re-attested receipt says what it carried, on the line a human reads.
+  if (result.valid && receipt.reattest && typeof receipt.reattest === "object") {
+    const r = receipt.reattest;
+    result.reattest = {
+      rerun: r.rerun,
+      carriedForward: Array.isArray(r.carriedForward) ? r.carriedForward.length : 0,
+      from: r.from?.generatedAt ?? null,
+    };
+  }
   // Surface the receipt's evidence rung (the ladder — qa/lib/evidence-level.mjs)
   // alongside the verdict: the rung is the receipt's own derived field, read
   // verbatim, never recomputed here. Older receipts without it stay valid.
@@ -231,9 +261,37 @@ function evaluate() {
 
 const result = evaluate();
 
+/**
+ * The in-progress allowance (qa/lib/stop-rule.mjs), asked only when the strict
+ * answer is INVALID and only for --hook / --quick. `allowed` is the quick
+ * receipt that lets the stop through; null when the strict answer must stand —
+ * with `owed` naming why when a feature is complete (or completeness cannot be
+ * derived, which fails closed).
+ */
+function quickAllowance() {
+  const owing = featuresOwingFullLane(ROOT);
+  if (!owing.ok) return { allowed: null, owed: `${owing.reason} — so the full lane is owed (fail closed)` };
+  if (owing.names.length > 0) {
+    return { allowed: null, owed: `the full lane is owed now, once: ${owing.why.join("; ")}` };
+  }
+  let quick;
+  try {
+    quick = quickCheckStanding(ROOT, () => computeInputsHash(ROOT));
+  } catch (err) {
+    quick = { ok: false, detail: err && err.message ? err.message : String(err) };
+  }
+  return quick.ok ? { allowed: quick, owed: null } : { allowed: null, owed: null, quickDetail: quick.detail };
+}
+const allowance = !result.valid && (asHook || asQuick) ? quickAllowance() : null;
+
 if (asHook) {
   const hookInput = readStdinJson();
   if (hookInput.stop_hook_active === true) {
+    process.exit(0);
+  }
+  if (allowance?.allowed) {
+    // Claude Code shows `systemMessage` to the human; exit 0 lets the turn end.
+    process.stdout.write(`${JSON.stringify({ systemMessage: quickStopMessage(allowance.allowed) })}\n`);
     process.exit(0);
   }
   if (!result.valid) {
@@ -257,15 +315,27 @@ if (asHook) {
     // where the hold is not the cause and offering it would misdirect.
     const flight = laneInFlight();
     const hold = holdExplains(result, readReceipt(ROOT)) ? assessHold(readHold(ROOT)) : null;
+    // In progress (no feature owes the full lane): the ask is the QUICK check,
+    // seconds — not the lane. A feature at Prove keeps the full-lane ask.
+    const inProgress = allowance && !allowance.owed;
     const act = flight
       ? `A full check is ALREADY RUNNING${flight.step ? ` (${flight.step}${flight.index && flight.total ? `, step ${flight.index} of ${flight.total}` : ""})` : ""} — ` +
         `wait for it to finish and commit its receipt. Do NOT start a second one; two lanes fight over the same build directory.`
       : hold?.held
         ? describeHold(hold)
-        : `Run \`${LANE_COMMAND}\` (it checks every promise and writes the receipt), ` +
+        : inProgress && !result.reattestable
+          ? `Quick check missing — no quick receipt attests this tree either (${allowance.quickDetail}). ` +
+            `A feature is still in progress, so a quick check is enough to stop: Run \`${LANE_COMMAND} --fast\` (seconds). ` +
+            "The full lane runs once, when a feature reaches Prove and before merge."
+        : result.reattestable
+          ? `Run \`${LANE_COMMAND} --reattest-approvals\` (seconds: it re-checks the signatures and carries the rest of the last full run forward), ` +
+            "commit the receipt, or see README §Verification enforcement to bypass."
+          : `Run \`${LANE_COMMAND}\` (it checks every promise and writes the receipt), ` +
           "commit the receipt, or see README §Verification enforcement to bypass.";
     process.stderr.write(
-      `■ Prove — not done: the promises are not yet checked against this tree. ${result.reason}. ${act}\n`,
+      allowance?.owed
+        ? `■ Prove — not done: ${allowance.owed}. ${result.reason}. ${act}\n`
+        : `■ Prove — not done: the promises are not yet checked against this tree. ${result.reason}. ${act}\n`,
     );
     process.exit(2);
   }
@@ -282,10 +352,23 @@ const rungSuffix = result.evidenceLevel
     (result.packId ? ` · pack ${result.packId}` : " · pack UNNAMED (this rung is comparable to nothing)")
   : "";
 
+if (asQuick && allowance?.allowed) {
+  if (asJson) console.log(JSON.stringify({ ...result, quick: allowance.allowed }, null, 2));
+  else console.log(`QUICK — ${quickStopMessage(allowance.allowed)}`);
+  process.exit(0);
+}
+if (asQuick && allowance?.owed && !asJson) console.error(`  ${allowance.owed}`);
+
 if (asJson) {
   console.log(JSON.stringify(result, null, 2));
 } else if (result.valid) {
   console.log(`VALID — ${result.reason}${rungSuffix}`);
+  if (result.reattest) {
+    console.log(
+      `  re-attested after a signature: re-ran ${(result.reattest.rerun ?? []).join(", ")}; ` +
+        `${result.reattest.carriedForward} step(s) carried from the full run of ${result.reattest.from} (CI never re-attests)`,
+    );
+  }
   if (result.attestation) {
     console.log(
       `  ${result.attestation.line} (this committed file is its producer's word; ` +

@@ -9,14 +9,16 @@
 <!-- >>> cmp:feature harness -->
 3. Run the verify lane: `node qa/verify.mjs`.
 4. Commit **including the updated receipt** (`qa/evidence/latest.json`). A change without a
-   PASS receipt is not done — CI re-runs the same lane and will say so.
+   PASS receipt is not done — CI checks the receipt before the PR merges and will say so.
 <!-- <<< cmp:feature harness -->
 <!-- >>> cmp:feature !harness -->
-3. Run the tests: `./gradlew :composeApp:desktopTest` must be green (CI re-runs it on
-   every push).
+3. Run the tests: `./gradlew :composeApp:desktopTest` must be green (CI re-runs it before
+   a pull request merges, and every night).
 4. Commit.
 <!-- <<< cmp:feature !harness -->
-5. Open a PR. Keep it one concern; note any intended golden/baseline changes explicitly.
+5. Open a PR — as a draft while you are still pushing (drafts run no CI), then mark it ready
+   (`gh pr ready`): that runs the pre-merge check, which must pass. Keep it one concern; note
+   any intended golden/baseline changes explicitly.
 
 ## Definition of done
 
