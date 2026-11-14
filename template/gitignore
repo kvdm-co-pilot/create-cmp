@@ -18,6 +18,9 @@ build/
 # (qa/evidence/latest.json) IS committed — these artifacts are hashed into it instead.
 # A --fast run writes latest-fast.json: inner-loop feedback, never evidence, never committed.
 qa/evidence/latest-fast.json
+# The feature profile (the CI's pre-merge check) writes latest-feature.json: one feature's
+# proof, never the receipt-of-record, never committed.
+qa/evidence/latest-feature.json
 qa-artifacts/
 
 # iOS / CocoaPods / XcodeGen

@@ -277,7 +277,7 @@ Library contract additions (binding, mirror §7.3's style):
 3. **Express lane:** one command approves all resolvable artifacts with the
    mode recorded; console shows the unshaped badge; a later real approval
    clears it.
-4. **Reopen:** approved → reopened → lane SKIP-warns (not FAIL); drift on a
+4. **Reopen:** approved → reopened → non-blocking, noted like `unreviewed` (not FAIL); drift on a
    *different* approved artifact still FAILs in the same run; console button
    writes the same ledger the CLI writes.
 5. **Variants:** two candidate token sets snapshotted; strip renders both;

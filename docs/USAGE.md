@@ -440,16 +440,32 @@ governed `app-base.spec.md` clauses, and the exemplar feature's file tree — ev
 from the real project, never fabricated.
 
 **Gate semantics** (the `approvals` step, in every verify-lane profile):
-- **`unreviewed`** → **SKIP** with a warning line — non-blocking; nothing fails until a human
+- **`unreviewed`** → non-blocking, named in the step's reason; nothing fails until a human
   opts in.
-- **`reopened`** → **SKIP** with a warning line, exactly like `unreviewed` — sanctioned redesign
-  never trips the gate.
-- **`approved`, hash still matches** → **PASS**.
+- **`reopened`** → non-blocking, exactly like `unreviewed` — sanctioned redesign never trips
+  the gate.
+- **`approved`, hash still matches** → verified. The step **PASSes** when every signature that
+  exists verifies, even while other artifacts are still unreviewed; its note says how many were
+  verified and how many are awaiting approval (`details.verified` lists them). It **SKIPs** only
+  when nothing is signed yet — there was nothing to verify. (Until 2026-11-14 any unreviewed
+  artifact made the row SKIP, which read as "signatures not checked" when they had been.)
 - **`approved`, hash no longer matches** → **FAIL**, naming the artifact and the re-approval
   command — the artifact changed after sign-off without a reopen. A gate FAIL fails the lane
   verdict, which the Stop hook and CI both already refuse "done" over — no separate enforcement
   to maintain. A run with one reopened artifact and one drifted artifact FAILs naming only the
   drifted one — redesign is a decision, drift is an accident.
+
+**After a signature — re-attest, don't re-run.** A signature rewrites `qa/approvals.json`, which
+the receipt attests, so the receipt goes INVALID. When the ledger is the only attested file that
+changed since a full PASS receipt, `node qa/verify.mjs --reattest-approvals` re-issues it in
+seconds: it re-runs the `approvals` step and the lane's self-check, and carries every other row
+forward from that full run — each carried row marked `carriedForward`, the run they came from
+named in the receipt's `reattest` block. It proves "only the ledger changed" by recomputing every
+other file's hash (`inputs.hashWithoutApprovals`), never by assuming it; it refuses by name on any
+other change, on a receipt that is not done-evidence, on changed lane code, and under CI (which
+never re-attests — it runs its own checks); and the rung it writes is never higher than the carried run's.
+`qa/approve.mjs` and the Stop hook both print the command when it applies. Why a flag rather than
+automatic: `docs/features/approvals-reattest.md`.
 
 ### The genesis walk — defining artifacts before freezing them
 

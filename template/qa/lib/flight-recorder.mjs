@@ -111,7 +111,7 @@ export function describeHighestRung(device) {
  *
  * @param {object} run
  * @param {string} run.profile lane profile (scaffold | local | ci | release)
- * @param {string} run.mode "full" | "fast"
+ * @param {string} run.mode "full" | "fast" | "reattest" (--reattest-approvals: its steps are only the rows it re-ran)
  * @param {string} run.verdict "PASS" | "FAIL"
  * @param {{rung: string}|null} run.evidenceLevel the derived rung (or null —
  *   fast runs and FAILed lanes carry none, and the journal records that
@@ -370,7 +370,8 @@ export function summarizeFlightJournal(entries, { now = new Date() } = {}) {
  * @returns {Array<{name: string, runs: number, reason: string}>}
  */
 export function neverRunTiers(steps, entries, { floor = 3 } = {}) {
-  const full = (Array.isArray(entries) ? entries : []).filter((e) => e && e.mode !== "fast" && Array.isArray(e.steps));
+  // A re-attest entry holds only the steps it re-ran — not a run of the tier.
+  const full = (Array.isArray(entries) ? entries : []).filter((e) => e && e.mode !== "fast" && e.mode !== "reattest" && Array.isArray(e.steps));
   const out = [];
   for (const st of (Array.isArray(steps) ? steps : []).filter((x) => x && x.verdict === "SKIP")) {
     const seen = full.filter((e) => e.steps.some((s) => s && s.name === st.name));
@@ -404,7 +405,8 @@ export function renderFlightReport(summary, { malformed = 0 } = {}) {
     lines.push(`  only ${summary.total} run(s) recorded — the counts below are individual facts, not a trend`);
   }
 
-  const modeBits = ["full", "fast"].map((m) => `${summary.byMode[m] ?? 0} ${m}`).join(" · ");
+  // `reattest` is named only when there is one, so a journal without any keeps its exact line.
+  const modeBits = ["full", "fast", ...(summary.byMode.reattest ? ["reattest"] : [])].map((m) => `${summary.byMode[m] ?? 0} ${m}`).join(" · ");
   lines.push(`modes:    ${modeBits}`);
   // Disclosure, not a footnote: qa/watch.mjs passes --no-journal, so
   // save-triggered fast runs are deliberately absent (a committed journal must

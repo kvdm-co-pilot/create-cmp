@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The verify lane — this project's single verification gate.
 //
-//   node qa/verify.mjs [--profile smoke|scaffold|local|ci|nightly|release] [--fast] [--json]
+//   node qa/verify.mjs [--profile smoke|scaffold|local|ci|nightly|release|feature] [--base <ref>] [--fast] [--dry-run] [--json]
 //
 // Runs every verification step this project carries, aggregates a typed
 // PASS/FAIL verdict, and writes the evidence receipt to qa/evidence/latest.json.
@@ -42,12 +42,15 @@ import { SNAPSHOT_REL, snapshotHtml } from "./lib/evidence-html.mjs";
 import { readFrameworkRecord } from "./lib/framework-record.mjs";
 import { appendFlightRecord, buildFlightEntry, machineClass, neverRunTiers, readFlightJournal } from "./lib/flight-recorder.mjs";
 import { StepTimeout, spawnTimedOut } from "./lib/step-outcomes.mjs";
-import { expectedDurations, runLane, stepDisplayName } from "./lib/lane-runner.mjs";
+import { expectedDurations, laneVerdict, runLane, stepDisplayName } from "./lib/lane-runner.mjs";
 import { resolveHarnessManifest } from "./lib/harness-manifest.mjs";
 import { loadProfile, loadProfileSync } from "./lib/profile-loader.mjs";
 import { laneMarkerPath, laneStepsPath } from "./lib/lane-markers.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "./lib/harness-lock.mjs";
 import { readHarnessSource } from "./lib/harness-source.mjs";
+import { readReceipt } from "./lib/receipt-validate.mjs";
+import { readLadder } from "./lib/evidence-level.mjs";
+import { REATTEST_FLAG, capLevel, mergeRows, planReattest } from "./lib/reattest.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -60,7 +63,7 @@ const ARTIFACTS_DIR = path.join(ROOT, "qa-artifacts");
 // killed). Same refusal-over-fabrication stance as qa/approve.mjs, which
 // refuses an unknown artifact by name rather than guessing: an unknown
 // argument here is refused by name, not swallowed into "run everything".
-const USAGE = `node qa/verify.mjs [--profile smoke|scaffold|local|ci|nightly|release] [--fast] [--json] [--html] [--help]
+const USAGE = `node qa/verify.mjs [--profile smoke|scaffold|local|ci|nightly|release|feature] [--base <ref>] [--fast] [--reattest-approvals] [--dry-run] [--json] [--html] [--help]
 
 The verify lane — this project's single verification gate. Runs every
 verification step this project carries, aggregates a typed PASS/FAIL
@@ -68,8 +71,19 @@ verdict, and writes the evidence receipt to qa/evidence/latest.json (commit
 it with your change — see CLAUDE.md). Exit code: 0 = PASS, 1 = FAIL.
 
 Flags:
-  --profile <smoke|scaffold|local|ci|nightly|release>
+  --profile <smoke|scaffold|local|ci|nightly|release|feature>
                                  which step set to run (default: local)
+  --base <ref>                   feature profile only: the ref the branch's
+                                 change is measured against (git diff
+                                 <ref>...HEAD; default origin/main). CI passes
+                                 HEAD^1 — a pull request's merge commit's
+                                 first parent is the base branch's tip
+  --dry-run                      print the steps the resolved profile would
+                                 run — and, for the feature profile, the scope
+                                 it derived (features, test filter, flows, and
+                                 whether anything a test can see changed) —
+                                 then exit 0 having run nothing and written no
+                                 receipt. With --json, one JSON object
   --fast                         INNER LOOP ONLY — run the resolved profile
                                   minus this pack's expensive tier (named
                                   under "This project" below), unconditionally,
@@ -82,6 +96,18 @@ Flags:
                                   evidence rung, and can NEVER satisfy the
                                   done-gate — run the full lane once before
                                   you call it done
+  --reattest-approvals           AFTER A SIGNATURE: re-issue the receipt in
+                                  seconds instead of minutes. Allowed only when
+                                  qa/approvals.json is the ONLY attested file
+                                  that changed since a full, PASSing,
+                                  done-evidence receipt — proven by recomputing
+                                  every other file's hash, not assumed. Re-runs
+                                  the steps that read the ledger plus the lane's
+                                  self-check; carries every other row forward,
+                                  marked, naming the run it came from. Never
+                                  raises the evidence rung. Refused (with the
+                                  reason) on any other change, and under CI,
+                                  which runs its own checks
   --determinism                  run the timezone determinism probe: the
                                   pack's host test tier executes TWICE, under
                                   TZ=Etc/GMT+12 (UTC-12) and TZ=Etc/GMT-14
@@ -136,6 +162,13 @@ they are listed under "This project" below.
             Schedule it; never wait on it.
   release   everything ci proves PLUS the pack's ship-time step; run it before
             cutting a release, never per-change
+  feature   the pre-merge check: only what the branch's change touches — its
+            feature's tests and its own e2e flow, scoped by the --fast
+            filter's rules over git diff <base>...HEAD. A docs-only change
+            scopes to nothing. Writes qa/evidence/latest-feature.json (never
+            the receipt-of-record), earns no rung, and is refused as
+            done-evidence: it proves one feature, and the nightly proves the
+            tree
 `;
 
 /**
@@ -188,10 +221,10 @@ if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
 // save without ever running the lane. test/verify-flags.test.mjs now pins
 // consumed ⊆ recognized and watch's spawn ⊆ recognized so the class cannot
 // recur.
-const RECOGNIZED_FLAGS = new Set(["--profile", "--json", "--fast", "--determinism", "--no-journal", "--events", "--html"]);
+const RECOGNIZED_FLAGS = new Set(["--profile", "--base", "--json", "--fast", "--determinism", "--no-journal", "--events", "--html", "--dry-run", REATTEST_FLAG]);
 for (let i = 0; i < rawArgs.length; i += 1) {
   const arg = rawArgs[i];
-  if (arg === "--profile") {
+  if (arg === "--profile" || arg === "--base") {
     i += 1; // consume its value (missing/invalid value keeps the existing exit-2 behavior below)
     continue;
   }
@@ -201,7 +234,16 @@ for (let i = 0; i < rawArgs.length; i += 1) {
 }
 
 const args = rawArgs;
-const profile = args.includes("--profile") ? args[args.indexOf("--profile") + 1] : "local";
+// --reattest-approvals (qa/lib/reattest.mjs). Read before the profile, because
+// a re-attest re-issues the profile the carried receipt RAN — `local` by
+// default would build the pack for a profile the receipt never had.
+const reattest = args.includes(REATTEST_FLAG);
+const previousReceipt = reattest ? readReceipt(ROOT) : null;
+const profile = args.includes("--profile")
+  ? args[args.indexOf("--profile") + 1]
+  : reattest && typeof previousReceipt?.profile === "string"
+    ? previousReceipt.profile
+    : "local";
 const asJson = args.includes("--json");
 // Step events go to STDERR, deliberately. `--json` prints ONE object on stdout
 // and both qa/watch.mjs and qa/refusal-demo.mjs parse it that way; interleaving
@@ -256,12 +298,30 @@ const emitStepEvent = asEvents
     }
   : null;
 const fast = args.includes("--fast");
+const dryRun = args.includes("--dry-run");
+// --base names the feature profile's comparison ref, and only that profile
+// reads it — so anywhere else it is refused by name rather than ignored.
+const base = args.includes("--base") ? args[args.indexOf("--base") + 1] : undefined;
+if (args.includes("--base") && (!base || base.startsWith("--"))) {
+  console.error("--base needs a git ref, e.g. --base origin/main");
+  process.exit(2);
+}
+if (base !== undefined && profile !== "feature") {
+  console.error(`--base belongs to the feature profile, not "${profile}" — run --profile feature --base ${base}`);
+  process.exit(2);
+}
+if (fast && profile === "feature") {
+  console.error("--fast cannot be combined with --profile feature: the feature profile is already scoped to the branch's change, and --fast would drop the e2e flow it exists to run.");
+  process.exit(2);
+}
 // A fast run writes its own file. Before 2026-09-08 it wrote latest.json, so a
 // resident watcher's next pass overwrote the checkpoint's receipt with a fast
 // one the Stop hook refuses — the agent had done everything right and was told
 // it had not. latest-fast.json is never committed (template gitignore) and is
 // read by nothing that grades; latest.json stays the single receipt-of-record.
-const RECEIPT_FILE = fast ? "latest-fast.json" : "latest.json";
+// The feature profile writes its own file for the same reason: it proves one
+// feature, and the receipt-of-record a Stop hook reads must stay the full lane's.
+const RECEIPT_FILE = fast ? "latest-fast.json" : profile === "feature" ? "latest-feature.json" : "latest.json";
 // --no-journal suppresses the flight-recorder append (qa/watch.mjs passes it).
 // See the append site below for why the inner loop must not write here.
 const noJournal = args.includes("--no-journal");
@@ -287,7 +347,17 @@ if (determinism && fast) {
   );
   process.exit(2);
 }
-if (determinism && profileExplicit && profile !== "ci" && profile !== "release") {
+if (reattest && (fast || determinism)) {
+  console.error(
+    `${REATTEST_FLAG} cannot be combined with ${fast ? "--fast" : "--determinism"}: a re-attest re-runs only the steps that read qa/approvals.json and carries a FULL run's rows forward — it is neither the inner loop nor a probe.`,
+  );
+  process.exit(2);
+}
+// nightly FORCES the probe (above), so it is a profile that owns it — without
+// it in this list, `--profile nightly` refused itself with exit 2 on every
+// run from the day the profile shipped, and nothing ran it until a stamped
+// app's scheduled CI did (2026-11-14).
+if (determinism && profileExplicit && profile !== "ci" && profile !== "release" && profile !== "nightly") {
   console.error(
     `--determinism belongs to the ci profile (release inherits it), not "${profile}" — run --profile ci --determinism, or bare --determinism to run the probe alone.`,
   );
@@ -385,7 +455,7 @@ if (!loaded.ok) {
   console.error(loaded.reason);
   process.exit(2);
 }
-const pack = loaded.profile.steps({ ROOT, HERE, fast, determinism, profile, mode, sh, tryGit, tryGitLines, DEGRADED_PATHS });
+const pack = loaded.profile.steps({ ROOT, HERE, fast, determinism, profile, mode, base, sh, tryGit, tryGitLines, DEGRADED_PATHS });
 const { stepsForProfile, DEVICE_STEPS, FAST_EXCLUDED_NAMES, STEP_FN_BY_NAME } = pack;
 
 // ── The evidence ladder, resolved once, before a step runs ──────────────────
@@ -405,8 +475,157 @@ if (!resolvedLadder.ok) {
 }
 
 if (!stepsForProfile[profile]) {
-  console.error(`Unknown profile "${profile}" — use smoke | scaffold | local | ci | nightly | release.`);
+  console.error(`Unknown profile "${profile}" — use smoke | scaffold | local | ci | nightly | release | feature.`);
   process.exit(2);
+}
+
+// ── --reattest-approvals: a signature costs what a signature costs ──────────
+// The whole decision is qa/lib/reattest.mjs's (planReattest) — this block only
+// gathers the facts it decides over, runs the few steps it names through the
+// SAME runner, and writes a receipt that says which rows ran now and which were
+// carried. Exits here; nothing below runs on a re-attest.
+if (reattest) {
+  const reattestStartedAt = Date.now();
+  const current = computeInputsHash(ROOT);
+  const integrityNow = checkHarnessIntegrity(ROOT);
+  // The legacy-SKIP fallback is resolved exactly as qa/receipt-check.mjs
+  // resolves it, so "is the carried receipt done-evidence" has one answer.
+  const declaredLegacy = loaded.profile?.legacySkipReasons;
+  const legacySkips =
+    resolvedLadder.ladder && Array.isArray(declaredLegacy) && declaredLegacy.length
+      ? { names: readLadder(resolvedLadder.ladder).l2Execution, reasons: declaredLegacy }
+      : null;
+  const plan = planReattest({
+    previous: previousReceipt,
+    current,
+    harnessSha: integrityNow.sha256 ?? null,
+    ledgerReaders: pack.approvalsLedgerReaders,
+    requestedProfile: profileExplicit ? profile : null,
+    ci: process.env.CI === "true" || process.env.CI === "1",
+    legacySkips,
+  });
+  if (!plan.ok) {
+    if (plan.noop) {
+      console.log(`✅ ${plan.reason} (qa/evidence/latest.json). Nothing written.`);
+      process.exit(0);
+    }
+    console.error(`✗ ${REATTEST_FLAG} refused — ${plan.reason}`);
+    process.exit(2);
+  }
+  const rerunFns = stepsForProfile[profile].filter((fn) => plan.rerun.includes(stepDisplayName(fn)));
+  if (rerunFns.length !== plan.rerun.length) {
+    const have = rerunFns.map((fn) => stepDisplayName(fn));
+    console.error(`✗ ${REATTEST_FLAG} refused — the "${profile}" profile has no step for ${plan.rerun.filter((n) => !have.includes(n)).join(", ")}; run the full lane (node qa/verify.mjs)`);
+    process.exit(2);
+  }
+  if (!asJson) {
+    console.log(
+      `♻ re-attest (approvals only): every attested file except qa/approvals.json is byte-identical to the full run of ${plan.from.generatedAt}` +
+        `${plan.from.commit ? ` (commit ${String(plan.from.commit).slice(0, 7)})` : ""}.\n` +
+        `  re-running now: ${plan.rerun.join(", ")} · carrying forward ${plan.carried.length} step(s) from that run, each marked on the receipt`,
+    );
+  }
+  const rerunLane = runLane({
+    steps: rerunFns,
+    markerPath: LANE_MARKER,
+    expected: { byName: new Map(), laneMs: null },
+    startedAt: reattestStartedAt,
+    setDeadline: (ms) => {
+      CURRENT_STEP_DEADLINE_MS = ms;
+    },
+    print: asJson ? null : (line) => console.log(line),
+    receiptPath: "qa/evidence/latest.json",
+    narrator: null,
+    onFinally: () => pack.releaseLease(),
+    compileStepName: pack.compileStepName,
+    stepDeadlines: pack.stepDeadlines,
+  });
+  const merged = mergeRows(previousReceipt.steps, rerunLane.steps, plan.rerun);
+  const reVerdict = laneVerdict(merged);
+  const reGrade = gradeEvidence(merged, profile, { mode: "full", ladder: resolvedLadder.ladder, plants: loaded.profile.plants });
+  // NEVER UP: the rung is the lower of what the merged rows grade to and what
+  // the carried receipt held. A FAIL has no rung at all.
+  const reLevel = reVerdict === "PASS" ? capLevel(reGrade.level, previousReceipt.evidenceLevel ?? null) : null;
+  const vouch = rerunLane.steps.find((r) => r && r.harness && typeof r.harness === "object");
+  const h = vouch?.harness ?? integrityNow;
+  const harnessSummary = { name: h.name, version: h.version, sha256: h.sha256, status: h.status, intact: h.status === "intact" };
+  const provenance = readHarnessSource(ROOT);
+  if (provenance?.source) harnessSummary.source = provenance.source;
+  if (h.status === "modified") Object.assign(harnessSummary, { modified: h.modified, missing: h.missing, extra: h.extra });
+  const undeclaredNow = undeclaredTopLevel(ROOT);
+  const reReceipt = {
+    schema: "prooflane-evidence/1",
+    profile,
+    stage: previousReceipt.stage ?? ({ smoke: "smoke", scaffold: "scaffold", local: "change", ci: "merge", nightly: "nightly", release: "release" }[profile] ?? profile),
+    // "full": what the rows on this receipt attest is a full run — the carried
+    // rows ARE one, and `reattest` says which rows were re-run when.
+    mode: "full",
+    verdict: reVerdict,
+    commit: {
+      sha: tryGit("rev-parse HEAD"),
+      dirty: tryGitLines("status --porcelain").map((l) => l.slice(3)).sort(),
+    },
+    inputs: {
+      hash: current.hash,
+      fileCount: current.fileCount,
+      hashWithoutApprovals: current.hashWithoutApprovals,
+      ...(undeclaredNow.length ? { undeclared: undeclaredNow } : {}),
+    },
+    steps: merged,
+    reattest: {
+      kind: "approvals-only",
+      rerun: plan.rerun,
+      carriedForward: plan.carried,
+      // The run every carried row was EARNED in — the original full run, even
+      // when the receipt on disk was itself a re-attest.
+      from: plan.from,
+      // The receipt this one replaced, for the audit trail in git history.
+      replaced: { inputsHash: previousReceipt.inputs.hash, generatedAt: previousReceipt.generatedAt },
+    },
+    harness: harnessSummary,
+    pack: { id: pack.id, version: typeof loaded.profile?.version === "string" ? loaded.profile.version : null },
+    strength: previousReceipt.strength ?? { onDeviceSteps: [] },
+    evidenceLevel: reLevel,
+    // The artifacts the carried rows were proven with — this run built none.
+    artifacts: Array.isArray(previousReceipt.artifacts) ? previousReceipt.artifacts : [],
+    toolVersions: { node: process.version, platform: `${process.platform}-${process.arch}` },
+    generatedAt: new Date().toISOString(),
+  };
+  fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
+  fs.writeFileSync(path.join(EVIDENCE_DIR, "latest.json"), `${JSON.stringify(reReceipt, null, 2)}\n`);
+  const reBadge = updateReadmeBadge(ROOT);
+  if (!noJournal) {
+    // Journalled as mode "reattest" with ONLY the rows that ran: a carried row
+    // re-journalled would count a build twice and teach the narrator that a
+    // full lane takes two seconds.
+    const appended = appendFlightRecord(
+      ROOT,
+      buildFlightEntry({
+        profile,
+        mode: "reattest",
+        verdict: reVerdict,
+        evidenceLevel: reLevel,
+        pack: { id: pack.id },
+        steps: rerunLane.steps,
+        sha: reReceipt.commit.sha,
+        durationMs: Date.now() - reattestStartedAt,
+        onDeviceSteps: [],
+        degraded: DEGRADED_PATHS,
+      }),
+    );
+    if (!appended.ok) console.error(`· flight recorder: journal append failed (${appended.reason})`);
+  }
+  if (asJson) {
+    console.log(JSON.stringify(reReceipt, null, 2));
+  } else {
+    const levelText = reLevel ? ` · ${reLevel.rung} ${reLevel.name} · pack ${pack.id}` : "";
+    console.log(
+      `\n${reVerdict === "PASS" ? "✅" : "❌"} verify lane [RE-ATTESTED — approvals only]: ${reVerdict}${levelText} — ` +
+        `re-ran ${plan.rerun.join(", ")}; ${plan.carried.length} step(s) carried from ${plan.from.generatedAt}. ` +
+        `Receipt written to qa/evidence/latest.json${reBadge.changed ? ` and ${README_REL_PATH}'s evidence badge refreshed` : ""} (commit ${reBadge.changed ? "them" : "it"} with your signature)`,
+    );
+  }
+  process.exit(reVerdict === "PASS" ? 0 : 1);
 }
 
 // ── Bare --determinism: the probe, nothing else, and NO receipt ─────────────
@@ -455,6 +674,32 @@ const fastExcluded = fast
   ? FAST_EXCLUDED_NAMES.filter((name) => stepsForProfile[profile].includes(STEP_FN_BY_NAME[name]))
   : [];
 
+// ── --dry-run: what would run, and nothing else ─────────────────────────────
+// No marker, no receipt, no journal line: a question about the lane must not
+// leave a trace the lane's readers would mistake for a run. The stamped CI
+// asks it of the feature profile before it boots an emulator, so a docs-only
+// pull request reports `run: false` and costs one checkout.
+if (dryRun) {
+  const plan = {
+    profile,
+    steps: laneSteps.map((fn) => stepDisplayName(fn)).filter(Boolean),
+    scope: typeof pack.describeScope === "function" ? pack.describeScope() : null,
+  };
+  if (asJson) {
+    console.log(JSON.stringify(plan, null, 2));
+  } else {
+    console.log(`dry run — profile ${profile}: ${plan.steps.join(", ") || "(no steps)"}`);
+    if (plan.scope) {
+      const sc = plan.scope;
+      console.log(`  scope since ${sc.base}: ${sc.run ? sc.reason : `nothing to test — ${sc.reason}`}`);
+      if (sc.run) {
+        console.log(`  unit tests: ${sc.unit.mode === "filtered" ? sc.unit.patterns.join(", ") : `all — ${sc.unit.reason}`}`);
+        console.log(`  flows: ${sc.flows.join(", ") || "(none)"} — ${sc.flowsReason}`);
+      }
+    }
+  }
+  process.exit(0);
+}
 if (fast) {
   console.error(
     [
@@ -716,7 +961,7 @@ if (undeclared.length) {
 // more than its stage allows. scaffold → scaffold, local → change (per commit),
 // ci → merge, nightly → nightly (proves the harness, never a change), release →
 // release. Receipts predating this field are read as their profile's stage.
-const STAGE_OF_PROFILE = { smoke: "smoke", scaffold: "scaffold", local: "change", ci: "merge", nightly: "nightly", release: "release" };
+const STAGE_OF_PROFILE = { smoke: "smoke", scaffold: "scaffold", local: "change", ci: "merge", nightly: "nightly", release: "release", feature: "feature" };
 // Computed once: `harness` and `pack` both read it, and checkHarnessIntegrity
 // hashes the whole region.
 const harnessSummary = harnessForReceipt();
@@ -740,6 +985,10 @@ const receipt = {
   inputs: {
     hash: inputs.hash,
     fileCount: inputs.fileCount,
+    // The same digest with qa/approvals.json left out (qa/lib/inputs-hash.mjs).
+    // It is what lets a later signature re-attest in seconds — the proof that
+    // nothing BUT the ledger moved (--reattest-approvals, qa/lib/reattest.mjs).
+    hashWithoutApprovals: inputs.hashWithoutApprovals,
     // Top-level entries the surface leaves unattested (see above). Absent when
     // there are none, so a receipt whose surface covers everything keeps its
     // exact prior shape.

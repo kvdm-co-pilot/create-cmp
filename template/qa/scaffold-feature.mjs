@@ -767,7 +767,7 @@ if (writesSpec) {
 
   // Approvals seeding (VERIFICATION-LAYER-DESIGN.md §2): the new feature's spec
   // is a governed artifact (`feature-spec:<name>`) — seed it unreviewed so the
-  // verify lane's `approvals` gate SKIP-warns until a human signs off. v1 does
+  // verify lane's `approvals` gate notes it (non-blocking) until a human signs off. v1 does
   // NOT refuse to stamp over this (warn-then-enforce-at-verify is the honest
   // default) — reuses `approvalsLib` (already resolved above, tolerantly, for
   // clone-source resolution) so a missing or out-of-date qa/lib/approvals.mjs

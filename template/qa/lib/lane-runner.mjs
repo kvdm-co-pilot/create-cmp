@@ -38,7 +38,9 @@ export function expectedDurations(entries, { machine = "local" } = {}) {
   const sameClass = (e) => (machine === "ci" ? e.machine === "ci" : e.machine !== "ci");
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
-    if (!e || e.mode === "fast" || !Array.isArray(e.steps) || !sameClass(e)) continue;
+    // A re-attest (--reattest-approvals) journals only the two steps it re-ran:
+    // read as "the last full run", it would teach the narrator a lane takes seconds.
+    if (!e || e.mode === "fast" || e.mode === "reattest" || !Array.isArray(e.steps) || !sameClass(e)) continue;
     const byName = new Map();
     for (const s of e.steps) {
       if (s && typeof s.name === "string" && typeof s.durationMs === "number" && s.durationMs > 0) byName.set(s.name, s.durationMs);

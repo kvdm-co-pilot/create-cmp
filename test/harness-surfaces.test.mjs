@@ -318,7 +318,11 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
       const gitignore = fs.readFileSync(path.join(out, ".gitignore"), "utf8");
       const ignoreRules = gitignore.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#"));
       const evidenceRules = ignoreRules.filter((l) => l.includes("qa/evidence"));
-      assert.deepEqual(evidenceRules, ["qa/evidence/latest-fast.json"], "the fast receipt is ignored — inner-loop feedback, never evidence — and ONLY it; latest.json is never gitignored");
+      assert.deepEqual(
+        evidenceRules,
+        ["qa/evidence/latest-fast.json", "qa/evidence/latest-feature.json"],
+        "the fast and feature receipts are ignored — inner-loop feedback and the CI's one-feature check, never evidence — and ONLY they; latest.json is never gitignored",
+      );
     });
 
     await t.test("qa/e2e/smoke.yaml cites SHELL-01 and uses extendedWaitUntil", () => {
@@ -449,7 +453,9 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
           assert.fail("expected --hook to exit 2 over a stale-hash receipt");
         } catch (err) {
           assert.equal(err.status, 2);
-          assert.doesNotMatch(String(err.stderr), /--fast/, "a mode-less receipt is never refused for fast-mode reasons");
+          // The fast-mode REFUSAL is what must not misfire. (Since 2026-11-14 the in-progress
+          // instruction itself names `--fast` as the quick check — qa/lib/stop-rule.mjs.)
+          assert.doesNotMatch(String(err.stderr), /--fast \(inner-loop only\)/, "a mode-less receipt is never refused for fast-mode reasons");
         }
       } finally {
         fs.rmSync(receiptPath, { force: true });
@@ -594,7 +600,9 @@ test("harness surfaces: default scaffold contains the HARNESS surfaces", async (
           assert.fail("expected refusal");
         } catch (err) {
           assert.equal(err.status, 2);
-          assert.match(String(err.stderr), /Run `node qa\/verify\.mjs`/, "back to the normal instruction");
+          // 2026-11-14 (qa/lib/stop-rule.mjs): with no feature at Prove the normal
+          // instruction is the quick check — `--fast`, seconds — not the full lane.
+          assert.match(String(err.stderr), /Run `node qa\/verify\.mjs( --fast)?`/, "back to the normal instruction");
           assert.doesNotMatch(String(err.stderr), /ALREADY RUNNING/);
         }
       } finally {

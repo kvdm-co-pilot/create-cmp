@@ -1,16 +1,43 @@
 # CI for your Compose Multiplatform app — stamped in by create-cmp.
 #
+# WHEN CI RUNS (one rule each, so an app opening hundreds of PRs pays for
+# what each one needs and no more):
+#
+#   1. Ordinary work runs NOTHING. A push to a branch, or to a DRAFT pull
+#      request, starts no job; docs-only changes never build. A newer run of
+#      the same PR cancels the older one.
+#   2. Before a feature merges into main — when its PR is opened ready for
+#      review, marked ready (`gh pr ready`), or pushed to while ready — the
+#      `android` job runs ONLY that feature's proof, and it must pass.
+#   3. Every night (and on demand, from the Actions tab) the `nightly` job
+#      runs everything, release builds included, over main.
+#
 # >>> cmp:feature harness
-# What runs on every push/PR: a toolchain report (advisory) and the VERIFY LANE
-# (qa/verify.mjs) — build + unit tests + every other gate this project carries,
-# producing the evidence receipt. Green here = your frozen version set still
-# builds AND the harness's checks pass.
+# What "that feature's proof" is: the lane's feature profile —
+# `node qa/verify.mjs --profile feature --base HEAD^1` — scopes to the PR's
+# own diff with the same rules as `verify --fast`: the feature's unit and
+# Compose UI tests, plus its Maestro flow `qa/e2e/<feature>.yaml` on an
+# Android emulator. A change that fans out (DI, build files, the harness)
+# runs the whole unit suite and says why; `--dry-run` shows the scope locally.
+# Everything else — the other features, the pure-Node gates, the release and
+# web builds, the instrumented tests — is the nightly's.
+#
+# "Must pass before merge", and who enforces it:
+#   - Public repository, or a paid plan: GitHub does. Require the `android`
+#     check on main with `gh api -X POST repos/{owner}/{repo}/rulesets
+#     --input qa/ruleset.json`. A docs-only or draft PR reports `android` as
+#     skipped, which a required check accepts.
+#   - Private repository on GitHub Free: rulesets and branch protection are
+#     not available, so GitHub cannot block the merge button. The rule then
+#     lives in the merge command: merge only with
+#       gh pr checks <pr> --watch --fail-fast && gh pr merge <pr>
+#     which waits for `android` and refuses to merge when it failed.
 # <<< cmp:feature harness
 # >>> cmp:feature !harness
-# What runs on every push/PR: a toolchain report (advisory), the JVM test tier
-# (unit + conformance + golden trees), and the Android debug build. This is a
-# minimal scaffold — `npx create-cmp-cli harden` upgrades this workflow to the
-# full verify lane with evidence receipts.
+# This is a minimal scaffold: before a merge it runs the JVM test tier
+# (unit + conformance + golden trees) and the Android debug build; the nightly
+# adds the release build. `npx create-cmp-cli harden` upgrades this workflow
+# to the verify lane, which scopes the pre-merge check to the PR's feature.
 # <<< cmp:feature !harness
 #
 # iOS: a ready-to-enable macOS job is included (commented out) at the bottom.
@@ -19,13 +46,75 @@
 name: Verify
 
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    # >>> cmp:feature !harness
+    paths-ignore: ["**.md", "docs/**"]
+    # <<< cmp:feature !harness
+  schedule:
+    - cron: "23 2 * * *" # nightly, 02:23 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # >>> cmp:feature harness
+  # Seconds, and no emulator: checks the committed receipt, then asks the lane
+  # what this PR touches. A draft PR skips it (and so `android`); a docs-only
+  # PR answers run=false and `android` is skipped. A skipped job satisfies a
+  # required check, where a workflow that never started would leave it
+  # waiting forever — which is why docs are filtered here and not with
+  # `paths-ignore`.
+  scope:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # the PR's merge commit and its first parent, the base tip
+      # Receipt attests HEAD: the committed evidence receipt (qa/evidence/latest.json)
+      # must validly attest the checked-out tree — verdict PASS and the inputs-hash
+      # still matching the verified surface. Robust to rebase/merge/squash: validity
+      # is a content hash of the inputs, not a parent SHA (docs/adr/0005). This is
+      # the same predicate the local Stop hook runs (qa/receipt-check.mjs) — one
+      # check, two locations — so a stale receipt fails here even if the author
+      # bypassed the local hook. It runs HERE, on every ready PR, because a PR that
+      # moves only specs or the approvals ledger moves the receipt's hash while
+      # touching nothing a test can see. No build, no tests: seconds.
+      - name: Receipt attests HEAD
+        run: node qa/receipt-check.mjs
+      - name: Feature scope
+        id: scope
+        run: |
+          node qa/verify.mjs --profile feature --base HEAD^1 --dry-run
+          node qa/verify.mjs --profile feature --base HEAD^1 --dry-run --json > "$RUNNER_TEMP/scope.json"
+          echo "run=$(node -p "require(process.env.RUNNER_TEMP + '/scope.json').scope.run")" >> "$GITHUB_OUTPUT"
+  # <<< cmp:feature harness
+
+  # The pre-merge check. Its id stays `android`: it is the status check
+  # qa/ruleset.json requires.
   android:
+    # >>> cmp:feature harness
+    # Runs when scope found something to test — AND when scope FAILED (a stale
+    # receipt, a lane that would not start), so that failure turns this
+    # required check red. A plain `needs.scope.outputs.run == 'true'` would
+    # skip here instead, and a ruleset reads a skipped check as passed.
+    needs: scope
+    if: always() && !cancelled() && (needs.scope.result == 'failure' || needs.scope.outputs.run == 'true')
+    # <<< cmp:feature harness
+    # >>> cmp:feature !harness
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    # <<< cmp:feature !harness
     runs-on: ubuntu-latest # ships with JDK + Android SDK preinstalled
+    timeout-minutes: 30
     # >>> cmp:feature harness
     # The attestation step below signs the receipt keylessly: id-token lets the
     # job ask GitHub's OIDC provider for its identity, attestations lets it store
@@ -38,15 +127,116 @@ jobs:
       attestations: write
     # <<< cmp:feature harness
     steps:
+      # >>> cmp:feature harness
+      - name: Scope job failed
+        if: needs.scope.result == 'failure'
+        run: |
+          echo "The scope job failed (a stale receipt, or a lane that would not start) — see its log. Nothing was proven, so this check fails."
+          exit 1
+      # <<< cmp:feature harness
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17 # the version set is pinned against JDK 17
 
-      # Caches Gradle + the configuration cache between runs (big speedup).
+      # Reads the Gradle cache the nightly writes on main; a PR never writes
+      # one (it would be visible to that PR alone).
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      # >>> cmp:feature !harness
+      - name: Tests (JVM tier) + debug build
+        run: ./gradlew :composeApp:desktopTest :composeApp:assembleDebug
+      # <<< cmp:feature !harness
+
+      # >>> cmp:feature harness
+      # The emulator needs hardware acceleration; hosted Linux runners have KVM
+      # but do not let the runner user open it until this rule is added.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # `shell: bash` runs with pipefail, so a failed download fails here
+      # instead of leaving a lane with no Maestro to find.
+      - name: Install Maestro
+        shell: bash
+        env:
+          MAESTRO_VERSION: 2.10.0
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          "$HOME/.maestro/bin/maestro" --version
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      # The feature check: the lane's feature profile, inside a booted emulator.
+      # The lane uses an attached device as-is (it boots none of its own), so
+      # the feature's flow runs on this one. Its receipt is
+      # qa/evidence/latest-feature.json — scoped, refused as done-evidence, and
+      # never the committed receipt-of-record.
+      - name: Feature check (tests + flow on an emulator)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: node qa/verify.mjs --profile feature --base HEAD^1
+
+      # CI attests the receipt CI itself just produced, keyless (Sigstore, bound
+      # to this workflow's OIDC identity):
+      #   gh attestation verify latest-feature.json --repo <owner>/<repo>
+      # answers "a GitHub-hosted run of this workflow produced this receipt from
+      # this commit". What it covers is what the receipt says it ran: one
+      # feature's tests and flow. A fork's pull request gets no id-token, so the
+      # step runs only where it can. Attestations are plan-gated: public
+      # repositories on every plan, private and internal ones on GitHub
+      # Enterprise Cloud only (ADR-0017). On Enterprise Cloud, widen this `if:`.
+      - name: Attest feature receipt
+        if: github.event.repository.visibility == 'public' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: qa/evidence/latest-feature.json
+
+      - name: Upload feature receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feature-evidence
+          path: qa/evidence/latest-feature.json
+          if-no-files-found: ignore
+      # <<< cmp:feature harness
+
+  # Everything, once a day over main, and on demand (Actions tab → Verify →
+  # Run workflow). The one job that WRITES the Gradle cache, so the next
+  # day's pull requests start warm.
+  nightly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # >>> cmp:feature harness
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    # <<< cmp:feature harness
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       # Advisory toolchain report from create-cmp's doctor. Non-blocking:
       # doctor also checks emulator/AVD bits that assembleDebug doesn't need,
@@ -56,8 +246,8 @@ jobs:
         run: npx --yes create-cmp-cli@latest doctor --yes --no-install --no-ios
 
       # >>> cmp:feature !harness
-      - name: Tests (JVM tier) + debug build
-        run: ./gradlew :composeApp:desktopTest :composeApp:assembleDebug
+      - name: Tests (JVM tier) + debug and release builds
+        run: ./gradlew :composeApp:desktopTest :composeApp:assembleDebug :composeApp:assembleRelease
       # >>> cmp:feature web
       - name: Browser app release build
         run: ./gradlew :composeApp:wasmJsBrowserDistribution
@@ -65,59 +255,53 @@ jobs:
       # <<< cmp:feature !harness
 
       # >>> cmp:feature harness
-      # Receipt attests HEAD: the committed evidence receipt (qa/evidence/latest.json)
-      # must validly attest the checked-out tree — verdict PASS and the inputs-hash
-      # still matching the verified surface — BEFORE we spend a runner re-running the
-      # lane. Robust to rebase/merge/squash: validity is a content hash of the inputs,
-      # not a parent SHA (docs/adr/0005). This is the same predicate the local Stop
-      # hook runs (qa/receipt-check.mjs) — one check, two locations — so a stale
-      # receipt fails here even if the author bypassed the local hook. A receipt
-      # whose verdict was hand-edited still passes this step (qa/evidence is outside
-      # the hash, and nothing signs it); the lane re-run below is what catches a
-      # forged L1 result. L2 rungs are attested only by the machine that ran them.
-      - name: Receipt attests HEAD
-        run: node qa/receipt-check.mjs
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
-      # The verify lane: build + unit tests + all shipped gates, with a typed
-      # verdict and an evidence receipt. If the build step fails after a
-      # dependency bump, remember: Kotlin / KSP / Compose / Room / AGP move as
-      # ONE set (see the comments in gradle/libs.versions.toml).
-      # CMP_DEVICE=none is the ONE explicit opt-out of the device tier: this
-      # hosted runner has no emulator, so e2eSmoke/androidChecks SKIP with that
-      # reason on the merge-stage receipt (visible, never silent). The lane boots
-      # a headless emulator itself everywhere else — locally that is the
-      # change-stage gate, and qa/receipt-check.mjs refuses a receipt whose
-      # device tier was opted out. To prove L2 here too, drop the variable and
-      # boot an emulator first (e.g. reactivecircus/android-emulator-runner).
-      - name: Verify lane
+      # `shell: bash` runs with pipefail, so a failed download fails here
+      # instead of leaving a lane with no Maestro to find.
+      - name: Install Maestro
+        shell: bash
         env:
-          CMP_DEVICE: none
-        run: node qa/verify.mjs --profile ci
+          MAESTRO_VERSION: 2.10.0
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          "$HOME/.maestro/bin/maestro" --version
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
-      # CI attests the receipt CI itself just produced. The signature is keyless
-      # (Sigstore, bound to this workflow's OIDC identity), so no key exists that
-      # the receipt's author could reach, and anyone can then check it:
-      #   gh attestation verify qa/evidence/latest.json --repo <owner>/<repo>
-      # answers "a GitHub-hosted run of this workflow produced this receipt from
-      # this commit". What it covers is the rungs this run executed: L1 here,
-      # because CMP_DEVICE=none above — the L2 verdict stays the author's
-      # machine's word until CI runs that tier.
-      # `v4` is the action's current major (latest release v4.2.2, checked
-      # 2026-10-13) and `subject-path` is its input name in v4's action.yml.
-      # A fork's pull request gets no id-token, so the step runs only where it can.
-      # Attestations are plan-gated: public repositories on every plan, private
-      # and internal ones on GitHub Enterprise Cloud only — so the step runs on
-      # public repositories, and a private repo's required check never fails for
-      # a plan it is not on (ADR-0017). On Enterprise Cloud, widen this `if:`.
+      # The full lane — every step this project carries, release builds and
+      # every e2e flow included — with the determinism probe forced on (the
+      # nightly profile). If a build step fails after a dependency bump,
+      # remember: Kotlin / KSP / Compose / Room / AGP move as ONE set (see the
+      # comments in gradle/libs.versions.toml). Its receipt is refused as
+      # done-evidence: it proves main, not a change.
+      - name: Verify lane (nightly, on an emulator)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: node qa/verify.mjs --profile nightly
+
+      # A scheduled run's event carries no repository object, so the
+      # visibility the attestation's plan gate needs is asked of the API.
+      - name: Repository visibility
+        id: repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "visibility=$(gh api "repos/${{ github.repository }}" --jq .visibility)" >> "$GITHUB_OUTPUT"
+
       - name: Attest evidence receipt
-        if: github.event.repository.visibility == 'public' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: steps.repository.outputs.visibility == 'public'
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: qa/evidence/latest.json
 
-      # The receipt this run produced, kept as a build artifact. The receipt
-      # committed by the author (qa/evidence/latest.json) lives in the repo —
-      # this artifact is CI's independent re-verification of the same change.
       - name: Upload evidence receipt
         if: always()
         uses: actions/upload-artifact@v4
@@ -127,14 +311,15 @@ jobs:
       # <<< cmp:feature harness
 
   # ── iOS (opt-in) ──────────────────────────────────────────────────────────
-  # Uncomment to build the iOS app on every push to main. Uses the exact
+  # Uncomment to build the iOS app in the nightly run. Uses the exact
   # command set create-cmp verified this template with: XcodeGen + CocoaPods
   # (LANG must be UTF-8) + an arm64-only simulator build (the Kotlin framework
   # embed phase emits only the active arch — a generic destination fails).
   #
   # ios:
   #   runs-on: macos-14
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  #   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  #   timeout-minutes: 60
   #   steps:
   #     - uses: actions/checkout@v4
   #     - uses: actions/setup-java@v4

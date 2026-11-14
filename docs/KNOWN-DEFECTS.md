@@ -129,6 +129,10 @@ you the same list without opening anything.
 | **KD-290** | create-cmp's own L2 console (`scripts/fleet-check.mjs:633`) prints a non-PASS step's reason as its first line only — KD-285's shape on the maintainer's printer; and `consoleRow` counts an ANSI-only line (`\x1b[0m`) as non-empty, spending the 12-line budget on a visually blank line, and an ERROR whose first line is empty prints a dangling ` — ` | no adopter is served by fleet-check's printer, and the run record keeps every step's full reason; the cmp profile's Gradle calls pass `--console=plain`, and `stepErrorResult` never opens with an empty line |
 | **KD-294** | `machineClass` (KD-291) reads only `CI`, and its comment says "GitHub Actions, GitLab, CircleCI, Buildkite and the rest all set `CI`" — Jenkins, Azure Pipelines (`TF_BUILD`), TeamCity (`TEAMCITY_VERSION`) and AWS CodeBuild (`CODEBUILD_BUILD_ID`) do not, so on those runners a committed laptop journal still bounds every step's deadline (KD-291's defect, unfixed there) | the only CI the template ships is GitHub Actions, which sets `CI=true`, and no doc claims another runner; the repair is reading the vendor markers too, and a laptop that exports `CI=true` gets the ceiling, the safe direction |
 | **KD-295** | `sync-harness.mjs`'s CONFLICT for a `TEMPLATE_OWNED` file that also has a package source is a refusal only `--check` performs: a real run has already overwritten the template-owned file in stage 2, prints CONFLICT, and exits 0 (planted 2026-10-21); the JSDoc says such a name "is refused below", and `--check`'s remedy line (`run: node scripts/sync-harness.mjs`) names a command that overwrites rather than resolves | no package source for a template-owned file exists, and `test/harness-parity.test.mjs` fails the suite on that state, so a conflicted tree cannot merge; the maintainer script only |
+| **KD-299** | on a private repository on GitHub Free, "the feature check must pass before merge" is the README's merge command, not a program: GitHub has no ruleset or branch protection there, and nothing refuses `gh pr merge` over a red `android` | an agent or a person merges without `gh pr checks --watch` first |
+| **KD-300** | `schedule` and `workflow_dispatch` on main share one `cancel-in-progress` concurrency group, so a manual Verify run cancels the nightly in flight, and the reverse | a cancelled run reads cancelled and the next night runs; nothing reads false |
+| **KD-301** | the `--minimal` workflow filters docs with `paths-ignore`, the shape the harness rendering rejects because a required check then waits forever | nothing shipped in a minimal app asks for `android` to be required; fires only if an owner requires it by hand |
+| **KD-302** | UNVERIFIED: a draft push leaves a skipped `android` on the head SHA; after `gh pr ready` that skip may stand until the new run's `scope` finishes | depends on when GitHub creates a `needs:` job's check run — not measured; seconds-wide |
 
 ---
 
@@ -998,3 +1002,63 @@ The repair is to run the CONFLICT check before stage 2 and exit non-zero on any 
 
 **Fires when:** someone adds a package source under a template-owned name and runs a plain sync.
 *Logged 2026-10-21, KD-285 slice review round 2 re-record.*
+
+### KD-299 — on a private Free repository, "must pass before merge" is a convention
+
+`template/.github/workflows/verify.yml` (the `android` job's header), `template/README.md` ("Must pass before merge")
+
+The stamped CI's pre-merge check (`android`, the feature profile) is made binding by `qa/ruleset.json` — which GitHub
+honours on public repositories and paid plans only. On a private repository on GitHub Free there are no rulesets, no
+branch protection and no merge queue, so GitHub cannot block a merge over a red `android`, and the stamped app's own
+hooks do not look at `gh pr merge` either. The README states the rule as a command
+(`gh pr checks <pr> --watch --fail-fast && gh pr merge <pr>`); that is prose read at the moment it matters least. The
+repair is a program at the moment of the merge: a `PreToolUse` hook in the stamped `.claude/settings.json` that refuses
+`gh pr merge <n>` unless `gh pr checks <n>` reports `android` passed or skipped. Not built in the slice that moved the
+CI policy, because the policy's own ask was a trigger that works on Free plus a documented enforcement, and a merge
+hook is a new governed surface with its own review.
+
+**Fires when:** an agent or a person merges a ready PR on a private Free repository before its `android` check is green.
+*Logged 2026-11-14, the feature-scoped CI slice.*
+
+### KD-300 — a manual run and the nightly cancel each other
+
+`template/.github/workflows/verify.yml` (`concurrency`)
+
+The group is `verify-${{ github.event.pull_request.number || github.ref }}` with `cancel-in-progress: true`. A
+`schedule` run and a `workflow_dispatch` run on main both resolve to `verify-refs/heads/main`, so dispatching the
+workflow from the Actions tab while the nightly is in flight cancels the nightly (and a nightly starting during a
+manual run cancels that). Nobody is told something false — a cancelled run reads cancelled, and the next night
+runs — so it does not block; the repair is `${{ github.event_name }}` in the group for non-PR events, or
+`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`.
+
+**Fires when:** someone dispatches Verify on main inside the nightly's window. *Logged 2026-11-14, review round 1 of
+the feature-scoped CI slice.*
+
+### KD-301 — the minimal workflow filters docs with `paths-ignore`, which its own harness twin calls a forever-pending check
+
+`template/.github/workflows/verify.yml` (the `!harness` block under `pull_request`)
+
+The harness rendering filters docs inside the `scope` job precisely because "a workflow that never started would leave
+[a required check] waiting forever". The `--minimal` rendering does the opposite — `paths-ignore: ["**.md", "docs/**"]`
+— so a docs-only PR starts no run and reports no `android` check at all. Nothing shipped in a minimal app tells its
+owner to require `android` (no `qa/ruleset.json`, no README section), so nobody is wrongly served today; an owner who
+requires it by hand gets docs PRs that can never merge, and `harden` replaces the workflow wholesale. The repair, if
+wanted, is the harness's shape: an always-started job that answers skip.
+
+**Fires when:** a minimal app's owner makes `android` a required check by hand and opens a docs-only PR. *Logged
+2026-11-14, review round 1 of the feature-scoped CI slice.*
+
+### KD-302 — UNVERIFIED: a draft run's skipped `android` may stand for a SHA until the ready run's `android` exists
+
+`template/.github/workflows/verify.yml` (`scope` → `android`, `types: [… synchronize, ready_for_review]`)
+
+A push to a DRAFT PR still starts a run (`synchronize` is listed); its `scope` is skipped by `!draft`, so `android` is
+reported **skipped** on that head SHA. `gh pr ready` then starts a second run on the SAME SHA, whose `android` waits on
+`scope`. If GitHub creates a `needs:` job's check run only when the job is scheduled — not measured here — the
+ruleset sees the draft run's skipped `android` (accepted) for the seconds `scope` takes, and a merge in that window
+goes through unchecked. Not verifiable without a live repository, so not a test; the cheap remedy either way is
+`if: github.event.pull_request.draft == false` at the workflow level via `types` (drop runs on drafts entirely) or
+making `android` not depend on `scope` for its existence.
+
+**Fires when:** a PR is marked ready and merged within seconds, on a ruleset-protected repository, if the check-run
+timing above holds. *Logged 2026-11-14, review round 1 of the feature-scoped CI slice.*

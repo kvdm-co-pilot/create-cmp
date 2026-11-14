@@ -647,12 +647,13 @@ test("THE asymmetry, one run: a reopened artifact + a drifted artifact ⇒ gate 
     assert.equal(gate.statuses.find((s) => s.id === "design-system").status, "reopened");
     assert.equal(gate.statuses.find((s) => s.id === "architecture").status, "changed-since-approval");
 
-    // Fix the drift: the reopened artifact alone downgrades the verdict to a
-    // non-blocking SKIP that names it as pending.
+    // Fix the drift: the reopened artifact is non-blocking pending work. Since
+    // 2026-11-14 the verified signature (architecture) makes the row a PASS,
+    // and the reopened one is named as pending — never FAILed.
     assert.equal(approveArtifact(out, "architecture", { approvedBy: "Test Signer <test@example.com>" }).ok, true);
     const gate2 = evaluateApprovalsGate(out);
-    assert.equal(gate2.verdict, "SKIP", "reopened behaves exactly like unreviewed: SKIP with warning, non-blocking");
-    assert.match(gate2.reason, /\[design-system\].*reopened for redesign/, "the SKIP warning explains the reopened state");
+    assert.equal(gate2.verdict, "PASS", "reopened behaves exactly like unreviewed: non-blocking, and the signature that exists is verified");
+    assert.match(gate2.reason, /\[design-system\].*reopened for redesign/, "the note explains the reopened state");
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }

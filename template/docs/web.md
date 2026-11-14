@@ -35,7 +35,7 @@ The verify lane builds the browser app in its `webBuild` step
 any other.
 <!-- <<< cmp:feature harness -->
 <!-- >>> cmp:feature !harness -->
-CI builds the browser app on every push (`./gradlew :composeApp:wasmJsBrowserDistribution`, in
+CI builds the browser app every night (`./gradlew :composeApp:wasmJsBrowserDistribution`, in
 `.github/workflows/verify.yml`).
 <!-- <<< cmp:feature !harness -->
 Previews, golden trees and UI tests run on the JVM tier against the same `commonMain` code the

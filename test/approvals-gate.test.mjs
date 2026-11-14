@@ -123,7 +123,7 @@ test("fresh scaffold: all six static artifacts are unreviewed and the gate SKIPs
   }
 });
 
-test("approve via CLI moves one artifact to approved+match; others stay unreviewed; gate still SKIPs", async () => {
+test("approve via CLI moves one artifact to approved+match; others stay unreviewed; gate PASSes over the one verified signature", async () => {
   const out = await makeProject("cmp-appr-partial-");
   try {
     const approveOut = runApprove(out, ["design-system"]);
@@ -131,7 +131,10 @@ test("approve via CLI moves one artifact to approved+match; others stay unreview
 
     const { evaluateApprovalsGate } = await loadLib(out);
     const gate = evaluateApprovalsGate(out);
-    assert.equal(gate.verdict, "SKIP", "the other 5 artifacts are still unreviewed");
+    // 2026-11-14: the signature that exists is verified, so the row says PASS;
+    // the 5 unreviewed artifacts ride along as a note, non-blocking.
+    assert.equal(gate.verdict, "PASS", "the one signature is verified while the other 5 are still unreviewed");
+    assert.match(gate.note, /1 signature\(s\) verified; 5 artifact\(s\) awaiting approval/);
     const ds = gate.statuses.find((s) => s.id === "design-system");
     assert.equal(ds.status, "approved");
     assert.equal(ds.storedHash, ds.hash);

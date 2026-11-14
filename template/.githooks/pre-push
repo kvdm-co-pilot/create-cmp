@@ -1,33 +1,71 @@
 #!/bin/sh
 # create-cmp pre-push gate — the human checkpoint before code leaves the machine.
 #
-# The committed evidence receipt (qa/evidence/latest.json) must attest HEAD.
-# This is the SAME check CI runs (qa/receipt-check.mjs), moved earlier so an
-# unverified push is caught locally. It is the CHEAP predicate — a hash
-# comparison — not the full lane, so it never rebuilds anything.
+# TWO STRENGTHS, by where the push goes (qa/lib/stop-rule.mjs carries the rule):
+#
+#   the default branch   the committed evidence receipt (qa/evidence/latest.json)
+#                        must attest HEAD — the full lane, the SAME check CI runs
+#                        on a pull request marked ready. Merging is where a feature
+#                        is complete, so this is where the full lane is owed.
+#   any other branch     work in progress: a PASS quick check that attests the tree
+#                        (node qa/verify.mjs --fast) is enough, unless a feature has
+#                        reached Prove — then the full lane is owed here too.
+#
+# Both are the CHEAP predicate — a hash comparison — never a lane run.
 #
 # Enable once with `node qa/setup-hooks.mjs`. Bypass in a pinch with
-# `git push --no-verify`; CI still enforces the same check.
+# `git push --no-verify`; CI still enforces the strict check before merge.
 
 if [ ! -f qa/receipt-check.mjs ]; then
   exit 0 # not a create-cmp project layout — nothing to gate
 fi
 
+# The default branch, as the remote names it; main and master when it cannot be read.
+default=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+
+to_default=0
+pushed=0
+# git feeds one line per ref: <local ref> <local sha> <remote ref> <remote sha>
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  [ -n "$remote_ref" ] || continue
+  pushed=1
+  branch=${remote_ref#refs/heads/}
+  if [ -n "$default" ]; then
+    [ "$branch" = "$default" ] && to_default=1
+  elif [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+    to_default=1
+  fi
+done
+# Nothing named on stdin (an older git, or a hand run): judge it as the strict case.
+[ "$pushed" = 1 ] || to_default=1
+
 # First the half nothing else checks: the receipt must be IN the commit being
 # pushed, not merely on disk. receipt-check reads the working tree by hash and
 # has no opinion about git; this line is what makes "committed receipt" true.
-if ! git ls-files --error-unmatch qa/evidence/latest.json >/dev/null 2>&1 || ! git diff --quiet HEAD -- qa/evidence/latest.json; then
+if [ "$to_default" = 1 ] && { ! git ls-files --error-unmatch qa/evidence/latest.json >/dev/null 2>&1 || ! git diff --quiet HEAD -- qa/evidence/latest.json; }; then
   echo ""
   echo "✗ pre-push blocked — qa/evidence/latest.json is not committed (or differs from HEAD)."
   echo "  Commit the receipt with your change, then push again."
   exit 1
 fi
-if node qa/receipt-check.mjs; then
-  exit 0
+if [ "$to_default" = 1 ]; then
+  if node qa/receipt-check.mjs; then
+    exit 0
+  fi
+  echo ""
+  echo "✗ pre-push blocked — the committed receipt does not attest HEAD (a push to ${default:-the default branch} needs the full lane)."
+  echo "  Run:  node qa/verify.mjs   then commit qa/evidence/latest.json, and push again."
+  echo "  Bypass this local gate with: git push --no-verify  (CI still checks)."
+  exit 1
 fi
 
+# Any other branch: work in progress — the quick check, unless a feature is at Prove.
+if node qa/receipt-check.mjs --quick; then
+  exit 0
+fi
 echo ""
-echo "✗ pre-push blocked — the committed receipt does not attest HEAD."
-echo "  Run:  node qa/verify.mjs   then commit qa/evidence/latest.json, and push again."
-echo "  Bypass this local gate with: git push --no-verify  (CI still checks)."
+echo "✗ pre-push blocked — nothing attests this tree yet."
+echo "  Run:  node qa/verify.mjs --fast   (seconds) and push again — or the full lane if a feature is at Prove."
+echo "  Bypass this local gate with: git push --no-verify  (CI still checks before merge)."
 exit 1
+

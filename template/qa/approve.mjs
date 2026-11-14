@@ -5,8 +5,11 @@
 //                                            records approval (recomputes each artifact's
 //                                            hash now, stamps the time, writes qa/approvals.json).
 //                                            Sign every pending artifact in ONE command: each
-//                                            signature moves the receipt's input hash, so N
-//                                            separate signings cost N lane re-runs.
+//                                            signature moves the receipt's input hash. After a
+//                                            green full run, `node qa/verify.mjs
+//                                            --reattest-approvals` re-issues the receipt in
+//                                            seconds (qa/lib/reattest.mjs) — printed below
+//                                            whenever the ledger is the only change.
 //   node qa/approve.mjs --status            lists every governed artifact + live state
 //                                            (unreviewed / approved / changed-since-approval /
 //                                            reopened, + mode when set) + short hash
@@ -54,9 +57,26 @@ import {
   reopenArtifact,
   reopenFeature,
 } from "./lib/approvals.mjs";
+import { computeInputsHash } from "./lib/inputs-hash.mjs";
+import { readReceipt } from "./lib/receipt-validate.mjs";
+import { REATTEST_HINT, onlyApprovalsChanged } from "./lib/reattest.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
+
+/**
+ * After a write to the ledger: if the receipt was a full PASS and the ledger is
+ * now the only thing it no longer matches, say how to re-attest in seconds
+ * (qa/lib/reattest.mjs). Silent otherwise — and never fatal: a hint that could
+ * fail a signature would be the hint breaking the thing it helps.
+ */
+function printReattestHint() {
+  try {
+    if (onlyApprovalsChanged(readReceipt(ROOT), computeInputsHash(ROOT))) console.log(`\n↻ receipt: ${REATTEST_HINT}`);
+  } catch {
+    /* no receipt, no surface, no git — nothing to offer */
+  }
+}
 
 function shortHash(hash) {
   return hash ? hash.slice(0, 8) : "none";
@@ -151,6 +171,7 @@ if (args.includes("--accept-defaults")) {
     console.log(`→ skipped ${s.id}: ${s.reason}`);
   }
   console.log(`\n${approved.length} approved (defaults-accepted), ${skipped.length} skipped (unresolvable).`);
+  printReattestHint();
   process.exit(0);
 }
 
@@ -191,6 +212,7 @@ if (reopenFlagIdx !== -1) {
     process.exit(1);
   }
   console.log(`↺ reopened ${result.artifact} for redesign — at ${result.reopenedAt}\n  reason: ${reason.trim()}`);
+  printReattestHint();
   process.exit(0);
 }
 
@@ -220,6 +242,7 @@ if (reopenFeatureFlagIdx !== -1) {
   for (const t of result.stillSigned ?? []) {
     console.log(`  ✓ ${t.id} still signed (${t.status}${t.hash ? ` @${t.hash}` : ""}) — re-signature demanded only if it changes; the hash enforces that`);
   }
+  printReattestHint();
   process.exit(0);
 }
 
@@ -298,6 +321,7 @@ for (const { id, result } of results) {
 }
 if (results.length > 1) {
   const signed = results.length - failed.length;
-  console.log(`\n${signed} signature${signed === 1 ? "" : "s"} in one write. Run the lane AFTER signing, not before — a signature moves the receipt's input hash, so signing after a green run costs you that run.`);
+  console.log(`\n${signed} signature${signed === 1 ? "" : "s"} in one write. Run the lane AFTER signing, not before — a signature moves the receipt's input hash, so signing after a green run costs you that run (when the ledger is the only change, node qa/verify.mjs --reattest-approvals buys it back in seconds).`);
 }
+if (failed.length < results.length) printReattestHint();
 if (failed.length) process.exit(1);

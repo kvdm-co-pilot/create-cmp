@@ -245,7 +245,14 @@ test("appending to the journal never moves the receipt's inputs hash", () => {
 test("lane wiring: the entry is appended AFTER the receipt is written, and a failed append is noted, not fatal", () => {
   const verify = laneSrc(path.join(REPO_ROOT, "template"));
   const receiptWrite = verify.indexOf('fs.writeFileSync(path.join(EVIDENCE_DIR, RECEIPT_FILE)');
-  const flightAppend = verify.indexOf("appendFlightRecord(");
+  // The FULL lane's append — searched for after the full lane's receipt write's
+  // own block starts. The --reattest-approvals block (earlier in the file, and
+  // exiting before the full lane) has its own write-then-append pair, pinned
+  // in test/reattest-approvals.test.mjs.
+  const flightAppend = verify.indexOf("appendFlightRecord(", verify.indexOf("const flight = noJournal"));
+  const reattestWrite = verify.indexOf('fs.writeFileSync(path.join(EVIDENCE_DIR, "latest.json")');
+  const reattestAppend = verify.indexOf("appendFlightRecord(", reattestWrite);
+  assert.ok(reattestWrite > 0 && reattestAppend > reattestWrite, "the re-attest also journals after its receipt is written");
   assert.ok(receiptWrite > 0 && flightAppend > receiptWrite, "the journal entry records the final verdict — appended after the receipt");
   assert.match(verify, /flight recorder: journal append failed/, "a failed append surfaces in the lane's own output");
   assert.match(verify, /lane verdict is unaffected/, "and says the lane result stands");

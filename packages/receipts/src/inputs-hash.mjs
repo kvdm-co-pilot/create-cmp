@@ -134,6 +134,24 @@ const EXCLUDED_PREFIXES = [
 // An unparsable ledger falls back to raw bytes — refusal over fabrication.
 const APPROVALS_PROJECTED_PATH = "qa/approvals.json";
 
+/**
+ * The approvals ledger's path, exported because ONE fact now hangs on it twice:
+ * the projection above, and the second digest computeInputsHash returns —
+ * `hashWithoutApprovals`, the same surface with this one file left out.
+ *
+ * Why a second digest exists (2026-11-14): signing an artifact rewrites the
+ * ledger, the ledger is attested, so a signature invalidated the receipt and
+ * the only way back was the whole lane — an Android release build, a web build
+ * and an emulator, ~4 minutes, to re-prove code that had not moved a byte.
+ * A receipt that records this digest lets a later run PROVE that nothing but
+ * the ledger changed (equal digests over every other file) and re-run only the
+ * steps that read the ledger (`node qa/verify.mjs --reattest-approvals`,
+ * qa/lib/reattest.mjs). Without the digest there is no such proof, and the
+ * re-attest refuses. It never replaces `hash`: `hash` is still the binding
+ * every reader checks.
+ */
+export const APPROVALS_LEDGER_PATH = APPROVALS_PROJECTED_PATH;
+
 function projectApprovalsBytes(raw) {
   let parsed;
   try {
@@ -427,7 +445,9 @@ export function undeclaredTopLevel(root, surface = resolveVerifiedSurface(root))
  * Compute the sha256 hash of the verified surface for the project rooted at `root`.
  * Deterministic: same tree (same file paths + same file bytes) → same hash.
  * @param {string} root absolute path to the project root
- * @returns {{ hash: string, fileCount: number }}
+ * @returns {{ hash: string, fileCount: number, hashWithoutApprovals: string }}
+ *   `hashWithoutApprovals` is the same digest with qa/approvals.json left out —
+ *   what an approvals-only re-attest compares (APPROVALS_LEDGER_PATH).
  */
 export function computeInputsHash(root) {
   // Code-unit sort (default String sort), NOT localeCompare: the hash depends
@@ -450,12 +470,17 @@ export function computeInputsHash(root) {
   }
 
   const overall = createHash("sha256");
+  // The same lines, minus the approvals ledger's — see APPROVALS_LEDGER_PATH.
+  // Built in the same pass so the two digests can never be computed over two
+  // different readings of the tree.
+  const withoutApprovals = createHash("sha256");
   for (const relPath of files) {
     const raw = fs.readFileSync(path.join(root, relPath));
     const bytes = relPath === APPROVALS_PROJECTED_PATH ? projectApprovalsBytes(raw) : raw;
     const fileSha = createHash("sha256").update(bytes).digest("hex");
     overall.update(`${relPath}\0${fileSha}\n`);
+    if (relPath !== APPROVALS_PROJECTED_PATH) withoutApprovals.update(`${relPath}\0${fileSha}\n`);
   }
 
-  return { hash: overall.digest("hex"), fileCount: files.length };
+  return { hash: overall.digest("hex"), fileCount: files.length, hashWithoutApprovals: withoutApprovals.digest("hex") };
 }
