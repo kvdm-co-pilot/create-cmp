@@ -14,6 +14,7 @@
 // Injectable exec/fetch for tests; nothing here fabricates device state.
 
 import path from "node:path";
+import { readPin, pinnedAvd, REPIN_HINT } from "prooflane-harness/lib/profiles/cmp/device-pin.mjs";
 
 const HEALTH_TIMEOUT_MS = 900;
 
@@ -115,10 +116,27 @@ export function createLiveSession({
       const attached = stdout.split("\n").slice(1).filter((l) => l.trim().endsWith("device"));
       if (attached.length > 0) return `already attached: ${attached[0].split("\t")[0]}`;
       const { stdout: avds } = await exec("emulator", ["-list-avds"]);
-      const avd = avds.split("\n").map((s) => s.trim()).filter(Boolean)[0];
+      const listed = avds.split("\n").map((s) => s.trim()).filter(Boolean);
+      // The machine's shared device pin, when it opted in (docs/features/shared-device-pin.md):
+      // CMP_AVD first, then the pinned AVD — refused when gone, never substituted.
+      const pin = readPin({ cwd: projectDir });
+      const shared = pinnedAvd(pin);
+      let avd;
+      if (process.env.CMP_AVD) {
+        if (!listed.includes(process.env.CMP_AVD)) throw new Error(`CMP_AVD=${process.env.CMP_AVD} is not an AVD on this machine (have: ${listed.join(", ") || "none"})`);
+        avd = process.env.CMP_AVD;
+      } else if (pin.state === "invalid") {
+        throw new Error(`the device pin at ${pin.path} is invalid (${pin.reason}) — ${REPIN_HINT}, or set CMP_AVD`);
+      } else if (shared) {
+        if (!listed.includes(shared)) throw new Error(`the pinned shared AVD ${shared} is not on this machine (have: ${listed.join(", ") || "none"}) — ${REPIN_HINT}`);
+        avd = shared;
+      } else {
+        avd = listed[0];
+      }
       if (!avd) throw new Error("no device attached and no AVDs exist — create one in Android Studio first");
-      // Detached boot; readiness is the next wait, not this spawn.
-      exec("emulator", ["-avd", avd, "-no-window", "-no-audio"], { detach: true });
+      // Detached boot; readiness is the next wait, not this spawn. The shared
+      // emulator boots wiped, so no other app's state carries into this session.
+      exec("emulator", ["-avd", avd, "-no-window", "-no-audio", ...(avd === shared ? ["-wipe-data"] : [])], { detach: true });
       await exec("adb", ["wait-for-device"], { timeoutMs: 120_000 });
       // sys.boot_completed gate — wait-for-device alone returns during boot animation.
       const deadline = Date.now() + 120_000;

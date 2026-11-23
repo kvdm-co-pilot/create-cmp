@@ -132,7 +132,7 @@
     "androidBuildOnly": "./gradlew :composeApp:assembleDebug",
     "androidSmoke": "./gradlew :composeApp:installDebug && maestro test qa/e2e/smoke.yaml",
     "iosLink": "./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64",
-    "ios": "cd iosApp && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && xcodegen generate && pod install && SIM_UDID=$(xcrun simctl list devices available | grep -Eo '[0-9A-F-]{36}' | head -1) && xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64 -destination \"id=$SIM_UDID\" build",
+    "ios": "SIM_UDID=$(node qa/lib/profiles/cmp/ios-sim.mjs) && cd iosApp && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && xcodegen generate && pod install && xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64 -destination \"id=$SIM_UDID\" build",
     "web": "./gradlew :composeApp:wasmJsBrowserDistribution",
     "iosNote": "On Apple Silicon, the KMP embedAndSignAppleFrameworkForXcode prebuild phase produces ONLY the active-arch (arm64) slice of ComposeApp.framework. A `-destination generic/platform=iOS Simulator` build demands a universal arm64+x86_64 binary and FAILS at CreateUniversalBinary. Constrain to arm64 (ARCHS=arm64 EXCLUDED_ARCHS=x86_64) and target a concrete arm64 simulator UDID — matching the linkDebugFrameworkIosSimulatorArm64 gate."
   },

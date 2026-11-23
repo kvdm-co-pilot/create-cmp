@@ -15,7 +15,7 @@
  * Value flags stay absent and are checked at their call sites with `typeof ===
  * "string"`: profile, target-dir, base-dir, set, specs, receipt, citation-roots,
  * name, package, bundle-id, region, theme-prefix, auth, tabs, google-services,
- * preset.
+ * preset, device-pin.
  */
 export const BOOLEAN_FLAGS = new Set([
   "help", "h", "version", "v",
@@ -56,6 +56,9 @@ export const KNOWN_FLAGS = new Set([
   "minimal", "yes", "y", "force", "fix", "verify", "no-install",
   // `doctor --adherence` — the report card (src/lib/adherence.mjs)
   "adherence",
+  // `doctor --device-pin <status|shared|per-app|repin>` — a VALUE; the machine's shared
+  // device pin (docs/features/shared-device-pin.md)
+  "device-pin",
   // the app shape — a VALUE (`lean` or `full`), never a boolean: it names a set of
   // toggle defaults (src/commands/create.mjs, PRESETS), and `--minimal` is the harness mode
   "preset",

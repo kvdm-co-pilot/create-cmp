@@ -850,6 +850,16 @@ function printFindings(findings) {
  * @param {string|undefined} positional optional target dir positional
  */
 export async function runDoctor(flags, positional) {
+  // The shared device pin is its own mode too: it installs nothing and deletes nothing
+  // (docs/features/shared-device-pin.md). `--yes` is deliberately not read — an opt-in
+  // is never auto-approved.
+  if (flags["device-pin"] !== undefined) {
+    const { runDevicePin } = await import("../lib/device-pin-doctor.mjs");
+    const mode = typeof flags["device-pin"] === "string" ? flags["device-pin"] : "status";
+    const dir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
+    process.exit(await runDevicePin(mode, { projectDir: path.resolve(dir) }));
+  }
+
   // The report card is its own mode: it installs nothing and diagnoses no build.
   if (flagBool(flags, "adherence", false)) {
     const dir = (typeof flags["target-dir"] === "string" && flags["target-dir"]) || positional || ".";
@@ -971,5 +981,29 @@ export async function runDoctor(flags, positional) {
     }
   }
 
+  if (isGradleProjectDir(projectDir)) await offerDevicePin(projectDir, { ask: !flagBool(flags, "fix", false) });
+
   process.exit(toolchain.green && projectGreen && healsRefused.length === 0 ? 0 : 1);
+}
+
+/**
+ * Asked once per PROJECT (K3), at a terminal. A `--fix` run (which asks its own
+ * questions about the app) gets the pointer line instead, as does an agent
+ * session with no terminal to answer in. Never changes the exit code: an
+ * unanswered question is not a broken toolchain.
+ */
+async function offerDevicePin(projectDir, { ask = true } = {}) {
+  const { readPin } = await import("../../packages/harness/src/lib/profiles/cmp/device-pin.mjs");
+  const pin = readPin({ cwd: projectDir });
+  if (pin.state === "shared" || pin.state === "per-app") return;
+  if (!ask || !process.stdin.isTTY) {
+    process.stdout.write(
+      `\n${colors.bold("Shared test devices:")} ${pin.state === "invalid" ? colors.red(`the pin at ${pin.path} is invalid (${pin.reason})`) : "not decided"} — ` +
+        `see the offer for this project with ${colors.bold("create-cmp doctor --device-pin status")}\n`
+    );
+    return;
+  }
+  const { runDevicePin } = await import("../lib/device-pin-doctor.mjs");
+  process.stdout.write("\n");
+  await runDevicePin("ask", { projectDir, prompt: (q) => consent(q, { assumeYes: false }) });
 }

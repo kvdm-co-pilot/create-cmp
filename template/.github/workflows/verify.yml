@@ -330,11 +330,11 @@ jobs:
   #     - run: brew install xcodegen   # CocoaPods is preinstalled on macos-14
   #     - name: Build iOS (simulator)
   #       run: |
+  #         SIM_UDID=$(node qa/lib/profiles/cmp/ios-sim.mjs)
   #         cd iosApp
   #         export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
   #         xcodegen generate
   #         pod install
-  #         SIM_UDID=$(xcrun simctl list devices available | grep -Eo '[0-9A-F-]{36}' | head -1)
   #         xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator \
   #           -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64 \
   #           -destination "id=$SIM_UDID" build

@@ -98,8 +98,42 @@ Two device-side notes that fit here (field lessons, both reproduced on real apps
   The next command is `adb kill-server && adb start-server && adb wait-for-device` — not an
   emulator reboot, not an app fault.
 - **Per-app AVD isolation** — sharing one emulator across different apps' sessions crosses
-  their data and can wedge adbd into false "app crash" symptoms. One AVD per app, named
-  after the app.
+  their data and can wedge adbd into false "app crash" symptoms. That is the default: one AVD
+  per app, named after the app. A project can opt into the machine's ONE shared emulator instead (next
+  section, asked per project), which keeps the isolation by booting it wiped and serializing it
+  with the device lease.
+
+## Shared test devices — asked per project (ask the human; never decide it)
+
+Per-app emulators and stray iOS runtimes cost 3–19 GB each, and filled a real developer's disk four
+times in seven weeks. The machine keeps ONE emulator, ONE simulator and ONE iOS runtime, detected
+from what is installed, and **each project is asked on its own** whether it uses them (the
+decision record is `docs/features/shared-device-pin.md` in the create-cmp repo). Every git worktree of one repo is one project. A project
+never asked keeps the per-app behaviour.
+
+Plain `doctor` inside a project asks at a terminal. **Your session has no terminal**, so you put
+the question — for the project you are working in (`--target-dir <app>`, default the cwd):
+
+1. `node "${CLAUDE_PLUGIN_ROOT}/bin/create-cmp.mjs" doctor --device-pin status --target-dir <app>`
+   — prints the project, whether it was asked, how many other projects share, the **disk check**
+   (free space and every installed emulator, image, runtime and cached runtime download with its
+   size), the shared set, the **pros**, the **cons**, and what sharing would let them reclaim with
+   the exact command for each. It writes nothing.
+2. If it says `decided: not asked yet` (or the user asked to change it), ask with
+   **AskUserQuestion**: two options, "Use the shared devices" and "Keep per-app devices", carrying the
+   pros, the cons, the free space and the reclaimable total from step 1 in the option descriptions.
+   Never pick for them, and never pass `--yes`.
+3. Record it for that project: `doctor --device-pin shared --target-dir <app>` or
+   `--device-pin per-app`. One project's answer never changes another's.
+4. Relay the "Reclaimable" list. **Doctor deletes nothing** — offer to run a removal only when the
+   user asks, one item at a time. A cached runtime download (`AssetsV2`) is protected by System
+   Integrity Protection — `rm` fails there even with `sudo` — so send the user to Xcode → Settings →
+   Components to delete that runtime; never suggest disabling SIP.
+
+When a lane, an iOS build or `connect_live` refuses with "the pinned shared … is not on this
+machine", the device was removed (often by an Xcode or SDK update): with the user's agreement run
+`doctor --device-pin repin`, which re-detects the machine's set from what is installed — it never
+downloads a replacement, and it changes the set for every project that shares it (it says how many).
 
 ## How to run it
 
