@@ -18,6 +18,10 @@
 //   - the AVD is CMP_AVD, else the doctor's `cmp_pixel`, else the only AVD;
 //     several AVDs and no way to choose is a refusal naming them (per-app AVD
 //     isolation: a lane must never guess another app's emulator);
+//   - UNLESS the machine opted into a shared device pin (device-pin.mjs,
+//     docs/features/shared-device-pin.md): then the AVD is CMP_AVD, else the
+//     pinned one — refused, never substituted, when it is gone — and it boots
+//     with -wipe-data, so sharing it across apps carries no state between them;
 //   - boot is bounded (BOOT_BOUND_MS); past it the emulator is killed and the
 //     step rows read ERROR "could not provision a device", which FAILs the
 //     lane — a device that never comes up is a failure to test, not a SKIP.
@@ -27,6 +31,7 @@
 // `spawnImpl`, so the whole decision tree is unit-tested without an SDK.
 
 import { spawn } from "node:child_process";
+import { readPin, pinnedAvd, REPIN_HINT } from "./device-pin.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -37,6 +42,8 @@ export const BOOT_BOUND_MS = 240_000;
 export const PREFERRED_AVD = "cmp_pixel";
 /** Headless, deterministic, no snapshot: every lane boots the same cold device. */
 export const HEADLESS_ARGS = Object.freeze(["-no-window", "-no-audio", "-no-boot-anim", "-no-snapshot", "-gpu", "swiftshader_indirect"]);
+/** A SHARED emulator boots factory-fresh: the isolation per-app AVDs used to buy. */
+export const SHARED_BOOT_ARGS = Object.freeze(["-wipe-data"]);
 
 /**
  * Was an already-attached emulator started headless?
@@ -117,13 +124,22 @@ export function emulatorBinary({ env = process.env, exists = fs.existsSync, home
  * carries another app's state, and a lane driving it crosses sessions.
  * @param {string[]} listed `emulator -list-avds` lines
  * @param {NodeJS.ProcessEnv} env
- * @returns {{ok: true, avd: string} | {ok: false, reason: string}}
+ * @param {{state: string, pin?: object}} [pin] the machine's device pin (readPin)
+ * @returns {{ok: true, avd: string, shared?: boolean} | {ok: false, reason: string}}
  */
-export function chooseAvd(listed, env = process.env) {
+export function chooseAvd(listed, env = process.env, pin = { state: "none" }) {
   const avds = listed.map((l) => l.trim()).filter((l) => l && !l.startsWith("INFO") && !l.startsWith("WARNING"));
+  const shared = pinnedAvd(pin);
   if (env.CMP_AVD) {
-    if (avds.includes(env.CMP_AVD)) return { ok: true, avd: env.CMP_AVD };
+    if (avds.includes(env.CMP_AVD)) return env.CMP_AVD === shared ? { ok: true, avd: env.CMP_AVD, shared: true } : { ok: true, avd: env.CMP_AVD };
     return { ok: false, reason: `CMP_AVD=${env.CMP_AVD} is not an AVD on this machine (have: ${avds.join(", ") || "none"})` };
+  }
+  if (pin && pin.state === "invalid") {
+    return { ok: false, reason: `the device pin at ${pin.path} is invalid (${pin.reason}) — ${REPIN_HINT}, or set CMP_AVD` };
+  }
+  if (shared) {
+    if (avds.includes(shared)) return { ok: true, avd: shared, shared: true };
+    return { ok: false, reason: `the pinned shared AVD ${shared} is not on this machine (have: ${avds.join(", ") || "none"}) — ${REPIN_HINT}; nothing is downloaded or substituted` };
   }
   if (avds.includes(PREFERRED_AVD)) return { ok: true, avd: PREFERRED_AVD };
   if (avds.length === 1) return { ok: true, avd: avds[0] };
@@ -142,7 +158,7 @@ export function chooseAvd(listed, env = process.env) {
  * @returns {{ok: true, serial: string, booted: boolean, avd?: string, pid?: number, bootMs?: number}
  *         | {ok: false, optOut?: boolean, reason: string}}
  */
-export function ensureDevice({ sh, env = process.env, spawnImpl = spawn, sleep = sleepSync, now = Date.now, log = () => {}, bootBoundMs = BOOT_BOUND_MS, exists = fs.existsSync, kill = (pid) => process.kill(pid) } = {}) {
+export function ensureDevice({ sh, env = process.env, spawnImpl = spawn, sleep = sleepSync, now = Date.now, log = () => {}, bootBoundMs = BOOT_BOUND_MS, exists = fs.existsSync, kill = (pid) => process.kill(pid), pin = readPin({ env }) } = {}) {
   if (env.CMP_DEVICE === "none") {
     return { ok: false, optOut: true, reason: "device tier disabled by CMP_DEVICE=none (the one explicit opt-out; a receipt carrying it is never done-evidence)" };
   }
@@ -164,14 +180,15 @@ export function ensureDevice({ sh, env = process.env, spawnImpl = spawn, sleep =
   if (!listing.ok) {
     return { ok: false, reason: `no device attached and the emulator binary could not list AVDs (${bin}) — install the Android emulator (cmp-doctor) or attach a device` };
   }
-  const choice = chooseAvd(listing.out.split("\n"), env);
+  const choice = chooseAvd(listing.out.split("\n"), env, pin);
   if (!choice.ok) return { ok: false, reason: `no device attached and ${choice.reason}` };
 
-  log(`no device attached — booting ${choice.avd} headless (bound ${Math.round(bootBoundMs / 1000)} s)`);
+  const bootArgs = choice.shared ? [...HEADLESS_ARGS, ...SHARED_BOOT_ARGS] : HEADLESS_ARGS;
+  log(`no device attached — booting ${choice.avd} headless${choice.shared ? " (the machine's shared emulator, wiped so no app's state carries over)" : ""} (bound ${Math.round(bootBoundMs / 1000)} s)`);
   const started = now();
   let child;
   try {
-    child = spawnImpl(bin, ["-avd", choice.avd, ...HEADLESS_ARGS], { detached: true, stdio: "ignore" });
+    child = spawnImpl(bin, ["-avd", choice.avd, ...bootArgs], { detached: true, stdio: "ignore" });
     if (typeof child.unref === "function") child.unref();
   } catch (err) {
     return { ok: false, reason: `could not start the emulator (${err && err.message ? err.message : String(err)})` };

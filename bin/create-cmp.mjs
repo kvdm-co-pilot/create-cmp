@@ -305,6 +305,9 @@ function printHelp() {
       `doctor flags:  --yes  --dry-run  --no-ios  --no-install  --target-dir <dir>  --fix\n` +
       `  --adherence   the report card: hooks, pre-push, CI Verify, receipt, credential denies, release acts,\n` +
       `                plugin bytes, cmp-inspector (with --fix: asks per user-scope entry; never shadows an allow)\n` +
+      `  --device-pin status|shared|per-app|repin   does THIS project (--target-dir) use the machine's one shared\n` +
+      `                emulator/simulator/iOS runtime — asked per project, with pros, cons and a disk check;\n` +
+      `                never deletes or downloads\n` +
       `upgrade flags: --target-dir <dir>  --set <id>  --dry-run  --yes  --verify\n` +
       `  --harness mode flags: --target-dir <dir>  --base-dir <extracted-template>  --dry-run  --yes\n` +
       `  (--harness dry-runs by default; conflicts never clobber — they land as *.cmp-new sidecars)\n` +

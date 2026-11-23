@@ -230,6 +230,13 @@ stub (testTag `<slug>_title`) wired into the bottom nav and the Maestro smoke fl
 is no hand-copying step. Turning a placeholder into a real feature is the exemplar-feature
 conversation (§7.4) or, after genesis, the ordinary `add-feature` skill.
 
+**Shared test devices — ask for THIS app.** Every new app is asked on its own whether it
+uses the machine's one shared emulator, simulator and iOS runtime (cmp-doctor, "Shared test
+devices"). Run `node "${CLAUDE_PLUGIN_ROOT}/bin/create-cmp.mjs" doctor --device-pin status
+--target-dir <app>`, put the choice to the user with AskUserQuestion carrying its pros, cons and
+disk numbers, and record it with `--device-pin shared` or `--device-pin per-app`. Never pick for
+them; an unanswered app keeps the per-app behaviour.
+
 ## 5. Start the daily UI loop — the walk below needs it
 
 Before offering the fork, start the loop — the design-language conversation depends on it.

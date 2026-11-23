@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-23
+
+Nothing is published. Rebased onto 0.31.0 (first numbered 0.29.x on its branch). `prooflane-harness` 0.27.0 carries the device pin and the simulator picker; `@create-cmp/inspector` 0.13.0 is its bundle rebuilt with the pin read in `connect_live`.
+
+### Added
+
+- **Shared test devices, opt-in per project** ([docs/features/shared-device-pin.md](docs/features/shared-device-pin.md)).
+  The machine keeps ONE emulator, ONE simulator and ONE iOS runtime, detected from what is installed
+  (never hard-coded), and each project is asked on its own whether it uses them — shown with the
+  pros, the cons and a disk check (free space, what each installed emulator/image/runtime costs,
+  what sharing lets you reclaim and the exact command for each — including the cached runtime
+  download in `AssetsV2` that silently re-installs a deleted iOS runtime).
+  `create-cmp doctor --device-pin status|shared|per-app|repin [--target-dir <app>]`; plain `doctor`
+  asks inside a project never asked, at a terminal; the `cmp-new` skill asks every new app. Answers
+  live per machine in `~/.config/create-cmp/devices.json`, keyed by repo (worktrees share one).
+  `--yes` never answers it. Doctor deletes and downloads nothing.
+- A project that shares gets the machine's devices in its lane, its iOS build and the inspector's
+  `connect_live` (`CMP_AVD` / `CMP_IOS_SIM` still win). The shared emulator boots with
+  `-wipe-data`, so no app's state carries into another's run; a shared device that is gone is a
+  refusal naming `--device-pin repin`, never a download or a substitute.
+
+### Changed
+
+- The template's iOS build no longer takes the first simulator `simctl` prints (`… | head -1`): it
+  asks `qa/lib/profiles/cmp/ios-sim.mjs`, which with no pin picks the first available iPhone on the
+  NEWEST installed runtime. List order had been landing builds on old runtimes, and an app's script
+  naming a device that only exists on an old runtime kept that runtime installed.
+
 ## [0.31.0] - 2026-11-14
 
 Nothing is published. Numbered after `fix/no-local-proof-ritual` (0.30.1, opened first and still
@@ -132,6 +160,7 @@ rebuilt over that harness `lib/`.
   on Slow 4G, against a 2-second phone target. That target is met on wifi and missed on
   mobile data. The stamped app's `docs/web.md` carries the numbers and what helps.
 
+||||||| parent of 330b88b (feat(doctor): opt-in shared device pin — one emulator, simulator and iOS runtime per machine, detected from what is installed)
 ## [0.28.12] - 2026-10-13
 
 Nothing is published. `prooflane-harness` 0.23.8 carries the watch's red rows and the machine-class deadlines; `@create-cmp/inspector` 0.9.5 is its bundle rebuilt over that harness `lib/`.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GENERATED — do not edit. Built by inspector/mcp/scripts/build-bundle.mjs.
 // Edit bin/server.mjs or src/**, then: npm run build:bundle (and commit this file).
-// cmp:bundle-inputs aac83cda752131d793a9741547d4443da4ac5fcb72b783554ef290e2a6238bff
+// cmp:bundle-inputs 19b2d84e48601b27cef7bbc0a1af510fb64f4194d99f130adbe18681c5b6f915
 import { createRequire as __cmpCreateRequire } from "node:module";
 const require = __cmpCreateRequire(import.meta.url);
 
@@ -3235,8 +3235,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path25) {
-      let input = path25;
+    function removeDotSegments(path26) {
+      let input = path26;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3488,8 +3488,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path25, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path25 && path25 !== "/" ? path25 : void 0;
+        const [path26, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path26 && path26 !== "/" ? path26 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6882,12 +6882,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs23, exportName) {
+    function addFormats(ajv, list, fs24, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs23[f]);
+        ajv.addFormat(f, fs24[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7254,8 +7254,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path25, errorMaps, issueData } = params;
-  const fullPath = [...path25, ...issueData.path || []];
+  const { data, path: path26, errorMaps, issueData } = params;
+  const fullPath = [...path26, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7370,11 +7370,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path25, key) {
+  constructor(parent, value, path26, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path25;
+    this._path = path26;
     this._key = key;
   }
   get path() {
@@ -11294,10 +11294,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path25) {
-  if (!path25)
+function getElementAtPath(obj, path26) {
+  if (!path26)
     return obj;
-  return path25.reduce((acc, key) => acc?.[key], obj);
+  return path26.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11706,11 +11706,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path25, issues) {
+function prefixIssues(path26, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path25);
+    iss.path.unshift(path26);
     return iss;
   });
 }
@@ -11857,16 +11857,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path25 = []) => {
+  const processError = (error52, path26 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path25, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path26, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path25, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path26, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path25, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path26, ...issue2.path]);
       } else {
-        const fullpath = [...path25, ...issue2.path];
+        const fullpath = [...path26, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -11893,17 +11893,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path25 = []) => {
+  const processError = (error52, path26 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path25, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path26, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path25, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path26, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path25, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path26, ...issue2.path]);
       } else {
-        const fullpath = [...path25, ...issue2.path];
+        const fullpath = [...path26, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -11935,8 +11935,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path25 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path25) {
+  const path26 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path26) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -25061,13 +25061,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path25 = ref.slice(1).split("/").filter(Boolean);
-  if (path25.length === 0) {
+  const path26 = ref.slice(1).split("/").filter(Boolean);
+  if (path26.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path25[0] === defsKey) {
-    const key = path25[1];
+  if (path26[0] === defsKey) {
+    const key = path26[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -31014,11 +31014,11 @@ function* walk(tree) {
   if (!root || typeof root !== "object") return;
   yield* walkNode(root, "root");
 }
-function* walkNode(node, path25) {
-  yield { node, path: path25 };
+function* walkNode(node, path26) {
+  yield { node, path: path26 };
   const children = Array.isArray(node.children) ? node.children : [];
   for (let i = 0; i < children.length; i++) {
-    yield* walkNode(children[i], `${path25}.children[${i}]`);
+    yield* walkNode(children[i], `${path26}.children[${i}]`);
   }
 }
 function findByTestTag(tree, tag) {
@@ -31057,18 +31057,18 @@ function layoutGaps(a, b) {
 }
 function siblingLayoutGaps(tree) {
   const out = [];
-  const visit = (node, path25) => {
+  const visit = (node, path26) => {
     const children = Array.isArray(node.children) ? node.children : [];
     const tagged = children.filter((c) => c && c.testTag != null && c.bounds);
     for (let i = 0; i + 1 < tagged.length; i++) {
       out.push({
-        parentPath: path25,
+        parentPath: path26,
         a: tagged[i].testTag,
         b: tagged[i + 1].testTag,
         gaps: layoutGaps(tagged[i], tagged[i + 1])
       });
     }
-    children.forEach((c, i) => c && visit(c, `${path25}.children[${i}]`));
+    children.forEach((c, i) => c && visit(c, `${path26}.children[${i}]`));
   };
   if (tree && tree.root) visit(tree.root, "root");
   return out;
@@ -31142,9 +31142,9 @@ function auditA11y(tree, opts = {}) {
   const violations = [];
   const warnings = [];
   let passCount = 0;
-  for (const { node, path: path25 } of walk(tree)) {
+  for (const { node, path: path26 } of walk(tree)) {
     const entryBase = {
-      path: path25,
+      path: path26,
       testTag: node.testTag ?? null,
       bounds: node.bounds ?? null
     };
@@ -31556,16 +31556,16 @@ function diffTrees(currentTree, goldenTree, tolerancePx = 1) {
   diffNode(cur, gold, "root", tol, diffs);
   return diffs;
 }
-function diffNode(cur, gold, path25, tol, out) {
+function diffNode(cur, gold, path26, tol, out) {
   if (cur.testTag !== gold.testTag) {
-    out.push({ path: path25, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
+    out.push({ path: path26, kind: "testTag-changed", before: gold.testTag, after: cur.testTag });
   }
   if (cur.text !== gold.text) {
-    out.push({ path: path25, kind: "text-changed", before: gold.text, after: cur.text });
+    out.push({ path: path26, kind: "text-changed", before: gold.text, after: cur.text });
   }
   if (cur.contentDescription !== gold.contentDescription) {
     out.push({
-      path: path25,
+      path: path26,
       kind: "contentDescription-changed",
       before: gold.contentDescription,
       after: cur.contentDescription
@@ -31573,29 +31573,29 @@ function diffNode(cur, gold, path25, tol, out) {
   }
   const roleB = gold.role ?? null;
   const roleA = cur.role ?? null;
-  if (roleA !== roleB) out.push({ path: path25, kind: "role-changed", before: roleB, after: roleA });
+  if (roleA !== roleB) out.push({ path: path26, kind: "role-changed", before: roleB, after: roleA });
   const clickB = gold.clickable ?? false;
   const clickA = cur.clickable ?? false;
-  if (clickA !== clickB) out.push({ path: path25, kind: "clickable-changed", before: clickB, after: clickA });
+  if (clickA !== clickB) out.push({ path: path26, kind: "clickable-changed", before: clickB, after: clickA });
   const disB = gold.disabled ?? false;
   const disA = cur.disabled ?? false;
-  if (disA !== disB) out.push({ path: path25, kind: "disabled-changed", before: disB, after: disA });
+  if (disA !== disB) out.push({ path: path26, kind: "disabled-changed", before: disB, after: disA });
   if (JSON.stringify(cur.designToken) !== JSON.stringify(gold.designToken)) {
-    out.push({ path: path25, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
+    out.push({ path: path26, kind: "designToken-changed", before: gold.designToken, after: cur.designToken });
   }
   const moved = boundsMovedBeyond(cur.bounds, gold.bounds, tol);
   if (moved) {
-    out.push({ path: path25, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
+    out.push({ path: path26, kind: "bounds-moved", before: gold.bounds, after: cur.bounds });
   }
   const curKids = cur.children || [];
   const goldKids = gold.children || [];
   const shared = Math.min(curKids.length, goldKids.length);
   for (let i = 0; i < shared; i++) {
-    diffNode(curKids[i], goldKids[i], `${path25}.children[${i}]`, tol, out);
+    diffNode(curKids[i], goldKids[i], `${path26}.children[${i}]`, tol, out);
   }
   for (let i = shared; i < curKids.length; i++) {
     out.push({
-      path: `${path25}.children[${i}]`,
+      path: `${path26}.children[${i}]`,
       kind: "node-added",
       before: null,
       after: summarize(curKids[i])
@@ -31603,7 +31603,7 @@ function diffNode(cur, gold, path25, tol, out) {
   }
   for (let i = shared; i < goldKids.length; i++) {
     out.push({
-      path: `${path25}.children[${i}]`,
+      path: `${path26}.children[${i}]`,
       kind: "node-removed",
       before: summarize(goldKids[i]),
       after: null
@@ -31649,8 +31649,8 @@ function parsePngHeader(buf) {
   }
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
-function readPngMeta(path25) {
-  const abs = resolve(path25);
+function readPngMeta(path26) {
+  const abs = resolve(path26);
   let buf;
   try {
     buf = readFileSync3(abs);
@@ -32110,9 +32110,9 @@ function renderTreeSvg(tree, opts = {}) {
   const originY = LEGEND_H + MARGIN / 2;
   let nodeCount = 0;
   const body = [];
-  for (const { node, path: path25 } of walk(root)) {
+  for (const { node, path: path26 } of walk(root)) {
     nodeCount++;
-    if (depthOf(path25) > maxDepth) continue;
+    if (depthOf(path26) > maxDepth) continue;
     const b = node.bounds;
     const w = boundsDim(b, "width");
     const h = boundsDim(b, "height");
@@ -32123,10 +32123,10 @@ function renderTreeSvg(tree, opts = {}) {
     const sh = h * scale;
     const tokenized = node.designToken != null;
     const clickable = node.clickable === true;
-    const rules = violationsByPath.get(path25);
+    const rules = violationsByPath.get(path26);
     const base = tokenized ? STYLE.tokenized : STYLE.plain;
     body.push(
-      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path25)}"/>`
+      `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(sw)}" height="${fmt(sh)}" fill="${base.fill}" stroke="${base.stroke}" stroke-width="${base.strokeWidth}"${tokenized ? ` class="tokenized"` : ""} data-path="${esc2(path26)}"/>`
     );
     if (clickable) {
       body.push(
@@ -32217,8 +32217,8 @@ var ABBREV = {
 function abbrev(key) {
   return ABBREV[key] ?? key;
 }
-function depthOf(path25) {
-  return (path25.match(/\.children\[/g) || []).length;
+function depthOf(path26) {
+  return (path26.match(/\.children\[/g) || []).length;
 }
 function boundsDim(b, key) {
   return b && typeof b[key] === "number" ? b[key] : 0;
@@ -32238,9 +32238,9 @@ function countRenderable(tree, opts = {}) {
   const maxDepth = typeof opts.maxDepth === "number" && opts.maxDepth >= 0 ? opts.maxDepth : Infinity;
   let total = 0;
   let drawn = 0;
-  for (const { node, path: path25 } of walk(root)) {
+  for (const { node, path: path26 } of walk(root)) {
     total++;
-    if (depthOf(path25) > maxDepth) continue;
+    if (depthOf(path26) > maxDepth) continue;
     if (boundsDim(node.bounds, "width") > 0 && boundsDim(node.bounds, "height") > 0) drawn++;
   }
   return { total, drawn };
@@ -32318,10 +32318,10 @@ function parseLogcat(raw, opts = {}) {
 
 // src/lib/preview-service.mjs
 import crypto from "node:crypto";
-import fs22 from "node:fs";
+import fs23 from "node:fs";
 import http from "node:http";
 import os3 from "node:os";
-import path24 from "node:path";
+import path25 from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 import { promisify } from "node:util";
@@ -32426,7 +32426,7 @@ function diffAgainstDesignSystem(tree, catalog) {
   const colors = catalog && catalog.colors || {};
   const dimens = catalog && catalog.dimens || {};
   const out = [];
-  for (const { node, path: path25 } of walk(tree)) {
+  for (const { node, path: path26 } of walk(tree)) {
     const dt = node.designToken;
     if (!dt || !Array.isArray(dt.tokens) || dt.tokens.length === 0) continue;
     const resolved = dt.resolved && typeof dt.resolved === "object" ? dt.resolved : {};
@@ -32440,7 +32440,7 @@ function diffAgainstDesignSystem(tree, catalog) {
       const matches = resolvedValues.includes(declaredNorm);
       if (!matches) {
         out.push({
-          path: path25,
+          path: path26,
           token,
           declared,
           // report the node's resolved value most likely intended for this token:
@@ -36109,7 +36109,94 @@ function getWalkthroughData(projectDir, { limit = 8 } = {}) {
 }
 
 // src/lib/live-session.mjs
+import path21 from "node:path";
+
+// ../../packages/harness/src/lib/profiles/cmp/device-pin.mjs
+import { execSync } from "node:child_process";
+import fs19 from "node:fs";
 import path20 from "node:path";
+var PIN_SCHEMA = "cmp-devices/1";
+var PROJECT_MODES = Object.freeze(["shared", "per-app"]);
+var REPIN_HINT = "run cmp-doctor (`create-cmp doctor --device-pin repin`)";
+function pinPath({ env = process.env } = {}) {
+  if (env.CMP_DEVICE_PIN) return path20.resolve(env.CMP_DEVICE_PIN);
+  const base = env.XDG_CONFIG_HOME || (env.HOME ? path20.join(env.HOME, ".config") : null);
+  return base ? path20.join(base, "create-cmp", "devices.json") : null;
+}
+function devicesProblem(devices) {
+  if (!devices || typeof devices !== "object") return "not an object";
+  if (!devices.android && !devices.ios) return "the device set pins neither an Android nor an iOS device";
+  if (devices.android && (typeof devices.android.avd !== "string" || !devices.android.avd)) return "devices.android.avd is missing";
+  if (devices.ios) {
+    const s = devices.ios.simulator;
+    if (typeof devices.ios.runtime !== "string" || !s || typeof s.udid !== "string" || !s.udid) return "devices.ios.runtime or devices.ios.simulator.udid is missing";
+  }
+  return null;
+}
+function pinFileProblem(file2) {
+  if (!file2 || typeof file2 !== "object" || Array.isArray(file2)) return "not a JSON object";
+  if (file2.schema !== PIN_SCHEMA) return `schema is ${JSON.stringify(file2.schema)}, expected "${PIN_SCHEMA}"`;
+  if (file2.devices !== null && file2.devices !== void 0) {
+    const p = devicesProblem(file2.devices);
+    if (p) return p;
+  }
+  if (!file2.projects || typeof file2.projects !== "object" || Array.isArray(file2.projects)) return "projects is not an object";
+  for (const [key, v] of Object.entries(file2.projects)) {
+    if (!v || !PROJECT_MODES.includes(v.mode)) return `project ${key}: mode is ${JSON.stringify(v && v.mode)}, expected one of ${PROJECT_MODES.join(", ")}`;
+  }
+  return null;
+}
+var emptyPinFile = () => ({ schema: PIN_SCHEMA, devices: null, projects: {} });
+function readPinFile({ env = process.env, readFile = fs19.readFileSync } = {}) {
+  const file2 = pinPath({ env });
+  if (!file2) return { state: "none", path: null, file: emptyPinFile() };
+  let raw;
+  try {
+    raw = readFile(file2, "utf8");
+  } catch (err) {
+    if (err && err.code === "ENOENT") return { state: "none", path: file2, file: emptyPinFile() };
+    return { state: "invalid", path: file2, reason: `unreadable (${err && err.code ? err.code : String(err)})` };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { state: "invalid", path: file2, reason: "not valid JSON" };
+  }
+  const problem = pinFileProblem(parsed);
+  if (problem) return { state: "invalid", path: file2, reason: problem };
+  return { state: "ok", path: file2, file: parsed };
+}
+function projectKey(dir, { sh = defaultSh } = {}) {
+  const abs = path20.resolve(dir);
+  const r = sh(`git -C ${JSON.stringify(abs)} rev-parse --path-format=absolute --git-common-dir`, { timeout: 1e4 });
+  const common = r.ok ? String(r.out).trim() : "";
+  if (!common) return abs;
+  return path20.basename(common) === ".git" ? path20.dirname(common) : common;
+}
+function readPin({ env = process.env, readFile = fs19.readFileSync, cwd = process.cwd(), sh = defaultSh, key } = {}) {
+  const f = readPinFile({ env, readFile });
+  if (f.state === "invalid") return { state: "invalid", path: f.path, reason: f.reason };
+  if (!f.path) return { state: "none", path: null };
+  const project = key || projectKey(cwd, { sh });
+  const entry = f.file.projects[project];
+  if (!entry) return { state: "none", path: f.path, project };
+  if (entry.mode === "per-app") return { state: "per-app", path: f.path, project };
+  if (!f.file.devices) return { state: "invalid", path: f.path, project, reason: "this project chose shared devices, but no device set is pinned" };
+  return { state: "shared", path: f.path, project, pin: f.file.devices };
+}
+function defaultSh(cmd, { timeout = 12e4 } = {}) {
+  try {
+    return { ok: true, out: execSync(cmd, { encoding: "utf8", timeout, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 }) };
+  } catch (err) {
+    return { ok: false, out: String(err && err.stdout || "") };
+  }
+}
+function pinnedAvd(read) {
+  return read && read.state === "shared" && read.pin.android ? read.pin.android.avd : null;
+}
+
+// src/lib/live-session.mjs
 var HEALTH_TIMEOUT_MS = 900;
 async function getLiveDeviceStatus({ port = 9500, fetchImpl = fetch } = {}) {
   const url2 = `http://127.0.0.1:${port}/inspect/health`;
@@ -36187,9 +36274,23 @@ function createLiveSession({
       const attached = stdout.split("\n").slice(1).filter((l) => l.trim().endsWith("device"));
       if (attached.length > 0) return `already attached: ${attached[0].split("	")[0]}`;
       const { stdout: avds } = await exec("emulator", ["-list-avds"]);
-      const avd = avds.split("\n").map((s) => s.trim()).filter(Boolean)[0];
+      const listed = avds.split("\n").map((s) => s.trim()).filter(Boolean);
+      const pin = readPin({ cwd: projectDir });
+      const shared = pinnedAvd(pin);
+      let avd;
+      if (process.env.CMP_AVD) {
+        if (!listed.includes(process.env.CMP_AVD)) throw new Error(`CMP_AVD=${process.env.CMP_AVD} is not an AVD on this machine (have: ${listed.join(", ") || "none"})`);
+        avd = process.env.CMP_AVD;
+      } else if (pin.state === "invalid") {
+        throw new Error(`the device pin at ${pin.path} is invalid (${pin.reason}) \u2014 ${REPIN_HINT}, or set CMP_AVD`);
+      } else if (shared) {
+        if (!listed.includes(shared)) throw new Error(`the pinned shared AVD ${shared} is not on this machine (have: ${listed.join(", ") || "none"}) \u2014 ${REPIN_HINT}`);
+        avd = shared;
+      } else {
+        avd = listed[0];
+      }
       if (!avd) throw new Error("no device attached and no AVDs exist \u2014 create one in Android Studio first");
-      exec("emulator", ["-avd", avd, "-no-window", "-no-audio"], { detach: true });
+      exec("emulator", ["-avd", avd, "-no-window", "-no-audio", ...avd === shared ? ["-wipe-data"] : []], { detach: true });
       await exec("adb", ["wait-for-device"], { timeoutMs: 12e4 });
       const deadline = Date.now() + 12e4;
       while (Date.now() < deadline) {
@@ -36229,11 +36330,11 @@ function createLiveSession({
     });
   }
   async function resolveAppId2() {
-    const fs23 = await import("node:fs");
+    const fs24 = await import("node:fs");
     for (const f of ["composeApp/build.gradle.kts", "composeApp/build.gradle"]) {
-      const p = path20.join(projectDir, f);
-      if (!fs23.existsSync(p)) continue;
-      const m = fs23.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
+      const p = path21.join(projectDir, f);
+      if (!fs24.existsSync(p)) continue;
+      const m = fs24.readFileSync(p, "utf8").match(/applicationId\s*=?\s*"([^"]+)"/);
       if (m) return m[1];
     }
     throw new Error("could not resolve applicationId from composeApp/build.gradle(.kts)");
@@ -36340,11 +36441,11 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
   }
   let openComments = null;
   try {
-    const fs23 = await import("node:fs");
-    const path25 = await import("node:path");
-    const ledger = path25.join(projectDir, "qa", "comments.json");
-    if (fs23.existsSync(ledger)) {
-      const data = JSON.parse(fs23.readFileSync(ledger, "utf8"));
+    const fs24 = await import("node:fs");
+    const path26 = await import("node:path");
+    const ledger = path26.join(projectDir, "qa", "comments.json");
+    if (fs24.existsSync(ledger)) {
+      const data = JSON.parse(fs24.readFileSync(ledger, "utf8"));
       openComments = (data.comments ?? []).filter((c) => c.status === "open").length;
     }
   } catch {
@@ -36354,15 +36455,15 @@ async function getDigestData(projectDir, { execFileAsync: execFileAsync3, sinceD
 }
 
 // src/lib/approval-diff.mjs
-import fs19 from "node:fs";
+import fs20 from "node:fs";
 import os2 from "node:os";
-import path21 from "node:path";
+import path22 from "node:path";
 import { pathToFileURL as pathToFileURL5 } from "node:url";
 var SEARCH_DEPTH = 120;
 var MAX_DIFF_LINES = 400;
 async function importProjectApprovals(projectDir) {
-  const lib = path21.join(projectDir, "qa", "lib", "approvals.mjs");
-  if (!fs19.existsSync(lib)) return null;
+  const lib = path22.join(projectDir, "qa", "lib", "approvals.mjs");
+  if (!fs20.existsSync(lib)) return null;
   try {
     return await import(pathToFileURL5(lib).href);
   } catch {
@@ -36370,13 +36471,13 @@ async function importProjectApprovals(projectDir) {
   }
 }
 async function materialize(git2, sha, relFiles, alsoNeeded) {
-  const tmp = fs19.mkdtempSync(path21.join(os2.tmpdir(), "cmp-approval-anchor-"));
+  const tmp = fs20.mkdtempSync(path22.join(os2.tmpdir(), "cmp-approval-anchor-"));
   for (const rel of [...relFiles, ...alsoNeeded]) {
     try {
       const { stdout } = await git2(["show", `${sha}:${rel}`]);
-      const dest = path21.join(tmp, rel);
-      fs19.mkdirSync(path21.dirname(dest), { recursive: true });
-      fs19.writeFileSync(dest, stdout);
+      const dest = path22.join(tmp, rel);
+      fs20.mkdirSync(path22.dirname(dest), { recursive: true });
+      fs20.writeFileSync(dest, stdout);
     } catch {
     }
   }
@@ -36428,7 +36529,7 @@ async function getApprovalAnchoredDiff(projectDir, artifactId, { execFileAsync: 
       }
     } catch {
     } finally {
-      if (tmp) fs19.rmSync(tmp, { recursive: true, force: true });
+      if (tmp) fs20.rmSync(tmp, { recursive: true, force: true });
     }
   }
   return {
@@ -39787,8 +39888,8 @@ ${section.bodyHtml}`;
 }
 
 // src/lib/design-language.mjs
-import fs20 from "node:fs";
-import path22 from "node:path";
+import fs21 from "node:fs";
+import path23 from "node:path";
 function findDeclaringObject(fileTexts, tokenNames) {
   if (tokenNames.length === 0) return null;
   let best = null;
@@ -39831,7 +39932,7 @@ function countReferences(fileTexts, objectName, tokenNames) {
   return counts;
 }
 function getTokenUsage(root, catalog = {}) {
-  const kotlinRoot = path22.join(root, "composeApp", "src", "commonMain", "kotlin");
+  const kotlinRoot = path23.join(root, "composeApp", "src", "commonMain", "kotlin");
   const files = walkKtFiles(kotlinRoot);
   if (files.length === 0) {
     return { available: false, reason: "no .kt files found under composeApp/src/commonMain/kotlin" };
@@ -39839,11 +39940,11 @@ function getTokenUsage(root, catalog = {}) {
   const fileTexts = /* @__PURE__ */ new Map();
   for (const f of files) {
     try {
-      fileTexts.set(f, fs20.readFileSync(f, "utf8"));
+      fileTexts.set(f, fs21.readFileSync(f, "utf8"));
     } catch {
     }
   }
-  const rel = (abs) => path22.relative(root, abs).split(path22.sep).join("/");
+  const rel = (abs) => path23.relative(root, abs).split(path23.sep).join("/");
   const group = (tokens) => {
     const names = Object.keys(tokens || {});
     const decl = findDeclaringObject(fileTexts, names);
@@ -39859,8 +39960,8 @@ function getTokenUsage(root, catalog = {}) {
 }
 
 // src/lib/intent.mjs
-import fs21 from "node:fs";
-import path23 from "node:path";
+import fs22 from "node:fs";
+import path24 from "node:path";
 var INTENT_REL_PATH = "specs/intent.md";
 var PLACEHOLDER_LEAD_RE = /^_not yet captured[^_]*_\s*/i;
 function parseIntentMarkdown(md) {
@@ -39902,10 +40003,10 @@ function parseIntentMarkdown(md) {
   };
 }
 function getIntentData(root) {
-  const file2 = path23.join(root, "specs", "intent.md");
+  const file2 = path24.join(root, "specs", "intent.md");
   let raw;
   try {
-    raw = fs21.readFileSync(file2, "utf8");
+    raw = fs22.readFileSync(file2, "utf8");
   } catch {
     return { available: false, reason: `${INTENT_REL_PATH} not found` };
   }
@@ -39949,8 +40050,8 @@ var MAX_TRANSIENT_RETRIES = 12;
 var STUCK_RETRY_MS = 3e4;
 var RENDER_MARKER_REL = ["composeApp", "build", ".cmp-render-in-progress"];
 function consoleRegistryPath(projectDir) {
-  const key = crypto.createHash("sha1").update(path24.resolve(projectDir)).digest("hex").slice(0, 12);
-  return path24.join(os3.tmpdir(), `cmp-console-${key}.json`);
+  const key = crypto.createHash("sha1").update(path25.resolve(projectDir)).digest("hex").slice(0, 12);
+  return path25.join(os3.tmpdir(), `cmp-console-${key}.json`);
 }
 async function treeState(projectDir) {
   try {
@@ -39973,7 +40074,7 @@ function processAlive(pid) {
 async function findLiveConsole(projectDir, { probe } = {}) {
   let rec;
   try {
-    rec = JSON.parse(fs22.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+    rec = JSON.parse(fs23.readFileSync(consoleRegistryPath(projectDir), "utf8"));
   } catch {
     return null;
   }
@@ -39986,7 +40087,7 @@ async function findLiveConsole(projectDir, { probe } = {}) {
       await new Promise((r) => setTimeout(r, RENEW_REJOIN_POLL_MS));
       let fresh;
       try {
-        fresh = JSON.parse(fs22.readFileSync(consoleRegistryPath(projectDir), "utf8"));
+        fresh = JSON.parse(fs23.readFileSync(consoleRegistryPath(projectDir), "utf8"));
       } catch {
         continue;
       }
@@ -39999,18 +40100,18 @@ async function findLiveConsole(projectDir, { probe } = {}) {
   return null;
 }
 function consoleLauncherPath() {
-  const here = path24.dirname(fileURLToPath2(import.meta.url));
+  const here = path25.dirname(fileURLToPath2(import.meta.url));
   const candidates = [
-    path24.join(here, "..", "..", "bin", "console.mjs"),
+    path25.join(here, "..", "..", "bin", "console.mjs"),
     // src/lib/ → package root
-    path24.join(here, "..", "bin", "console.mjs"),
+    path25.join(here, "..", "bin", "console.mjs"),
     // dist/ → package root
-    path24.join(here, "console.mjs")
+    path25.join(here, "console.mjs")
     // bin/ (defensive)
   ];
   for (const c of candidates) {
     try {
-      if (fs22.existsSync(c)) return c;
+      if (fs23.existsSync(c)) return c;
     } catch {
     }
   }
@@ -40027,7 +40128,7 @@ async function ensureConsole(projectDir, opts = {}) {
       log("ensureConsole: no standalone launcher found beside this build \u2014 skipping");
       return null;
     }
-    const args = [launcher, path24.resolve(projectDir)];
+    const args = [launcher, path25.resolve(projectDir)];
     if (typeof port === "number") args.push(String(port));
     if (hot === true) args.push("--hot");
     const child = spawnImpl(process.execPath, args, { detached: true, stdio: "ignore" });
@@ -40048,9 +40149,9 @@ async function ensureConsole(projectDir, opts = {}) {
 }
 function writeConsoleRegistry(projectDir, port, extra = {}) {
   try {
-    fs22.writeFileSync(
+    fs23.writeFileSync(
       consoleRegistryPath(projectDir),
-      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path24.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
+      `${JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}/`, projectDir: path25.resolve(projectDir), startedAt: (/* @__PURE__ */ new Date()).toISOString(), build: LOADED_BUILD.id, buildStale: false, ...extra })}
 `
     );
   } catch {
@@ -40059,9 +40160,9 @@ function writeConsoleRegistry(projectDir, port, extra = {}) {
 function updateConsoleRegistry(projectDir, patch) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs22.readFileSync(p, "utf8"));
+    const rec = JSON.parse(fs23.readFileSync(p, "utf8"));
     if (!rec || rec.pid !== process.pid) return;
-    fs22.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
+    fs23.writeFileSync(p, `${JSON.stringify({ ...rec, ...patch })}
 `);
   } catch {
   }
@@ -40069,16 +40170,16 @@ function updateConsoleRegistry(projectDir, patch) {
 function clearConsoleRegistry(projectDir) {
   try {
     const p = consoleRegistryPath(projectDir);
-    const rec = JSON.parse(fs22.readFileSync(p, "utf8"));
-    if (rec && rec.pid === process.pid) fs22.rmSync(p, { force: true });
+    const rec = JSON.parse(fs23.readFileSync(p, "utf8"));
+    if (rec && rec.pid === process.pid) fs23.rmSync(p, { force: true });
   } catch {
   }
 }
 function stampRenderMarker(projectDir) {
   try {
-    const p = path24.join(projectDir, ...RENDER_MARKER_REL);
-    fs22.mkdirSync(path24.dirname(p), { recursive: true });
-    fs22.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+    const p = path25.join(projectDir, ...RENDER_MARKER_REL);
+    fs23.mkdirSync(path25.dirname(p), { recursive: true });
+    fs23.writeFileSync(p, `${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   } catch {
   }
@@ -40086,31 +40187,31 @@ function stampRenderMarker(projectDir) {
 function touchRenderMarker(projectDir) {
   try {
     const now = /* @__PURE__ */ new Date();
-    fs22.utimesSync(path24.join(projectDir, ...RENDER_MARKER_REL), now, now);
+    fs23.utimesSync(path25.join(projectDir, ...RENDER_MARKER_REL), now, now);
   } catch {
   }
 }
 function clearRenderMarker(projectDir) {
   try {
-    fs22.rmSync(path24.join(projectDir, ...RENDER_MARKER_REL), { force: true });
+    fs23.rmSync(path25.join(projectDir, ...RENDER_MARKER_REL), { force: true });
   } catch {
   }
 }
 function resolveAppName(projectDir) {
   for (const f of ["settings.gradle.kts", "settings.gradle"]) {
     try {
-      const text = fs22.readFileSync(path24.join(projectDir, f), "utf8");
+      const text = fs23.readFileSync(path25.join(projectDir, f), "utf8");
       const m = text.match(/rootProject\.name\s*=\s*["']([^"']+)["']/);
       if (m) return m[1];
     } catch {
     }
   }
-  return path24.basename(projectDir);
+  return path25.basename(projectDir);
 }
 function detectCapabilities(projectDir) {
   const has = (rel) => {
     try {
-      return fs22.statSync(path24.join(projectDir, rel)).isDirectory();
+      return fs23.statSync(path25.join(projectDir, rel)).isDirectory();
     } catch {
       return false;
     }
@@ -40119,7 +40220,7 @@ function detectCapabilities(projectDir) {
 }
 function laneInProgress(projectDir, { now = Date.now } = {}) {
   try {
-    const st = fs22.statSync(path24.join(projectDir, ...LANE_MARKER_REL));
+    const st = fs23.statSync(path25.join(projectDir, ...LANE_MARKER_REL));
     return now() - st.mtimeMs < LANE_MARKER_STALE_MS2;
   } catch {
     return false;
@@ -40132,22 +40233,22 @@ async function withKspSelfHeal(projectDir, log, run) {
     const text = `${err && err.message ? err.message : err}${err && err.stdout ? err.stdout : ""}${err && err.stderr ? err.stderr : ""}`;
     if (!KSP_COLLISION_RE.test(text)) throw err;
     log("KSP cache collision (concurrent Gradle \u2014 verify lane?) \u2014 clearing kspCaches, retrying once");
-    fs22.rmSync(path24.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
+    fs23.rmSync(path25.join(projectDir, "composeApp", "build", "kspCaches"), { recursive: true, force: true });
     return await run();
   }
 }
 function detectAppPackage(projectDir) {
-  const spec = path24.join(projectDir, "create-cmp.json");
-  if (fs22.existsSync(spec)) {
+  const spec = path25.join(projectDir, "create-cmp.json");
+  if (fs23.existsSync(spec)) {
     try {
-      const pkg = JSON.parse(fs22.readFileSync(spec, "utf8")).package;
+      const pkg = JSON.parse(fs23.readFileSync(spec, "utf8")).package;
       if (pkg) return pkg;
     } catch {
     }
   }
-  const gradle = path24.join(projectDir, "composeApp", "build.gradle.kts");
-  if (fs22.existsSync(gradle)) {
-    const m = fs22.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
+  const gradle = path25.join(projectDir, "composeApp", "build.gradle.kts");
+  if (fs23.existsSync(gradle)) {
+    const m = fs23.readFileSync(gradle, "utf8").match(/namespace\s*=\s*"([^"]+)"/);
     if (m) return m[1];
   }
   throw new Error(
@@ -40203,11 +40304,11 @@ function applyConsoleCopy(projectDir) {
   }
 }
 function createPreviewService(opts) {
-  const projectDir = path24.resolve(opts.projectDir);
+  const projectDir = path25.resolve(opts.projectDir);
   applyConsoleCopy(projectDir);
   const appName = opts.appName || resolveAppName(projectDir);
-  const previewsDir = path24.join(projectDir, "composeApp", "build", "previews");
-  const srcDir = path24.join(projectDir, "composeApp", "src");
+  const previewsDir = path25.join(projectDir, "composeApp", "build", "previews");
+  const srcDir = path25.join(projectDir, "composeApp", "src");
   const log = opts.log || (() => {
   });
   const hot = opts.hot !== false;
@@ -40471,11 +40572,11 @@ function createPreviewService(opts) {
     return result;
   }
   async function getDesignSystemData() {
-    const catalogPath = path24.join(previewsDir, "design-system.json");
-    const sourcePath = path24.relative(projectDir, catalogPath).split(path24.sep).join("/");
-    if (fs22.existsSync(catalogPath)) {
+    const catalogPath = path25.join(previewsDir, "design-system.json");
+    const sourcePath = path25.relative(projectDir, catalogPath).split(path25.sep).join("/");
+    if (fs23.existsSync(catalogPath)) {
       try {
-        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs22.readFileSync(catalogPath, "utf8")) };
+        return { available: true, source: "previews", sourcePath, catalog: JSON.parse(fs23.readFileSync(catalogPath, "utf8")) };
       } catch (err) {
         log(`design-system.json at ${catalogPath} is not valid JSON (${err.message}) \u2014 trying a live session`);
       }
@@ -40501,26 +40602,26 @@ function createPreviewService(opts) {
         reason: "no current render to stash \u2014 call preview {projectDir} and wait for a render to complete first"
       };
     }
-    const variantDir = path24.join(previewsDir, "variants", name);
+    const variantDir = path25.join(previewsDir, "variants", name);
     try {
-      fs22.rmSync(variantDir, { recursive: true, force: true });
-      fs22.mkdirSync(variantDir, { recursive: true });
+      fs23.rmSync(variantDir, { recursive: true, force: true });
+      fs23.mkdirSync(variantDir, { recursive: true });
     } catch (err) {
       return { ok: false, reason: `could not prepare ${variantDir}: ${err && err.message ? err.message : err}` };
     }
     const screens = [];
     for (const { screen } of cards) {
-      const src = path24.join(previewsDir, screen.png);
-      if (!fs22.existsSync(src)) continue;
-      const dst = path24.join(variantDir, screen.png);
-      fs22.mkdirSync(path24.dirname(dst), { recursive: true });
-      fs22.copyFileSync(src, dst);
+      const src = path25.join(previewsDir, screen.png);
+      if (!fs23.existsSync(src)) continue;
+      const dst = path25.join(variantDir, screen.png);
+      fs23.mkdirSync(path25.dirname(dst), { recursive: true });
+      fs23.copyFileSync(src, dst);
       screens.push(screen.id);
     }
     let designSystemStashed = false;
-    const dsSrc = path24.join(previewsDir, "design-system.json");
-    if (fs22.existsSync(dsSrc)) {
-      fs22.copyFileSync(dsSrc, path24.join(variantDir, "design-system.json"));
+    const dsSrc = path25.join(previewsDir, "design-system.json");
+    if (fs23.existsSync(dsSrc)) {
+      fs23.copyFileSync(dsSrc, path25.join(variantDir, "design-system.json"));
       designSystemStashed = true;
     }
     touch("variant-snapshot");
@@ -40582,17 +40683,17 @@ function createPreviewService(opts) {
     }
   }
   function loadPreviews() {
-    const manifestPath = path24.join(previewsDir, "manifest.json");
-    const manifest = JSON.parse(fs22.readFileSync(manifestPath, "utf8"));
+    const manifestPath = path25.join(previewsDir, "manifest.json");
+    const manifest = JSON.parse(fs23.readFileSync(manifestPath, "utf8"));
     try {
-      lastRenderAt = fs22.statSync(manifestPath).mtimeMs;
+      lastRenderAt = fs23.statSync(manifestPath).mtimeMs;
     } catch {
       lastRenderAt = Date.now();
     }
     viewport = manifest.viewport;
     const trees = /* @__PURE__ */ new Map();
     cards = manifest.screens.map((screen) => {
-      const treeJson = fs22.readFileSync(path24.join(previewsDir, screen.tree), "utf8");
+      const treeJson = fs23.readFileSync(path25.join(previewsDir, screen.tree), "utf8");
       trees.set(screen.id, treeJson);
       const tree = JSON.parse(treeJson);
       const a11y = auditA11y(tree);
@@ -40629,8 +40730,8 @@ function createPreviewService(opts) {
       };
     }
     let catalog;
-    const catalogPath = path24.join(previewsDir, "design-system.json");
-    if (fs22.existsSync(catalogPath)) catalog = JSON.parse(fs22.readFileSync(catalogPath, "utf8"));
+    const catalogPath = path25.join(previewsDir, "design-system.json");
+    if (fs23.existsSync(catalogPath)) catalog = JSON.parse(fs23.readFileSync(catalogPath, "utf8"));
     return {
       ok: true,
       screen,
@@ -40647,10 +40748,10 @@ function createPreviewService(opts) {
   }
   function snapshotPngs() {
     for (const { screen } of cards) {
-      const src = path24.join(previewsDir, screen.png);
-      const dst = path24.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
+      const src = path25.join(previewsDir, screen.png);
+      const dst = path25.join(previewsDir, String(screen.png).replace(/screen\.png$/, "screen.prev.png"));
       try {
-        if (fs22.existsSync(src)) fs22.copyFileSync(src, dst);
+        if (fs23.existsSync(src)) fs23.copyFileSync(src, dst);
       } catch {
       }
     }
@@ -40681,8 +40782,8 @@ function createPreviewService(opts) {
     } catch {
       return false;
     }
-    const theirs = health && typeof health.previewsDir === "string" ? path24.resolve(health.previewsDir) : null;
-    if (theirs && theirs !== path24.resolve(previewsDir)) {
+    const theirs = health && typeof health.previewsDir === "string" ? path25.resolve(health.previewsDir) : null;
+    if (theirs && theirs !== path25.resolve(previewsDir)) {
       log(`a daemon is running on ${daemonUrl} but serves ${theirs} \u2014 not this project; staying on the gradle path`);
       return false;
     }
@@ -40789,9 +40890,9 @@ function createPreviewService(opts) {
   }
   function watchClasses() {
     if (classesWatcher) return;
-    const classesDir = path24.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
+    const classesDir = path25.join(projectDir, "composeApp", "build", "classes", "kotlin", "desktop", "main");
     try {
-      classesWatcher = fs22.watch(classesDir, { recursive: true }, () => {
+      classesWatcher = fs23.watch(classesDir, { recursive: true }, () => {
         touch("classes-change");
         scheduleRender(CLASSES_DEBOUNCE_MS);
       });
@@ -40987,13 +41088,13 @@ function createPreviewService(opts) {
     } catch {
     }
     try {
-      fs22.writeFileSync(
+      fs23.writeFileSync(
         consoleRegistryPath(projectDir),
         `${JSON.stringify({
           pid: process.ppid,
           port: handoffPort,
           url: `http://127.0.0.1:${handoffPort}/`,
-          projectDir: path24.resolve(projectDir),
+          projectDir: path25.resolve(projectDir),
           startedAt: (/* @__PURE__ */ new Date()).toISOString(),
           renewing: true,
           renewingAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -41020,7 +41121,7 @@ function createPreviewService(opts) {
     for (const dir of sourceRoots()) {
       try {
         selfWatchers.push(
-          fs22.watch(dir, { recursive: true }, (_event, filename) => {
+          fs23.watch(dir, { recursive: true }, (_event, filename) => {
             if (filename && !String(filename).endsWith(".mjs")) return;
             onSelfSourceChange();
           })
@@ -41033,7 +41134,7 @@ function createPreviewService(opts) {
   const IGNORE = /(^|[\\/])(build|\.gradle|\.idea|\.DS_Store)([\\/]|$)/;
   function startWatching() {
     try {
-      watcher = fs22.watch(srcDir, { recursive: true }, (_event, filename) => {
+      watcher = fs23.watch(srcDir, { recursive: true }, (_event, filename) => {
         if (filename && IGNORE.test(filename)) return;
         touch("src-change");
         clearTimeout(activityBroadcastTimer);
@@ -41119,18 +41220,18 @@ function createPreviewService(opts) {
   }
   function watchGovernance() {
     for (const w of GOVERNANCE_WATCHES) {
-      const abs = path24.join(projectDir, w.rel);
-      if (!fs22.existsSync(abs)) {
+      const abs = path25.join(projectDir, w.rel);
+      if (!fs23.existsSync(abs)) {
         if (!w.mkdir || !capabilities.screens) continue;
         try {
-          fs22.mkdirSync(abs, { recursive: true });
+          fs23.mkdirSync(abs, { recursive: true });
         } catch {
           continue;
         }
       }
       try {
-        const watcher2 = fs22.watch(abs, (_event, filename) => {
-          const base = filename ? path24.basename(filename) : "";
+        const watcher2 = fs23.watch(abs, (_event, filename) => {
+          const base = filename ? path25.basename(filename) : "";
           if (w.only && !w.only.has(base)) return;
           pendingGovernance.add(w.kind === "ledger" ? base === "comments.json" ? "comment" : "approval" : "governance");
           clearTimeout(governanceTimer);
@@ -41147,24 +41248,24 @@ function createPreviewService(opts) {
       if (sseClients.size === 0) return;
       broadcast(nowFrame(readStepStream(projectDir), event));
     });
-    if (stepTail.path) log(`watching the lane's step stream (${path24.relative(projectDir, stepTail.path)})`);
+    if (stepTail.path) log(`watching the lane's step stream (${path25.relative(projectDir, stepTail.path)})`);
   }
   function scanStamp() {
     let stamp = 0;
     (function walk2(dir) {
       let entries;
       try {
-        entries = fs22.readdirSync(dir, { withFileTypes: true });
+        entries = fs23.readdirSync(dir, { withFileTypes: true });
       } catch {
         return;
       }
       for (const e of entries) {
-        const p = path24.join(dir, e.name);
+        const p = path25.join(dir, e.name);
         if (IGNORE.test(p)) continue;
         if (e.isDirectory()) walk2(p);
         else {
           try {
-            stamp = Math.max(stamp, fs22.statSync(p).mtimeMs);
+            stamp = Math.max(stamp, fs23.statSync(p).mtimeMs);
           } catch {
           }
         }
@@ -41561,30 +41662,30 @@ function createPreviewService(opts) {
         return;
       }
       if (url2.pathname.startsWith("/walkthrough/")) {
-        const wtRoot = path24.join(projectDir, WALKTHROUGH_REL_DIR);
+        const wtRoot = path25.join(projectDir, WALKTHROUGH_REL_DIR);
         const rel = decodeURIComponent(url2.pathname.slice("/walkthrough/".length));
-        const file2 = path24.normalize(path24.join(wtRoot, rel));
-        if (!file2.startsWith(wtRoot) || !fs22.existsSync(file2) || !fs22.statSync(file2).isFile()) {
+        const file2 = path25.normalize(path25.join(wtRoot, rel));
+        if (!file2.startsWith(wtRoot) || !fs23.existsSync(file2) || !fs23.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".html") ? "text/html; charset=utf-8" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs22.createReadStream(file2).pipe(res);
+        fs23.createReadStream(file2).pipe(res);
         return;
       }
       if (url2.pathname.startsWith("/previews/")) {
         const rel = decodeURIComponent(url2.pathname.slice("/previews/".length));
-        const file2 = path24.normalize(path24.join(previewsDir, rel));
-        if (!file2.startsWith(previewsDir) || !fs22.existsSync(file2) || !fs22.statSync(file2).isFile()) {
+        const file2 = path25.normalize(path25.join(previewsDir, rel));
+        if (!file2.startsWith(previewsDir) || !fs23.existsSync(file2) || !fs23.statSync(file2).isFile()) {
           res.writeHead(404);
           res.end("not found");
           return;
         }
         const type = file2.endsWith(".png") ? "image/png" : file2.endsWith(".json") ? "application/json" : file2.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream";
         res.writeHead(200, { "content-type": type });
-        fs22.createReadStream(file2).pipe(res);
+        fs23.createReadStream(file2).pipe(res);
         return;
       }
       res.writeHead(404);
@@ -41677,8 +41778,8 @@ function createPreviewService(opts) {
         a11yPass: a11y.pass,
         a11yViolations: a11y.violations.length,
         lastChangedVersion: changedAt.get(screen.id) ?? null,
-        tree: path24.join(previewsDir, screen.tree),
-        png: path24.join(previewsDir, screen.png)
+        tree: path25.join(previewsDir, screen.tree),
+        png: path25.join(previewsDir, screen.png)
       }))
     };
   }
@@ -41705,7 +41806,7 @@ function createPreviewService(opts) {
           throw err;
         }
       }
-      if (capabilities.screens && fs22.existsSync(path24.join(previewsDir, "manifest.json"))) {
+      if (capabilities.screens && fs23.existsSync(path25.join(previewsDir, "manifest.json"))) {
         loadPreviews();
       }
       await listen(opts.port ?? DEFAULT_PORT2);
@@ -41845,7 +41946,7 @@ async function gitChangedFiles(cwd) {
     return [];
   }
 }
-var SERVER_VERSION = true ? "0.12.0" : JSON.parse(readFileSync4(new URL("../package.json", import.meta.url), "utf8")).version;
+var SERVER_VERSION = true ? "0.13.0" : JSON.parse(readFileSync4(new URL("../package.json", import.meta.url), "utf8")).version;
 var server = new McpServer({
   name: "cmp-inspector",
   version: SERVER_VERSION

@@ -48,6 +48,7 @@ import { evaluateAuditCadence } from "../../audit-cadence.mjs";
 import { androidChecksOutcome } from "./android-checks.mjs";
 import { deviceLogIncidents, maestroOutcome, parseMaestroJunit } from "./maestro.mjs";
 import { ensureDevice, releaseDevice } from "./device-provider.mjs";
+import { readPin } from "./device-pin.mjs";
 import { checkHarnessIntegrity, describeIntegrity, LOCK_PATH } from "../../harness-lock.mjs";
 import { stepDisplayName } from "../../lane-runner.mjs";
 import { CMP_LADDER } from "./ladder.mjs";
@@ -254,7 +255,7 @@ function deviceRow(stepName, d) {
 /** null when the lane has a device; otherwise the row the step returns verbatim. */
 function ensureLaneDevice(stepName) {
   if (!laneDevice) {
-    laneDevice = ensureDevice({ sh, log: (line) => console.error(`· ${line}`) });
+    laneDevice = ensureDevice({ sh, log: (line) => console.error(`· ${line}`), pin: readPin({ cwd: ROOT }) });
     if (laneDevice.ok && laneDevice.booted) {
       console.error(`· booted ${laneDevice.avd} headless (${laneDevice.serial}) in ${Math.round(laneDevice.bootMs / 1000)} s — shut down when the lane exits (CMP_KEEP_DEVICE=1 keeps it)`);
     }
